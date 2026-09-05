@@ -3,7 +3,7 @@ import type { CanvasDocument, CanvasNode } from '../types/document';
 
 function describe(node: CanvasNode, depth = 0): string[] {
   const pad = '  '.repeat(depth);
-  const common = `${pad}- ${node.kind}`;
+  const common = `${pad}- ${node.kind}${node.glass ? ` / glass=${node.glass}` : ''}`;
   switch (node.kind) {
     case 'text':
       return [`${common}: ${node.text} / ${node.fontSize}pt / ${node.weight}`];

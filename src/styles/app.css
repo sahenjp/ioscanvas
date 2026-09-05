@@ -68,11 +68,15 @@ button { color: inherit; }
 .canvas-node:hover { outline-color: rgba(10,132,255,.35); }
 .canvas-node.is-selected { outline: 2px solid var(--blue); }
 .canvas-node.is-drop-target { outline: 2px dashed var(--blue); background: rgba(10,132,255,.08); }
+.canvas-node.glass-regular, .canvas-node.glass-clear { padding: 6px; border: 1px solid rgba(255,255,255,.55); border-radius: 16px; background: rgba(255,255,255,.34); backdrop-filter: blur(16px) saturate(1.15); }
+.canvas-node.glass-clear { background: rgba(255,255,255,.18); }
 .canvas-text { display: block; width: 100%; padding: 2px 0; color: #111; text-align: left; line-height: 1.22; }
 .ios-image { min-height: 44px; display: flex; align-items: center; gap: 9px; padding: 8px 12px; border: 1px solid #d4d4d7; border-radius: 10px; background: #fff; color: #555; font-size: 12px; }
 .ios-image-symbol { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 7px; background: #e8e8ed; color: #555; font-size: 17px; }
 .ios-button { width: 100%; border: 0; border-radius: 11px; padding: 8px 14px; background: #0a84ff; color: #fff; font-weight: 600; cursor: default; }
 .ios-button.destructive { background: #ff3b30; }
+.ios-button.ios-button-regular, .ios-button.ios-button-clear { border: 1px solid rgba(255,255,255,.72); background: rgba(255,255,255,.42); color: #111; backdrop-filter: blur(16px) saturate(1.15); }
+.ios-button.ios-button-clear { background: rgba(255,255,255,.2); }
 .ios-row { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 0 13px; border: 0; border-radius: 10px; background: #fff; color: #111; text-align: left; cursor: default; }
 .ios-switch { width: 51px; height: 31px; padding: 2px; border-radius: 19px; background: #34c759; }
 .ios-switch span { display: block; width: 27px; height: 27px; margin-left: 20px; border-radius: 50%; background: white; box-shadow: 0 1px 3px rgba(0,0,0,.25); }

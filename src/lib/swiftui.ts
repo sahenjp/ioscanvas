@@ -31,6 +31,17 @@ function swiftIdentifier(value: string, fallback: string): string {
 }
 
 function renderNode(node: CanvasNode, depth: number, bindings: Map<string, BindingInfo>): string {
+  const rendered = renderNodeContent(node, depth, bindings);
+  if (!node.glass) return rendered;
+
+  const pad = indent(depth);
+  const modifier = node.kind === 'button' && node.glass === 'regular'
+    ? '.buttonStyle(.glass)'
+    : `.glassEffect(.${node.glass})`;
+  return `${rendered}\n${pad}${modifier}`;
+}
+
+function renderNodeContent(node: CanvasNode, depth: number, bindings: Map<string, BindingInfo>): string {
   const pad = indent(depth);
 
   switch (node.kind) {

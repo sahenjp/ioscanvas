@@ -4,9 +4,13 @@ import { parseCanvasDocument } from '../lib/document';
 
 describe('project document parsing', () => {
   it('accepts a valid exported document without unknown fields', () => {
-    const parsed = parseCanvasDocument(structuredClone(defaultDocument));
+    const document = structuredClone(defaultDocument);
+    const text = document.screens[0]?.root.children[0];
+    if (!text) throw new Error('Fixture node missing');
+    text.glass = 'regular';
+    const parsed = parseCanvasDocument(document);
 
-    expect(parsed).toEqual(defaultDocument);
+    expect(parsed).toEqual(document);
   });
 
   it('rejects malformed or duplicate node IDs', () => {

@@ -11,12 +11,14 @@ export type NodeKind =
   | 'spacer';
 
 export type ButtonRole = 'normal' | 'destructive' | 'cancel';
+export type GlassStyle = 'regular' | 'clear';
 
 export interface BaseNode {
   id: string;
   kind: NodeKind;
   label?: string;
   children?: CanvasNode[];
+  glass?: GlassStyle;
 }
 
 export interface TextNode extends BaseNode {

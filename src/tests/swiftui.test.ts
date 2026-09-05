@@ -65,4 +65,20 @@ describe('SwiftUI generator', () => {
     expect(output).toContain('.accessibilityLabel("Profile")');
     expect(output).not.toContain('..accessibilityLabel');
   });
+
+  it('exports Liquid Glass using iOS 26 SwiftUI APIs', () => {
+    const document = structuredClone(defaultDocument);
+    const screen = document.screens[0];
+    if (!screen) throw new Error('Fixture screen missing');
+    const text = screen.root.children.find((node) => node.kind === 'text');
+    const button = screen.root.children.find((node) => node.kind === 'button');
+    if (!text || text.kind !== 'text' || !button || button.kind !== 'button') throw new Error('Fixture nodes missing');
+    text.glass = 'clear';
+    button.glass = 'regular';
+
+    const output = generateSwiftUI(document);
+
+    expect(output).toContain('.glassEffect(.clear)');
+    expect(output).toContain('.buttonStyle(.glass)');
+  });
 });

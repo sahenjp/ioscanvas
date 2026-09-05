@@ -25,6 +25,7 @@ function NodeView({ node, allNodes }: { node: CanvasNode; allNodes: CanvasNode[]
   const moveNode = useEditorStore((state) => state.moveNode);
   const [isDropTarget, setIsDropTarget] = useState(false);
   const selected = selectedNodeId === node.id;
+  const glassClass = node.glass && node.kind !== 'button' ? `glass-${node.glass}` : '';
 
   const select = (event: React.MouseEvent) => {
     event.stopPropagation();
@@ -88,7 +89,7 @@ function NodeView({ node, allNodes }: { node: CanvasNode; allNodes: CanvasNode[]
 
   return (
     <div
-      className={`canvas-node ${selected ? 'is-selected' : ''} ${isDropTarget ? 'is-drop-target' : ''}`}
+      className={`canvas-node ${glassClass} ${selected ? 'is-selected' : ''} ${isDropTarget ? 'is-drop-target' : ''}`}
       draggable
       onClick={select}
       onDragEnd={() => setIsDropTarget(false)}
@@ -120,7 +121,7 @@ function renderNodeContent(node: CanvasNode, allNodes: CanvasNode[]): React.Reac
       );
     case 'button':
       return (
-        <button type="button" className={`ios-button ${node.role === 'destructive' ? 'destructive' : ''}`} style={{ minHeight: node.minHeight }}>
+        <button type="button" className={`ios-button ${node.role === 'destructive' ? 'destructive' : ''} ${node.glass ? `ios-button-${node.glass}` : ''}`} style={{ minHeight: node.minHeight }}>
           {node.label || 'Button'}
         </button>
       );

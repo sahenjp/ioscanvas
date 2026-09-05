@@ -1,7 +1,7 @@
 import { findNode } from '../lib/nodes';
 import { lintDocument } from '../lib/hig';
 import { useEditorStore } from '../store/editor';
-import type { CanvasNode } from '../types/document';
+import type { CanvasNode, GlassStyle } from '../types/document';
 
 export function Inspector() {
   const document = useEditorStore((state) => state.document);
@@ -38,6 +38,16 @@ export function Inspector() {
         <div className="inspector-scroll">
           <section className="inspector-section">
             <div className="inspector-kind">{node.kind}</div>
+            <Field label="Glass">
+              <select
+                value={node.glass ?? 'none'}
+                onChange={(event) => updateSelectedNode({ glass: event.target.value === 'none' ? undefined : event.target.value as GlassStyle } as Partial<CanvasNode>)}
+              >
+                <option value="none">Default</option>
+                <option value="regular">Liquid Glass</option>
+                <option value="clear">Clear Glass</option>
+              </select>
+            </Field>
             {'text' in node && node.kind === 'text' && (
               <Field label="Text">
                 <input value={node.text} onChange={(event) => updateSelectedNode({ text: event.target.value } as Partial<CanvasNode>)} />

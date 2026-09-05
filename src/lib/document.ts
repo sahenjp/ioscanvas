@@ -1,5 +1,5 @@
 import { isContainerNode } from './nodes';
-import type { CanvasDocument, CanvasNode, CanvasScreen, NodeKind } from '../types/document';
+import type { CanvasDocument, CanvasNode, CanvasScreen, GlassStyle, NodeKind } from '../types/document';
 
 type RecordValue = Record<string, unknown>;
 
@@ -19,35 +19,43 @@ function isOneOf<T extends string>(value: unknown, values: readonly T[]): value 
   return typeof value === 'string' && values.includes(value as T);
 }
 
+function readGlass(value: unknown): GlassStyle | null | undefined {
+  if (value === undefined) return undefined;
+  return isOneOf(value, ['regular', 'clear']) ? value : null;
+}
+
 function readNode(value: unknown, ids: Set<string>): CanvasNode | null {
   if (!isRecord(value) || !isString(value.id) || !isString(value.kind) || ids.has(value.id)) return null;
   ids.add(value.id);
+  const glass = readGlass(value.glass);
+  if (glass === null) return null;
+  const glassProperties = glass === undefined ? {} : { glass };
 
   switch (value.kind as NodeKind) {
     case 'text':
       return isString(value.text) && isNumber(value.fontSize) && isOneOf(value.weight, ['regular', 'medium', 'semibold', 'bold'])
-        ? { id: value.id, kind: 'text', text: value.text, fontSize: value.fontSize, weight: value.weight }
+        ? { id: value.id, kind: 'text', text: value.text, fontSize: value.fontSize, weight: value.weight, ...glassProperties }
         : null;
     case 'button':
       return isString(value.label) && isOneOf(value.role, ['normal', 'destructive', 'cancel']) && isNumber(value.minHeight)
-        ? { id: value.id, kind: 'button', label: value.label, role: value.role, minHeight: value.minHeight }
+        ? { id: value.id, kind: 'button', label: value.label, role: value.role, minHeight: value.minHeight, ...glassProperties }
         : null;
     case 'toggle':
       return isString(value.label) && isString(value.binding) && isNumber(value.minHeight)
-        ? { id: value.id, kind: 'toggle', label: value.label, binding: value.binding, minHeight: value.minHeight }
+        ? { id: value.id, kind: 'toggle', label: value.label, binding: value.binding, minHeight: value.minHeight, ...glassProperties }
         : null;
     case 'textfield':
       return isString(value.label) && isString(value.binding) && isNumber(value.minHeight)
-        ? { id: value.id, kind: 'textfield', label: value.label, binding: value.binding, minHeight: value.minHeight }
+        ? { id: value.id, kind: 'textfield', label: value.label, binding: value.binding, minHeight: value.minHeight, ...glassProperties }
         : null;
     case 'image':
       return isString(value.systemName) && isString(value.accessibilityLabel)
-        ? { id: value.id, kind: 'image', systemName: value.systemName, accessibilityLabel: value.accessibilityLabel }
+        ? { id: value.id, kind: 'image', systemName: value.systemName, accessibilityLabel: value.accessibilityLabel, ...glassProperties }
         : null;
     case 'divider':
-      return { id: value.id, kind: 'divider' };
+      return { id: value.id, kind: 'divider', ...glassProperties };
     case 'spacer':
-      return { id: value.id, kind: 'spacer' };
+      return { id: value.id, kind: 'spacer', ...glassProperties };
     case 'vstack':
     case 'hstack':
     case 'section': {
@@ -59,6 +67,7 @@ function readNode(value: unknown, ids: Set<string>): CanvasNode | null {
       return {
         id: value.id,
         kind: value.kind,
+        ...glassProperties,
         ...(value.spacing === undefined ? {} : { spacing: value.spacing }),
         ...(value.title === undefined ? {} : { title: value.title }),
         children: children as CanvasNode[],
