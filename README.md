@@ -1,35 +1,45 @@
 # ioscanvas
 
-Visual interface composition for SwiftUI.
+A browser-based canvas for composing iOS-style interfaces as a semantic SwiftUI-like tree, checking basic Human Interface Guidelines constraints, and exporting implementation-ready SwiftUI.
 
-The editor treats an interface as a structured SwiftUI-oriented document instead of a loose screenshot. Compose a screen, inspect its semantic tree, catch obvious Apple HIG issues, then export SwiftUI or a precise implementation prompt for a coding agent.
+## What it does
 
-> Status: early prototype. The current build proves the document model → preview → HIG lint → SwiftUI/prompt export loop. It is not yet a production UI builder.
+- Build screens from semantic UI nodes instead of freeform coordinates.
+- Preview iPhone-style layouts in the browser.
+- Edit properties from an inspector.
+- Run lightweight HIG checks such as minimum tap-target sizing.
+- Export SwiftUI code from the document tree.
+- Export a structured implementation prompt when needed.
+- Persist the current document locally in the browser.
 
-## Why
+## Current component set
 
-Visual UI tools often optimize for pixels first and leave implementation semantics to guesswork. This approach does the opposite: the editor stores layout and controls as a small typed tree so the generated implementation can preserve intent.
+The first prototype includes a small set of primitives such as:
 
-The first milestone intentionally stays narrow:
+- Text
+- Button
+- Toggle
+- TextField
+- VStack
+- HStack
+- Section
 
-- SwiftUI-oriented node tree
-- iPhone screen preview
-- editable text, buttons, toggles, text fields, stacks and sections
-- basic HIG linting
-- SwiftUI export
-- coding-agent prompt export
-- local persistence
+The intent is to keep the model close to SwiftUI rather than reproduce a generic absolute-position design tool.
 
-## Inspiration
+## Architecture
 
-This project was inspired by **M3E Canvas by lnkiai**, a browser tool for sketching Material 3 Expressive screens and turning them into prompts for coding tools:
+```text
+CanvasDocument
+├── Screen[]
+│   └── CanvasNode[]
+│       └── children[]
+├── preview
+├── HIG checks
+├── SwiftUI generator
+└── prompt generator
+```
 
-- https://github.com/lnkiai/m3e-canvas
-- https://lnkiai.github.io/m3e-canvas/
-
-M3E Canvas is MIT licensed. This is an independent implementation for SwiftUI and Apple-platform semantics. No M3E Canvas source code is copied into this prototype.
-
-Thank you to lnkiai for the original idea and for publishing the project openly.
+The document tree is the source of truth for editing, previewing, validation, and export.
 
 ## Development
 
@@ -38,7 +48,7 @@ npm install
 npm run dev
 ```
 
-Checks:
+Useful checks:
 
 ```bash
 npm run test
@@ -46,69 +56,14 @@ npm run lint
 npm run build
 ```
 
-## Architecture
+## Inspiration
 
-```text
-CanvasDocument
-└── CanvasScreen[]
-    └── root: VStack
-        └── CanvasNode[]
-            ├── Text
-            ├── Button
-            ├── Toggle
-            ├── TextField
-            ├── Section
-            ├── VStack / HStack
-            ├── Divider
-            └── Spacer
+This project was inspired by **M3E Canvas by lnkiai** and explores a similar design-to-implementation workflow for SwiftUI and iOS-oriented interfaces.
 
-CanvasDocument
-├── browser preview
-├── HIG linter
-├── SwiftUI generator
-└── implementation-prompt generator
-```
+It is an independent implementation. No M3E Canvas source code is currently copied into this repository.
 
-The document model is the source of truth. The canvas is a view of that model, not the model itself.
+See [`ACKNOWLEDGEMENTS.md`](./ACKNOWLEDGEMENTS.md) for attribution details.
 
-## Design constraints
+## Status
 
-- Prefer native SwiftUI semantics over reproducing Apple UI with custom web/CSS concepts.
-- Do not bundle or redistribute Apple font files or exported SF Symbols assets.
-- Generated SwiftUI may reference system-provided symbols and components through Apple APIs.
-- Keep the editor visually restrained: this is a tool, not a marketing dashboard.
-- Accessibility warnings should be actionable and traceable to a document node.
-
-## Roadmap
-
-### 0.1 — editor loop
-
-Current prototype.
-
-### 0.2 — real composition
-
-- drag from palette and reorder nodes
-- drop into stacks and sections
-- undo / redo
-- document tree panel
-- multiple screens
-- navigation links / sheets / tabs
-
-### 0.3 — Apple-aware preview
-
-- light / dark appearance
-- Dynamic Type sizes
-- iPhone / iPad presets
-- safe-area visualization
-- richer HIG checks
-
-### 0.4 — generation
-
-- deterministic SwiftUI formatting
-- navigation/state generation
-- JSON document import/export
-- optional project template export
-
-## Attribution policy
-
-If the public project continues to draw from M3E Canvas at the concept level, keep the Inspiration section visible in the README and launch post. If source code is ever reused, preserve the relevant MIT copyright and license notice as required by that source.
+Early prototype. The editor model, preview, basic inspector, lightweight HIG checks, and SwiftUI export are present; interaction design and component coverage are still limited.
