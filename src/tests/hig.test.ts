@@ -44,4 +44,17 @@ describe('HIG linter', () => {
       ]),
     );
   });
+
+  it('flags a screen with no navigation title', () => {
+    const document = structuredClone(defaultDocument);
+    const screen = document.screens[0];
+    if (!screen) throw new Error('Fixture screen missing');
+    screen.navigationTitle = '  ';
+
+    expect(lintDocument(document)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ nodeId: screen.root.id, code: 'NAVIGATION_STRUCTURE' }),
+      ]),
+    );
+  });
 });

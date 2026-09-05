@@ -166,7 +166,12 @@ export function moveNode(
 ): CanvasNode[] {
   const source = findNodeLocation(nodes, nodeId);
   const target = parentId === null ? undefined : findNode(nodes, parentId);
-  if (!source || (target && !isContainerNode(target)) || (target && findNode(source.node.children ?? [], target.id))) {
+  if (
+    !source
+    || nodeId === parentId
+    || (target && !isContainerNode(target))
+    || (target && findNode(source.node.children ?? [], target.id))
+  ) {
     return nodes;
   }
 

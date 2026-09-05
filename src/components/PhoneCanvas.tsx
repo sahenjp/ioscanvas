@@ -63,18 +63,22 @@ function NodeView({ node, allNodes }: { node: CanvasNode; allNodes: CanvasNode[]
     const location = findNodeLocation(allNodes, node.id);
     if (!location) return;
     const rect = event.currentTarget.getBoundingClientRect();
-    const edge = Math.min(28, rect.height / 3);
+    const horizontal = node.kind === 'hstack';
+    const pointer = horizontal ? event.clientX : event.clientY;
+    const start = horizontal ? rect.left : rect.top;
+    const size = horizontal ? rect.width : rect.height;
+    const edge = Math.min(28, size / 3);
     const insideContainer = isContainerNode(node)
       && data.kind === 'move'
-      && event.clientY > rect.top + edge
-      && event.clientY < rect.bottom - edge;
+      && pointer > start + edge
+      && pointer < start + size - edge;
 
     if (insideContainer) {
       moveNode(data.nodeId, node.id, node.children.length);
       return;
     }
 
-    const insertBefore = event.clientY < rect.top + rect.height / 2;
+    const insertBefore = pointer < start + size / 2;
     const index = location.index + (insertBefore ? 0 : 1);
     if (data.kind === 'new') addNode(data.nodeKind, location.parentId, index);
     else moveNode(data.nodeId, location.parentId, index);

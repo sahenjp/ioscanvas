@@ -34,7 +34,7 @@ export function Inspector() {
             {node.kind === 'text' && (
               <>
                 <Field label="Size">
-                  <input type="number" min="8" max="72" value={node.fontSize} onChange={(event) => updateSelectedNode({ fontSize: Number(event.target.value) } as Partial<CanvasNode>)} />
+                  <input type="number" min="8" max="72" value={node.fontSize} onChange={(event) => updateSelectedNode({ fontSize: numericValue(event.target.value, node.fontSize, 8, 72) } as Partial<CanvasNode>)} />
                 </Field>
                 <Field label="Weight">
                   <select value={node.weight} onChange={(event) => updateSelectedNode({ weight: event.target.value as typeof node.weight } as Partial<CanvasNode>)}>
@@ -48,7 +48,7 @@ export function Inspector() {
             )}
             {(node.kind === 'button' || node.kind === 'toggle' || node.kind === 'textfield') && (
               <Field label="Min height">
-                <div className="input-with-unit"><input type="number" min="20" max="120" value={node.minHeight} onChange={(event) => updateSelectedNode({ minHeight: Number(event.target.value) } as Partial<CanvasNode>)} /><span>pt</span></div>
+                <div className="input-with-unit"><input type="number" min="20" max="120" value={node.minHeight} onChange={(event) => updateSelectedNode({ minHeight: numericValue(event.target.value, node.minHeight, 20, 120) } as Partial<CanvasNode>)} /><span>pt</span></div>
               </Field>
             )}
             {(node.kind === 'toggle' || node.kind === 'textfield') && (
@@ -72,7 +72,7 @@ export function Inspector() {
             )}
             {(node.kind === 'vstack' || node.kind === 'hstack') && (
               <Field label="Spacing">
-                <input type="number" min="0" max="64" value={node.spacing ?? 0} onChange={(event) => updateSelectedNode({ spacing: Number(event.target.value) } as Partial<CanvasNode>)} />
+                <input type="number" min="0" max="64" value={node.spacing ?? 0} onChange={(event) => updateSelectedNode({ spacing: numericValue(event.target.value, node.spacing ?? 0, 0, 64) } as Partial<CanvasNode>)} />
               </Field>
             )}
           </section>
@@ -95,4 +95,9 @@ export function Inspector() {
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return <label className="field"><span>{label}</span>{children}</label>;
+}
+
+function numericValue(raw: string, fallback: number, min: number, max: number): number {
+  const value = Number(raw);
+  return Number.isFinite(value) ? Math.min(max, Math.max(min, value)) : fallback;
 }

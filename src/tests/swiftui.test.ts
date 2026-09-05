@@ -30,4 +30,21 @@ describe('SwiftUI generator', () => {
     expect(output).toContain('text: $_1_user_name');
     expect(output).toContain('relativeTo: .body');
   });
+
+  it('keeps Boolean and String bindings separate when names collide', () => {
+    const document = structuredClone(defaultDocument);
+    const screen = document.screens[0];
+    if (!screen) throw new Error('Fixture screen missing');
+    screen.root.children.push(
+      { id: 'toggle-shared', kind: 'toggle', label: 'Enabled', binding: 'shared', minHeight: 44 },
+      { id: 'field-shared', kind: 'textfield', label: 'Name', binding: 'shared', minHeight: 44 },
+    );
+
+    const output = generateSwiftUI(document);
+
+    expect(output).toContain('@State private var shared: Bool = false');
+    expect(output).toContain('@State private var shared2: String = ""');
+    expect(output).toContain('isOn: $shared');
+    expect(output).toContain('text: $shared2');
+  });
 });

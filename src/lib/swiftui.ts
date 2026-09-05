@@ -9,12 +9,19 @@ const swiftKeywords = new Set([
   'break', 'case', 'catch', 'continue', 'default', 'defer', 'do', 'else', 'fallthrough',
   'for', 'guard', 'if', 'in', 'repeat', 'return', 'throw', 'switch', 'where', 'while',
   'as', 'false', 'is', 'nil', 'self', 'Self', 'super', 'throws', 'true', 'try',
-  'Any', 'Protocol', 'Type', 'some', 'unowned', 'weak',
+  'Any', 'Protocol', 'Type', 'some', 'unowned', 'weak', 'actor', 'async', 'await',
+  'borrowing', 'consume', 'convenience', 'distributed', 'dynamic', 'each', 'final',
+  'indirect', 'isolated', 'macro', 'mutating', 'nonisolated', 'package', 'required',
+  'sending',
 ]);
 
 interface BindingInfo {
   name: string;
   type: 'Bool' | 'String';
+}
+
+function bindingKey(node: Extract<CanvasNode, { kind: 'toggle' | 'textfield' }>): string {
+  return `${node.kind === 'toggle' ? 'Bool' : 'String'}:${node.binding}`;
 }
 
 function swiftIdentifier(value: string, fallback: string): string {
@@ -36,9 +43,9 @@ function renderNode(node: CanvasNode, depth: number, bindings: Map<string, Bindi
       return `${pad}Button(${quoted(node.label)}${role}) {\n${pad}    // Action\n${pad}}\n${pad}.frame(minHeight: ${node.minHeight})`;
     }
     case 'toggle':
-      return `${pad}Toggle(${quoted(node.label)}, isOn: $${bindings.get(node.binding)?.name ?? swiftIdentifier(node.binding, 'isEnabled')})\n${pad}    .frame(minHeight: ${node.minHeight})`;
+      return `${pad}Toggle(${quoted(node.label)}, isOn: $${bindings.get(bindingKey(node))?.name ?? swiftIdentifier(node.binding, 'isEnabled')})\n${pad}    .frame(minHeight: ${node.minHeight})`;
     case 'textfield':
-      return `${pad}TextField(${quoted(node.label)}, text: $${bindings.get(node.binding)?.name ?? swiftIdentifier(node.binding, 'value')})\n${pad}    .textFieldStyle(.roundedBorder)\n${pad}    .frame(minHeight: ${node.minHeight})`;
+      return `${pad}TextField(${quoted(node.label)}, text: $${bindings.get(bindingKey(node))?.name ?? swiftIdentifier(node.binding, 'value')})\n${pad}    .textFieldStyle(.roundedBorder)\n${pad}    .frame(minHeight: ${node.minHeight})`;
     case 'divider':
       return `${pad}Divider()`;
     case 'spacer':
@@ -63,14 +70,15 @@ function collectBindings(
 ): Map<string, BindingInfo> {
   for (const node of nodes) {
     if (node.kind === 'toggle' || node.kind === 'textfield') {
-      if (!result.has(node.binding)) {
+      const key = bindingKey(node);
+      if (!result.has(key)) {
         const type = node.kind === 'toggle' ? 'Bool' : 'String';
         const base = swiftIdentifier(node.binding, `value_${swiftIdentifier(node.id, 'node')}`);
         let name = base;
         let suffix = 2;
         while (usedNames.has(name)) name = `${base}${suffix++}`;
         usedNames.add(name);
-        result.set(node.binding, { name, type });
+        result.set(key, { name, type });
       }
     }
     if (node.children) collectBindings(node.children, result, usedNames);

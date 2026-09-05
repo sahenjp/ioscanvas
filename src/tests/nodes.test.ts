@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createNode, findNode, moveNode } from '../lib/nodes';
+import { createNode, findNode, isContainerNode, moveNode } from '../lib/nodes';
 import type { CanvasNode } from '../types/document';
 
 describe('semantic node tree operations', () => {
@@ -27,5 +27,14 @@ describe('semantic node tree operations', () => {
     parent.children.push(child);
 
     expect(moveNode([parent], parent.id, child.id)).toEqual([parent]);
+  });
+
+  it('does not remove a node when it is dropped onto itself', () => {
+    const stack = createNode('vstack');
+    const text = createNode('text');
+    if (!isContainerNode(stack)) throw new Error('Fixture stack missing children');
+    stack.children.push(text);
+
+    expect(moveNode([stack], stack.id, stack.id)).toEqual([stack]);
   });
 });

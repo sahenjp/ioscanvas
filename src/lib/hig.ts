@@ -101,6 +101,14 @@ function lintNode(node: CanvasNode, issues: LintIssue[]): void {
 export function lintDocument(document: CanvasDocument): LintIssue[] {
   const issues: LintIssue[] = [];
   for (const screen of document.screens) {
+    if (screen.navigationTitle.trim().length === 0) {
+      issues.push({
+        nodeId: screen.root.id,
+        severity: 'warning',
+        code: 'NAVIGATION_STRUCTURE',
+        message: 'NavigationStackのタイトルが空です。画面の階層と目的が伝わるタイトルを設定してください。',
+      });
+    }
     screen.root.children.forEach((node) => lintNode(node, issues));
   }
   return issues;
