@@ -58,6 +58,18 @@ npm run lint
 npm run build
 ```
 
+The repository also contains an iOS SwiftUI target under [`ios/`](./ios), built with [xtool](https://github.com/xtool-org/xtool):
+
+```bash
+npm run build:ios
+```
+
+The first xtool build requires Swift, an iOS Swift SDK, and the one-time xtool setup described in its documentation. `npm run build:all` runs both the browser build and the xtool iOS build.
+
+## Versioning
+
+The project follows Semantic Versioning. The current release line is `1.0.0`.
+
 ## Inspiration
 
 This project was inspired by **M3E Canvas by lnkiai** and explores a similar design-to-implementation workflow for SwiftUI and iOS-oriented interfaces.
@@ -68,4 +80,4 @@ See [`ACKNOWLEDGEMENTS.md`](./ACKNOWLEDGEMENTS.md) for attribution details.
 
 ## Status
 
-Early prototype. The semantic editor, nested drag-and-drop, structure tree, inspector, HIG checks, history controls, and SwiftUI export are present; component coverage is still limited.
+Version 1.0.0 baseline. The semantic editor, nested drag-and-drop, structure tree, inspector, HIG checks, history controls, SwiftUI export, and an xtool SwiftUI target are present; component coverage is still limited.

@@ -4,3 +4,7 @@ dist
 *.local
 .vscode/
 .idea/
+ios/.build/
+ios/xtool/
+ios/Packages/
+ios/DerivedData/
