@@ -13,7 +13,7 @@ describe('SwiftUI generator', () => {
 
   it('keeps generated Swift identifiers valid', () => {
     const document = structuredClone(defaultDocument);
-    const screen = document.screens[0];
+    const screen = document.screens[0]!;
     screen.name = '123 Login';
     screen.root.children.push(
       { id: 'toggle-test', kind: 'toggle', label: 'Enabled', binding: 'class', minHeight: 44 },
