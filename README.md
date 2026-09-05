@@ -13,7 +13,9 @@ A browser-based canvas for composing iOS-style interfaces as a semantic SwiftUI-
 - Save and open validated `.ioscanvas.json` project files.
 - Opt into iOS 26 Liquid Glass styles from the Inspector and export the corresponding SwiftUI modifiers.
 - Add, duplicate, switch, and remove screens, then inspect them in a read-only Preview mode.
+- Follow NavigationLink transitions directly in Preview to check the screen flow.
 - Use a Layers / Components library with component filtering, canvas zoom, and grid visibility controls.
+- Compose native `List`, `Form`, and `NavigationLink` patterns across screens, then export the linked SwiftUI views together.
 - Run lightweight HIG checks such as minimum tap-target sizing.
 - Export SwiftUI code from the document tree.
 - Export a structured implementation prompt when needed.
@@ -31,8 +33,11 @@ The first prototype includes a small set of primitives such as:
 - VStack
 - HStack
 - Section
+- List
+- Form
+- NavigationLink
 
-The intent is to keep the model close to SwiftUI rather than reproduce a generic absolute-position design tool. The preview uses a fixed `NavigationStack` → `ScrollView` screen scaffold; the editable document tree starts at the screen's content `VStack`.
+The intent is to keep the model close to SwiftUI rather than reproduce a generic absolute-position design tool. Screens use a `NavigationStack` scaffold, while direct `List` and `Form` roots keep their native scrolling behavior; the editable document tree starts at the screen's content `VStack`.
 
 ## Architecture
 
@@ -74,7 +79,7 @@ The first xtool build requires Swift, an iOS Swift SDK, and the one-time xtool s
 
 ## Versioning
 
-The project follows Semantic Versioning. The current release line is `1.3.0`.
+The project follows Semantic Versioning. The current release line is `1.4.0`.
 
 ## Inspiration
 
@@ -86,4 +91,4 @@ See [`ACKNOWLEDGEMENTS.md`](./ACKNOWLEDGEMENTS.md) for attribution details.
 
 ## Status
 
-Version 1.3.0. The semantic editor, multi-screen workspace, nested drag-and-drop, structure tree, inspector, Preview mode, history controls, project files, SF Symbol images, Liquid Glass styles, HIG checks, SwiftUI export, and an xtool SwiftUI target are present; component coverage is still limited.
+Version 1.4.0. The semantic editor, multi-screen workspace, nested drag-and-drop, structure tree, inspector, Preview mode with screen flow, history controls, project files, SF Symbol images, Liquid Glass styles, native List/Form/NavigationLink patterns, HIG checks, linked SwiftUI export, and an xtool SwiftUI target are present.

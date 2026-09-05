@@ -7,7 +7,7 @@ export type DragData =
   | { kind: 'move'; nodeId: string };
 
 const nodeKinds = new Set<NodeKind>([
-  'vstack', 'hstack', 'section', 'text', 'button', 'toggle', 'textfield', 'image', 'divider', 'spacer',
+  'vstack', 'hstack', 'list', 'form', 'section', 'text', 'button', 'toggle', 'textfield', 'navigation-link', 'image', 'divider', 'spacer',
 ]);
 
 let sequence = 0;
@@ -28,12 +28,18 @@ export function createNode(kind: NodeKind): CanvasNode {
       return { id, kind, label: 'Toggle', binding: 'isEnabled', minHeight: 44 };
     case 'textfield':
       return { id, kind, label: 'Text field', binding: 'value', minHeight: 44 };
+    case 'navigation-link':
+      return { id, kind, label: 'Open screen', destinationScreenId: '', minHeight: 44 };
     case 'image':
       return { id, kind, systemName: 'star.fill', accessibilityLabel: 'Image' };
     case 'vstack':
       return { id, kind, spacing: 12, children: [] };
     case 'hstack':
       return { id, kind, spacing: 8, children: [] };
+    case 'list':
+      return { id, kind, children: [] };
+    case 'form':
+      return { id, kind, children: [] };
     case 'section':
       return { id, kind, title: 'Section', children: [] };
     case 'divider':
@@ -50,7 +56,11 @@ export function cloneNode(node: CanvasNode): CanvasNode {
 }
 
 export function isContainerNode(node: CanvasNode): node is ContainerNode {
-  return node.kind === 'vstack' || node.kind === 'hstack' || node.kind === 'section';
+  return node.kind === 'vstack'
+    || node.kind === 'hstack'
+    || node.kind === 'list'
+    || node.kind === 'form'
+    || node.kind === 'section';
 }
 
 export function encodeDragData(data: DragData): string {

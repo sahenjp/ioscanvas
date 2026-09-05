@@ -1,11 +1,13 @@
 import { useRef, useState } from 'react';
 import { parseCanvasDocument } from '../lib/document';
 import { lintDocument } from '../lib/hig';
+import { findNode } from '../lib/nodes';
 import { useEditorStore } from '../store/editor';
 
 export function TopBar() {
   const document = useEditorStore((state) => state.document);
   const selectScreen = useEditorStore((state) => state.selectScreen);
+  const selectNode = useEditorStore((state) => state.selectNode);
   const addScreen = useEditorStore((state) => state.addScreen);
   const duplicateActiveScreen = useEditorStore((state) => state.duplicateActiveScreen);
   const deleteActiveScreen = useEditorStore((state) => state.deleteActiveScreen);
@@ -23,6 +25,17 @@ export function TopBar() {
   const issues = lintDocument(document);
   const warnings = issues.filter((issue) => issue.severity === 'warning').length;
   const notes = issues.length - warnings;
+
+  const focusFirstIssue = () => {
+    const issue = issues[0];
+    if (!issue) return;
+    const owner = document.screens.find((candidate) =>
+      candidate.root.id === issue.nodeId || Boolean(findNode(candidate.root.children, issue.nodeId)),
+    );
+    if (!owner) return;
+    if (owner.id !== document.activeScreenId) selectScreen(owner.id);
+    selectNode(owner.root.id === issue.nodeId ? null : issue.nodeId);
+  };
 
   const saveProject = () => {
     const baseName = document.name.trim().replace(/[^a-z0-9_-]+/gi, '-').replace(/^-|-$/g, '') || 'ioscanvas';
@@ -74,11 +87,11 @@ export function TopBar() {
       </div>
       <div className="topbar-spacer" />
       <div className="topbar-status">
-        <div className={`lint-status ${warnings > 0 ? 'has-issues' : ''}`}>
+        <button className={`lint-status ${warnings > 0 ? 'has-issues' : ''}`} type="button" onClick={focusFirstIssue} disabled={issues.length === 0} aria-label="Show first HIG issue">
           <span className="status-dot" aria-hidden="true" />
           <span>{warnings === 0 ? 'HIG clean' : `${warnings} warning${warnings === 1 ? '' : 's'}`}</span>
           {notes > 0 && <span className="status-notes">{notes} note{notes === 1 ? '' : 's'}</span>}
-        </div>
+        </button>
         {fileError && <span className="project-error" role="status">{fileError}</span>}
       </div>
       <div className="topbar-actions">

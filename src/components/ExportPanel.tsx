@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { generateImplementationPrompt } from '../lib/prompt';
 import { generateSwiftUI } from '../lib/swiftui';
 import { useEditorStore } from '../store/editor';
@@ -15,6 +15,15 @@ export function ExportPanel() {
   const swiftui = useMemo(() => generateSwiftUI(document), [document]);
   const prompt = useMemo(() => generateImplementationPrompt(document), [document]);
   const value = tab === 'swiftui' ? swiftui : prompt;
+
+  useEffect(() => {
+    if (!open) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [open, setOpen]);
 
   if (!open) return null;
 

@@ -73,4 +73,21 @@ describe('HIG linter', () => {
       ]),
     );
   });
+
+  it('flags a navigation link without a destination screen', () => {
+    const document = structuredClone(defaultDocument);
+    document.screens[0]?.root.children.push({
+      id: 'link-test',
+      kind: 'navigation-link',
+      label: 'Details',
+      destinationScreenId: 'missing-screen',
+      minHeight: 44,
+    });
+
+    expect(lintDocument(document)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ nodeId: 'link-test', code: 'NAVIGATION_DESTINATION' }),
+      ]),
+    );
+  });
 });

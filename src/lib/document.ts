@@ -48,6 +48,10 @@ function readNode(value: unknown, ids: Set<string>): CanvasNode | null {
       return isString(value.label) && isString(value.binding) && isNumber(value.minHeight)
         ? { id: value.id, kind: 'textfield', label: value.label, binding: value.binding, minHeight: value.minHeight, ...glassProperties }
         : null;
+    case 'navigation-link':
+      return isString(value.label) && isString(value.destinationScreenId) && isNumber(value.minHeight)
+        ? { id: value.id, kind: 'navigation-link', label: value.label, destinationScreenId: value.destinationScreenId, minHeight: value.minHeight, ...glassProperties }
+        : null;
     case 'image':
       return isString(value.systemName) && isString(value.accessibilityLabel)
         ? { id: value.id, kind: 'image', systemName: value.systemName, accessibilityLabel: value.accessibilityLabel, ...glassProperties }
@@ -58,6 +62,8 @@ function readNode(value: unknown, ids: Set<string>): CanvasNode | null {
       return { id: value.id, kind: 'spacer', ...glassProperties };
     case 'vstack':
     case 'hstack':
+    case 'list':
+    case 'form':
     case 'section': {
       if (!Array.isArray(value.children)) return null;
       if (value.spacing !== undefined && (!isNumber(value.spacing) || value.spacing < 0)) return null;

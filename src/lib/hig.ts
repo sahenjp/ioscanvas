@@ -13,12 +13,13 @@ export interface LintIssue {
     | 'EMPTY_SECTION'
     | 'FIXED_HEIGHT'
     | 'NAVIGATION_STRUCTURE'
+    | 'NAVIGATION_DESTINATION'
     | 'ACCESSIBILITY';
   message: string;
 }
 
-function lintNode(node: CanvasNode, issues: LintIssue[]): void {
-  if (node.kind === 'button' || node.kind === 'toggle' || node.kind === 'textfield') {
+function lintNode(node: CanvasNode, issues: LintIssue[], screenIds: Set<string>): void {
+  if (node.kind === 'button' || node.kind === 'toggle' || node.kind === 'textfield' || node.kind === 'navigation-link') {
     if (node.minHeight < 44) {
       issues.push({
         nodeId: node.id,
@@ -43,6 +44,15 @@ function lintNode(node: CanvasNode, issues: LintIssue[]): void {
         message: '操作要素には表示ラベルとVoiceOverで理解できる名前を付けてください。',
       });
     }
+  }
+
+  if (node.kind === 'navigation-link' && !screenIds.has(node.destinationScreenId)) {
+    issues.push({
+      nodeId: node.id,
+      severity: 'warning',
+      code: 'NAVIGATION_DESTINATION',
+      message: 'NavigationLinkの遷移先画面が未設定です。実装時に表示する画面を指定してください。',
+    });
   }
 
   if (node.kind === 'text') {
@@ -104,11 +114,12 @@ function lintNode(node: CanvasNode, issues: LintIssue[]): void {
     }
   }
 
-  node.children?.forEach((child) => lintNode(child, issues));
+  node.children?.forEach((child) => lintNode(child, issues, screenIds));
 }
 
 export function lintDocument(document: CanvasDocument): LintIssue[] {
   const issues: LintIssue[] = [];
+  const screenIds = new Set(document.screens.map((screen) => screen.id));
   for (const screen of document.screens) {
     if (screen.navigationTitle.trim().length === 0) {
       issues.push({
@@ -118,7 +129,7 @@ export function lintDocument(document: CanvasDocument): LintIssue[] {
         message: 'NavigationStackのタイトルが空です。画面の階層と目的が伝わるタイトルを設定してください。',
       });
     }
-    screen.root.children.forEach((node) => lintNode(node, issues));
+    screen.root.children.forEach((node) => lintNode(node, issues, screenIds));
   }
   return issues;
 }

@@ -81,4 +81,35 @@ describe('SwiftUI generator', () => {
     expect(output).toContain('.glassEffect(.clear)');
     expect(output).toContain('.buttonStyle(.glass)');
   });
+
+  it('exports native list containers and links between screens', () => {
+    const document = structuredClone(defaultDocument);
+    const home = document.screens[0];
+    if (!home) throw new Error('Home screen missing');
+    document.screens = [home];
+    document.screens.push({
+      id: 'screen-details',
+      name: 'Details',
+      navigationTitle: 'Details',
+      root: { id: 'root-details', kind: 'vstack', spacing: 16, children: [] },
+    });
+    home.root.children.push({
+      id: 'settings-list',
+      kind: 'list',
+      children: [{
+        id: 'settings-link',
+        kind: 'navigation-link',
+        label: 'Details',
+        destinationScreenId: 'screen-details',
+        minHeight: 44,
+      }],
+    });
+
+    const output = generateSwiftUI(document);
+
+    expect(output).toContain('List {');
+    expect(output).toContain('NavigationLink("Details")');
+    expect(output).toContain('DetailsView()');
+    expect(output).toContain('struct DetailsView: View');
+  });
 });

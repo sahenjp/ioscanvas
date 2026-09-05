@@ -21,6 +21,7 @@ function hasNodeDragData(event: React.DragEvent): boolean {
 function NodeView({ node, allNodes }: { node: CanvasNode; allNodes: CanvasNode[] }) {
   const selectedNodeId = useEditorStore((state) => state.selectedNodeId);
   const selectNode = useEditorStore((state) => state.selectNode);
+  const selectScreen = useEditorStore((state) => state.selectScreen);
   const addNode = useEditorStore((state) => state.addNode);
   const moveNode = useEditorStore((state) => state.moveNode);
   const previewMode = useEditorStore((state) => state.previewMode);
@@ -90,7 +91,10 @@ function NodeView({ node, allNodes }: { node: CanvasNode; allNodes: CanvasNode[]
     else moveNode(data.nodeId, location.parentId, index);
   };
 
-  const content = renderNodeContent(node, allNodes);
+  const navigate = previewMode && node.kind === 'navigation-link' && node.destinationScreenId
+    ? () => selectScreen(node.destinationScreenId)
+    : undefined;
+  const content = renderNodeContent(node, allNodes, navigate);
 
   return (
     <div
@@ -109,7 +113,7 @@ function NodeView({ node, allNodes }: { node: CanvasNode; allNodes: CanvasNode[]
   );
 }
 
-function renderNodeContent(node: CanvasNode, allNodes: CanvasNode[]): React.ReactNode {
+function renderNodeContent(node: CanvasNode, allNodes: CanvasNode[], onNavigate?: () => void): React.ReactNode {
   switch (node.kind) {
     case 'text':
       return (
@@ -143,18 +147,32 @@ function renderNodeContent(node: CanvasNode, allNodes: CanvasNode[]): React.Reac
           {node.label || 'Text field'}
         </div>
       );
+    case 'navigation-link':
+      return onNavigate ? (
+        <button type="button" className="ios-row ios-navigation-link" style={{ minHeight: node.minHeight }} onClick={onNavigate}>
+          <span>{node.label || 'Open screen'}</span>
+          <span className="ios-link-indicator" aria-hidden="true">Next</span>
+        </button>
+      ) : (
+        <div className="ios-row ios-navigation-link" style={{ minHeight: node.minHeight }}>
+          <span>{node.label || 'Open screen'}</span>
+          <span className="ios-link-indicator" aria-hidden="true">Next</span>
+        </div>
+      );
     case 'divider':
       return <div aria-label="Divider" className="ios-divider" />;
     case 'spacer':
       return <div aria-label="Spacer" className="ios-spacer">Spacer</div>;
     case 'vstack':
     case 'hstack':
+    case 'list':
+    case 'form':
     case 'section': {
       const horizontal = node.kind === 'hstack';
       return (
-        <div className={`canvas-container ${horizontal ? 'horizontal' : ''}`}>
+        <div className={`canvas-container ${horizontal ? 'horizontal' : ''} canvas-${node.kind}`}>
           {node.kind === 'section' && <div className="section-title">{node.title || 'Section'}</div>}
-          <div className={horizontal ? 'node-row' : 'node-column'} style={{ gap: node.kind === 'section' ? 8 : node.spacing }}>
+          <div className={horizontal ? 'node-row' : 'node-column'} style={{ gap: node.kind === 'section' || node.kind === 'list' || node.kind === 'form' ? 8 : node.spacing }}>
             {node.children.length === 0
               ? <div className="empty-container">Drop content here</div>
               : node.children.map((child) => <NodeView key={child.id} node={child} allNodes={allNodes} />)}
@@ -193,7 +211,7 @@ export function PhoneCanvas() {
       <div className="workspace-toolbar">
         <div className="workspace-title">
           <strong>{previewMode ? 'Preview' : 'Canvas'}</strong>
-          <span>iPhone · 393 × 852 pt</span>
+          <span>{screen.name} · iPhone · 393 × 852 pt</span>
         </div>
         {!previewMode && <div className="workspace-controls" onClick={(event) => event.stopPropagation()}>
           <button className="canvas-toolbar-button" type="button" onClick={() => setZoom((current) => Math.max(75, current - 25))} aria-label="Zoom out">−</button>
@@ -203,7 +221,7 @@ export function PhoneCanvas() {
           <button className={`canvas-toolbar-button grid-toggle ${showGrid ? 'active' : ''}`} type="button" aria-pressed={showGrid} onClick={() => setShowGrid((current) => !current)}>Grid</button>
         </div>}
       </div>
-      <div className="workspace-ruler"><span>Preview</span><span>{zoom}%</span></div>
+      <div className="workspace-ruler"><span>{previewMode ? 'Read-only preview' : 'iPhone frame'}</span><span>393 × 852 pt · {zoom}%</span></div>
       <div className="phone-stage" style={{ transform: `scale(${zoom / 100})` }}>
         <div
           className={`phone-shell ${isOver ? 'is-over' : ''}`}
@@ -212,7 +230,7 @@ export function PhoneCanvas() {
           onDragOver={previewMode ? undefined : (event) => { if (hasNodeDragData(event)) event.preventDefault(); }}
           onDrop={previewMode ? undefined : dropOnScreen}
         >
-          <div className="phone-screen">
+          <div className="phone-screen" aria-label={`${screen.name} iPhone preview`}>
             <div className="statusbar"><span>9:41</span><span className="status-icons">● ◒</span></div>
             <div className="dynamic-island" aria-hidden="true" />
             <div className="navigation-title">{screen.navigationTitle}</div>

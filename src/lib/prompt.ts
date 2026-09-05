@@ -13,12 +13,16 @@ function describe(node: CanvasNode, depth = 0): string[] {
       return [`${common}: ${node.label} / binding=${node.binding}`];
     case 'textfield':
       return [`${common}: ${node.label} / binding=${node.binding}`];
+    case 'navigation-link':
+      return [`${common}: ${node.label} / destination=${node.destinationScreenId || 'unset'}`];
     case 'image':
       return [`${common}: ${node.systemName} / accessibility=${node.accessibilityLabel || 'decorative'}`];
     case 'section':
       return [`${common}: ${node.title ?? 'Section'}`, ...node.children.flatMap((child) => describe(child, depth + 1))];
     case 'vstack':
     case 'hstack':
+    case 'list':
+    case 'form':
       return [common, ...node.children.flatMap((child) => describe(child, depth + 1))];
     default:
       return [common];

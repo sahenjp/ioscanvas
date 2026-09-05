@@ -3,8 +3,11 @@ import { defaultDocument } from '../lib/defaultDocument';
 import { useEditorStore } from '../store/editor';
 
 beforeEach(() => {
+  const base = structuredClone(defaultDocument);
+  const home = base.screens[0];
+  if (!home) throw new Error('Home screen missing');
   useEditorStore.setState({
-    document: structuredClone(defaultDocument),
+    document: { ...base, screens: [home], activeScreenId: home.id },
     selectedNodeId: null,
     exportOpen: false,
     previewMode: false,

@@ -1,11 +1,14 @@
 export type NodeKind =
   | 'vstack'
   | 'hstack'
+  | 'list'
+  | 'form'
   | 'section'
   | 'text'
   | 'button'
   | 'toggle'
   | 'textfield'
+  | 'navigation-link'
   | 'image'
   | 'divider'
   | 'spacer';
@@ -49,6 +52,13 @@ export interface TextFieldNode extends BaseNode {
   minHeight: number;
 }
 
+export interface NavigationLinkNode extends BaseNode {
+  kind: 'navigation-link';
+  label: string;
+  destinationScreenId: string;
+  minHeight: number;
+}
+
 export interface ImageNode extends BaseNode {
   kind: 'image';
   systemName: string;
@@ -56,7 +66,7 @@ export interface ImageNode extends BaseNode {
 }
 
 export interface ContainerNode extends BaseNode {
-  kind: 'vstack' | 'hstack' | 'section';
+  kind: 'vstack' | 'hstack' | 'list' | 'form' | 'section';
   spacing?: number;
   title?: string;
   children: CanvasNode[];
@@ -75,6 +85,7 @@ export type CanvasNode =
   | ButtonNode
   | ToggleNode
   | TextFieldNode
+  | NavigationLinkNode
   | ImageNode
   | ContainerNode
   | DividerNode
