@@ -2,6 +2,15 @@ import type { CanvasDocument, CanvasNode } from '../types/document';
 
 const indent = (depth: number) => '    '.repeat(depth);
 const quoted = (value: string) => JSON.stringify(value);
+const swiftKeywords = new Set([
+  'associatedtype', 'class', 'deinit', 'enum', 'extension', 'fileprivate', 'func', 'import',
+  'init', 'inout', 'internal', 'let', 'open', 'operator', 'private', 'precedencegroup',
+  'protocol', 'public', 'rethrows', 'static', 'struct', 'subscript', 'typealias', 'var',
+  'break', 'case', 'catch', 'continue', 'default', 'defer', 'do', 'else', 'fallthrough',
+  'for', 'guard', 'if', 'in', 'repeat', 'return', 'throw', 'switch', 'where', 'while',
+  'as', 'false', 'is', 'nil', 'self', 'Self', 'super', 'throws', 'true', 'try',
+  'Any', 'Protocol', 'Type', 'some', 'unowned', 'weak',
+]);
 
 interface BindingInfo {
   name: string;
@@ -9,10 +18,9 @@ interface BindingInfo {
 }
 
 function swiftIdentifier(value: string, fallback: string): string {
-  const normalized = value.replace(/[^A-Za-z0-9_]/g, '_') || fallback;
-  const withLeadingLetter = /^\d/.test(normalized) ? `_${normalized}` : normalized;
-  const reserved = new Set(['class', 'deinit', 'enum', 'extension', 'func', 'import', 'init', 'let', 'protocol', 'static', 'struct', 'subscript', 'typealias', 'var', 'break', 'case', 'continue', 'default', 'defer', 'do', 'else', 'fallthrough', 'for', 'guard', 'if', 'in', 'repeat', 'return', 'switch', 'where', 'while', 'as', 'Any', 'catch', 'false', 'is', 'nil', 'rethrows', 'super', 'self', 'Self', 'throw', 'throws', 'true', 'try', 'associativity', 'convenience', 'dynamic', 'didSet', 'final', 'get', 'infix', 'indirect', 'lazy', 'mutating', 'none', 'nonmutating', 'optional', 'override', 'postfix', 'precedence', 'prefix', 'Protocol', 'required', 'set', 'some', 'Type', 'unowned', 'weak', 'willSet']);
-  return reserved.has(withLeadingLetter) ? `${withLeadingLetter}Value` : withLeadingLetter;
+  const normalized = value.trim().replace(/[^A-Za-z0-9_]/g, '_') || fallback;
+  const identifier = /^\d/.test(normalized) ? `_${normalized}` : normalized;
+  return swiftKeywords.has(identifier) ? `_${identifier}` : identifier;
 }
 
 function renderNode(node: CanvasNode, depth: number, bindings: Map<string, BindingInfo>): string {
@@ -57,7 +65,7 @@ function collectBindings(
     if (node.kind === 'toggle' || node.kind === 'textfield') {
       if (!result.has(node.binding)) {
         const type = node.kind === 'toggle' ? 'Bool' : 'String';
-        const base = swiftIdentifier(node.binding, node.kind === 'toggle' ? 'isEnabled' : 'value');
+        const base = swiftIdentifier(node.binding, `value_${swiftIdentifier(node.id, 'node')}`);
         let name = base;
         let suffix = 2;
         while (usedNames.has(name)) name = `${base}${suffix++}`;
