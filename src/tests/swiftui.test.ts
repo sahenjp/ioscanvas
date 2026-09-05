@@ -10,4 +10,21 @@ describe('SwiftUI generator', () => {
     expect(output).toContain('Button("Continue")');
     expect(output).toContain('.navigationTitle("Home")');
   });
+
+  it('keeps generated Swift identifiers valid', () => {
+    const document = structuredClone(defaultDocument);
+    const screen = document.screens[0];
+    screen.name = '123 Login';
+    screen.root.children.push(
+      { id: 'toggle-test', kind: 'toggle', label: 'Enabled', binding: 'class', minHeight: 44 },
+      { id: 'field-test', kind: 'textfield', label: 'Name', binding: '1 user-name', minHeight: 44 },
+    );
+
+    const output = generateSwiftUI(document);
+    expect(output).toContain('struct _123LoginView: View');
+    expect(output).toContain('@State private var _class: Bool = false');
+    expect(output).toContain('@State private var _1username: String = ""');
+    expect(output).toContain('isOn: $_class');
+    expect(output).toContain('text: $_1username');
+  });
 });
