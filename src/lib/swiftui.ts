@@ -3,22 +3,34 @@ import type { CanvasDocument, CanvasNode } from '../types/document';
 const indent = (depth: number) => '    '.repeat(depth);
 const quoted = (value: string) => JSON.stringify(value);
 
-function renderNode(node: CanvasNode, depth: number): string {
+interface BindingInfo {
+  name: string;
+  type: 'Bool' | 'String';
+}
+
+function swiftIdentifier(value: string, fallback: string): string {
+  const normalized = value.replace(/[^A-Za-z0-9_]/g, '_') || fallback;
+  const withLeadingLetter = /^\d/.test(normalized) ? `_${normalized}` : normalized;
+  const reserved = new Set(['class', 'deinit', 'enum', 'extension', 'func', 'import', 'init', 'let', 'protocol', 'static', 'struct', 'subscript', 'typealias', 'var', 'break', 'case', 'continue', 'default', 'defer', 'do', 'else', 'fallthrough', 'for', 'guard', 'if', 'in', 'repeat', 'return', 'switch', 'where', 'while', 'as', 'Any', 'catch', 'false', 'is', 'nil', 'rethrows', 'super', 'self', 'Self', 'throw', 'throws', 'true', 'try', 'associativity', 'convenience', 'dynamic', 'didSet', 'final', 'get', 'infix', 'indirect', 'lazy', 'mutating', 'none', 'nonmutating', 'optional', 'override', 'postfix', 'precedence', 'prefix', 'Protocol', 'required', 'set', 'some', 'Type', 'unowned', 'weak', 'willSet']);
+  return reserved.has(withLeadingLetter) ? `${withLeadingLetter}Value` : withLeadingLetter;
+}
+
+function renderNode(node: CanvasNode, depth: number, bindings: Map<string, BindingInfo>): string {
   const pad = indent(depth);
 
   switch (node.kind) {
     case 'text': {
-      const weight = node.weight === 'regular' ? '' : `\n${pad}    .fontWeight(.${node.weight})`;
-      return `${pad}Text(${quoted(node.text)})\n${pad}    .font(.system(size: ${node.fontSize}))${weight}`;
+      const weight = node.weight === 'regular' ? '' : `, weight: .${node.weight}`;
+      return `${pad}Text(${quoted(node.text)})\n${pad}    .font(.system(size: ${node.fontSize}${weight}, relativeTo: .body))`;
     }
     case 'button': {
       const role = node.role === 'normal' ? '' : `, role: .${node.role}`;
       return `${pad}Button(${quoted(node.label)}${role}) {\n${pad}    // Action\n${pad}}\n${pad}.frame(minHeight: ${node.minHeight})`;
     }
     case 'toggle':
-      return `${pad}Toggle(${quoted(node.label)}, isOn: $${node.binding})\n${pad}    .frame(minHeight: ${node.minHeight})`;
+      return `${pad}Toggle(${quoted(node.label)}, isOn: $${bindings.get(node.binding)?.name ?? swiftIdentifier(node.binding, 'isEnabled')})\n${pad}    .frame(minHeight: ${node.minHeight})`;
     case 'textfield':
-      return `${pad}TextField(${quoted(node.label)}, text: $${node.binding})\n${pad}    .textFieldStyle(.roundedBorder)\n${pad}    .frame(minHeight: ${node.minHeight})`;
+      return `${pad}TextField(${quoted(node.label)}, text: $${bindings.get(node.binding)?.name ?? swiftIdentifier(node.binding, 'value')})\n${pad}    .textFieldStyle(.roundedBorder)\n${pad}    .frame(minHeight: ${node.minHeight})`;
     case 'divider':
       return `${pad}Divider()`;
     case 'spacer':
@@ -26,21 +38,34 @@ function renderNode(node: CanvasNode, depth: number): string {
     case 'vstack':
     case 'hstack': {
       const type = node.kind === 'vstack' ? 'VStack' : 'HStack';
-      const children = node.children.map((child) => renderNode(child, depth + 1)).join('\n');
+      const children = node.children.map((child) => renderNode(child, depth + 1, bindings)).join('\n');
       return `${pad}${type}(spacing: ${node.spacing ?? 0}) {\n${children}\n${pad}}`;
     }
     case 'section': {
-      const children = node.children.map((child) => renderNode(child, depth + 1)).join('\n');
+      const children = node.children.map((child) => renderNode(child, depth + 1, bindings)).join('\n');
       return `${pad}Section(${quoted(node.title ?? 'Section')}) {\n${children}\n${pad}}`;
     }
   }
 }
 
-function collectBindings(nodes: CanvasNode[], result = new Map<string, 'Bool' | 'String'>()): Map<string, 'Bool' | 'String'> {
+function collectBindings(
+  nodes: CanvasNode[],
+  result = new Map<string, BindingInfo>(),
+  usedNames = new Set<string>(),
+): Map<string, BindingInfo> {
   for (const node of nodes) {
-    if (node.kind === 'toggle') result.set(node.binding, 'Bool');
-    if (node.kind === 'textfield') result.set(node.binding, 'String');
-    if (node.children) collectBindings(node.children, result);
+    if (node.kind === 'toggle' || node.kind === 'textfield') {
+      if (!result.has(node.binding)) {
+        const type = node.kind === 'toggle' ? 'Bool' : 'String';
+        const base = swiftIdentifier(node.binding, node.kind === 'toggle' ? 'isEnabled' : 'value');
+        let name = base;
+        let suffix = 2;
+        while (usedNames.has(name)) name = `${base}${suffix++}`;
+        usedNames.add(name);
+        result.set(node.binding, { name, type });
+      }
+    }
+    if (node.children) collectBindings(node.children, result, usedNames);
   }
   return result;
 }
@@ -50,10 +75,11 @@ export function generateSwiftUI(document: CanvasDocument): string {
   if (!screen) return '';
 
   const bindings = collectBindings(screen.root.children);
-  const stateLines = [...bindings.entries()]
-    .map(([name, type]) => `    @State private var ${name}: ${type} = ${type === 'Bool' ? 'false' : '\"\"'}`)
+  const stateLines = [...bindings.values()]
+    .map(({ name, type }) => `    @State private var ${name}: ${type} = ${type === 'Bool' ? 'false' : '""'}`)
     .join('\n');
-  const body = screen.root.children.map((node) => renderNode(node, 4)).join('\n');
+  const body = screen.root.children.map((node) => renderNode(node, 4, bindings)).join('\n');
+  const viewName = swiftIdentifier(`${screen.name}View`, 'ContentView');
 
-  return `import SwiftUI\n\nstruct ${screen.name.replace(/[^A-Za-z0-9_]/g, '') || 'Content'}View: View {\n${stateLines ? `${stateLines}\n\n` : ''}    var body: some View {\n        NavigationStack {\n            ScrollView {\n                VStack(alignment: .leading, spacing: ${screen.root.spacing ?? 16}) {\n${body}\n                }\n                .padding()\n            }\n            .navigationTitle(${quoted(screen.navigationTitle)})\n        }\n    }\n}\n`;
+  return `import SwiftUI\n\nstruct ${viewName}: View {\n${stateLines ? `${stateLines}\n\n` : ''}    var body: some View {\n        NavigationStack {\n            ScrollView {\n                VStack(alignment: .leading, spacing: ${screen.root.spacing ?? 16}) {\n${body}\n                }\n                .padding()\n            }\n            .navigationTitle(${quoted(screen.navigationTitle)})\n        }\n    }\n}\n`;
 }

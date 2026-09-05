@@ -28,4 +28,20 @@ describe('HIG linter', () => {
       ]),
     );
   });
+
+  it('flags empty sections and oversized fixed controls', () => {
+    const document = structuredClone(defaultDocument);
+    const section = { id: 'section-test', kind: 'section' as const, title: 'Settings', children: [] };
+    const button = document.screens[0]?.root.children.find((node) => node.kind === 'button');
+    if (!button || button.kind !== 'button') throw new Error('Fixture button missing');
+    button.minHeight = 120;
+    document.screens[0]?.root.children.push(section);
+
+    expect(lintDocument(document)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ nodeId: section.id, code: 'EMPTY_SECTION' }),
+        expect.objectContaining({ nodeId: button.id, code: 'FIXED_HEIGHT' }),
+      ]),
+    );
+  });
 });

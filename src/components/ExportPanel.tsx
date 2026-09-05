@@ -11,6 +11,7 @@ export function ExportPanel() {
   const document = useEditorStore((state) => state.document);
   const [tab, setTab] = useState<ExportTab>('swiftui');
   const [copied, setCopied] = useState(false);
+  const [copyError, setCopyError] = useState(false);
   const swiftui = useMemo(() => generateSwiftUI(document), [document]);
   const prompt = useMemo(() => generateImplementationPrompt(document), [document]);
   const value = tab === 'swiftui' ? swiftui : prompt;
@@ -18,9 +19,16 @@ export function ExportPanel() {
   if (!open) return null;
 
   const copy = async () => {
-    await navigator.clipboard.writeText(value);
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1200);
+    try {
+      if (!navigator.clipboard) throw new Error('Clipboard API unavailable');
+      await navigator.clipboard.writeText(value);
+      setCopyError(false);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1200);
+    } catch {
+      setCopied(false);
+      setCopyError(true);
+    }
   };
 
   return (
@@ -39,7 +47,7 @@ export function ExportPanel() {
         </div>
         <pre className="export-code"><code>{value}</code></pre>
         <footer className="export-footer">
-          <span>{tab === 'swiftui' ? 'Generated from the document tree.' : 'Includes implementation constraints and current HIG warnings.'}</span>
+          <span>{copyError ? 'Copy failed. Select the text manually.' : tab === 'swiftui' ? 'Generated from the document tree.' : 'Includes implementation constraints and current HIG warnings.'}</span>
           <button type="button" className="primary-toolbar-button" onClick={copy}>{copied ? 'Copied' : 'Copy'}</button>
         </footer>
       </section>

@@ -7,6 +7,8 @@ A browser-based canvas for composing iOS-style interfaces as a semantic SwiftUI-
 - Build screens from semantic UI nodes instead of freeform coordinates.
 - Preview iPhone-style layouts in the browser.
 - Edit properties from an inspector.
+- Drag components into the screen or into layout containers, then reorder or reparent them.
+- Inspect the generated structure tree and use Undo/Redo or Delete/Backspace while editing.
 - Run lightweight HIG checks such as minimum tap-target sizing.
 - Export SwiftUI code from the document tree.
 - Export a structured implementation prompt when needed.
@@ -24,7 +26,7 @@ The first prototype includes a small set of primitives such as:
 - HStack
 - Section
 
-The intent is to keep the model close to SwiftUI rather than reproduce a generic absolute-position design tool.
+The intent is to keep the model close to SwiftUI rather than reproduce a generic absolute-position design tool. The preview uses a fixed `NavigationStack` → `ScrollView` screen scaffold; the editable document tree starts at the screen's content `VStack`.
 
 ## Architecture
 
@@ -66,4 +68,4 @@ See [`ACKNOWLEDGEMENTS.md`](./ACKNOWLEDGEMENTS.md) for attribution details.
 
 ## Status
 
-Early prototype. The editor model, preview, basic inspector, lightweight HIG checks, and SwiftUI export are present; interaction design and component coverage are still limited.
+Early prototype. The semantic editor, nested drag-and-drop, structure tree, inspector, HIG checks, history controls, and SwiftUI export are present; component coverage is still limited.

@@ -1,4 +1,14 @@
-import type { CanvasNode, NodeKind } from '../types/document';
+import type { CanvasNode, ContainerNode, NodeKind } from '../types/document';
+
+export const NODE_DRAG_MIME = 'application/x-ioscanvas-node';
+
+export type DragData =
+  | { kind: 'new'; nodeKind: NodeKind }
+  | { kind: 'move'; nodeId: string };
+
+const nodeKinds = new Set<NodeKind>([
+  'vstack', 'hstack', 'section', 'text', 'button', 'toggle', 'textfield', 'divider', 'spacer',
+]);
 
 let sequence = 0;
 
@@ -31,6 +41,44 @@ export function createNode(kind: NodeKind): CanvasNode {
   }
 }
 
+export function isContainerNode(node: CanvasNode): node is ContainerNode {
+  return node.kind === 'vstack' || node.kind === 'hstack' || node.kind === 'section';
+}
+
+export function encodeDragData(data: DragData): string {
+  return JSON.stringify(data);
+}
+
+export function decodeDragData(value: string): DragData | null {
+  try {
+    const data: unknown = JSON.parse(value);
+    if (!data || typeof data !== 'object') return null;
+
+    if (
+      'kind' in data &&
+      data.kind === 'new' &&
+      'nodeKind' in data &&
+      typeof data.nodeKind === 'string' &&
+      nodeKinds.has(data.nodeKind as NodeKind)
+    ) {
+      return { kind: 'new', nodeKind: data.nodeKind as NodeKind };
+    }
+
+    if (
+      'kind' in data &&
+      data.kind === 'move' &&
+      'nodeId' in data &&
+      typeof data.nodeId === 'string'
+    ) {
+      return { kind: 'move', nodeId: data.nodeId };
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
 export function updateNode(nodes: CanvasNode[], id: string, patch: Partial<CanvasNode>): CanvasNode[] {
   return nodes.map((node) => {
     if (node.id === id) {
@@ -60,4 +108,71 @@ export function findNode(nodes: CanvasNode[], id: string): CanvasNode | undefine
     }
   }
   return undefined;
+}
+
+export interface NodeLocation {
+  node: CanvasNode;
+  parentId: string | null;
+  index: number;
+}
+
+export function findNodeLocation(
+  nodes: CanvasNode[],
+  id: string,
+  parentId: string | null = null,
+): NodeLocation | undefined {
+  for (const [index, node] of nodes.entries()) {
+    if (node.id === id) return { node, parentId, index };
+    if (node.children) {
+      const found = findNodeLocation(node.children, id, node.id);
+      if (found) return found;
+    }
+  }
+  return undefined;
+}
+
+function insertAt(nodes: CanvasNode[], node: CanvasNode, index?: number): CanvasNode[] {
+  const next = [...nodes];
+  const position = index === undefined ? next.length : Math.max(0, Math.min(index, next.length));
+  next.splice(position, 0, node);
+  return next;
+}
+
+export function insertNode(
+  nodes: CanvasNode[],
+  parentId: string | null,
+  node: CanvasNode,
+  index?: number,
+): CanvasNode[] {
+  if (parentId === null) return insertAt(nodes, node, index);
+
+  return nodes.map((candidate) => {
+    if (candidate.id === parentId) {
+      return isContainerNode(candidate)
+        ? { ...candidate, children: insertAt(candidate.children, node, index) }
+        : candidate;
+    }
+    return candidate.children
+      ? ({ ...candidate, children: insertNode(candidate.children, parentId, node, index) } as CanvasNode)
+      : candidate;
+  });
+}
+
+export function moveNode(
+  nodes: CanvasNode[],
+  nodeId: string,
+  parentId: string | null,
+  index?: number,
+): CanvasNode[] {
+  const source = findNodeLocation(nodes, nodeId);
+  const target = parentId === null ? undefined : findNode(nodes, parentId);
+  if (!source || (target && !isContainerNode(target)) || (target && findNode(source.node.children ?? [], target.id))) {
+    return nodes;
+  }
+
+  const withoutSource = removeNode(nodes, nodeId);
+  const adjustedIndex = source.parentId === parentId && index !== undefined && index > source.index
+    ? index - 1
+    : index;
+  return insertNode(withoutSource, parentId, source.node, adjustedIndex);
 }
