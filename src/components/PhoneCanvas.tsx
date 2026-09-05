@@ -111,6 +111,13 @@ function renderNodeContent(node: CanvasNode, allNodes: CanvasNode[]): React.Reac
           {node.text}
         </div>
       );
+    case 'image':
+      return (
+        <div className="ios-image" role="img" aria-label={node.accessibilityLabel || undefined}>
+          <span className="ios-image-symbol" aria-hidden="true">✦</span>
+          <span>{node.systemName || 'system image'}</span>
+        </div>
+      );
     case 'button':
       return (
         <button type="button" className={`ios-button ${node.role === 'destructive' ? 'destructive' : ''}`} style={{ minHeight: node.minHeight }}>

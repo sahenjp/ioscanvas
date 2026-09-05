@@ -62,6 +62,15 @@ function lintNode(node: CanvasNode, issues: LintIssue[]): void {
     });
   }
 
+  if (node.kind === 'image' && node.systemName.trim().length === 0) {
+    issues.push({
+      nodeId: node.id,
+      severity: 'warning',
+      code: 'ACCESSIBILITY',
+      message: 'ImageのSF Symbol名が空です。表示する意味のある画像を指定してください。',
+    });
+  }
+
   if (node.kind === 'section') {
     if (node.children.length === 0) {
       issues.push({

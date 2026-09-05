@@ -17,6 +17,7 @@ const groups: { title: string; items: { kind: NodeKind; label: string; symbol: s
     title: 'Content',
     items: [
       { kind: 'text', label: 'Text', symbol: 'T' },
+      { kind: 'image', label: 'Image', symbol: '✦' },
       { kind: 'divider', label: 'Divider', symbol: '―' },
     ],
   },

@@ -9,6 +9,8 @@ A browser-based canvas for composing iOS-style interfaces as a semantic SwiftUI-
 - Edit properties from an inspector.
 - Drag components into the screen or into layout containers, then reorder or reparent them.
 - Inspect the generated structure tree and use Undo/Redo or Delete/Backspace while editing.
+- Duplicate selected elements with Cmd/Ctrl+D, including nested children.
+- Save and open validated `.ioscanvas.json` project files.
 - Run lightweight HIG checks such as minimum tap-target sizing.
 - Export SwiftUI code from the document tree.
 - Export a structured implementation prompt when needed.
@@ -19,6 +21,7 @@ A browser-based canvas for composing iOS-style interfaces as a semantic SwiftUI-
 The first prototype includes a small set of primitives such as:
 
 - Text
+- Image (SF Symbol)
 - Button
 - Toggle
 - TextField
@@ -68,7 +71,7 @@ The first xtool build requires Swift, an iOS Swift SDK, and the one-time xtool s
 
 ## Versioning
 
-The project follows Semantic Versioning. The current release line is `1.0.1`.
+The project follows Semantic Versioning. The current release line is `1.1.0`.
 
 ## Inspiration
 
@@ -80,4 +83,4 @@ See [`ACKNOWLEDGEMENTS.md`](./ACKNOWLEDGEMENTS.md) for attribution details.
 
 ## Status
 
-Version 1.0.1. The semantic editor, nested drag-and-drop, structure tree, inspector, HIG checks, history controls, SwiftUI export, and an xtool SwiftUI target are present; component coverage is still limited.
+Version 1.1.0. The semantic editor, nested drag-and-drop, structure tree, inspector, history controls, project files, SF Symbol images, HIG checks, SwiftUI export, and an xtool SwiftUI target are present; component coverage is still limited.

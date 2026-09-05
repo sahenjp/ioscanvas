@@ -57,4 +57,20 @@ describe('HIG linter', () => {
       ]),
     );
   });
+
+  it('flags an image with no SF Symbol name', () => {
+    const document = structuredClone(defaultDocument);
+    document.screens[0]?.root.children.push({
+      id: 'image-test',
+      kind: 'image',
+      systemName: '  ',
+      accessibilityLabel: 'Image',
+    });
+
+    expect(lintDocument(document)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ nodeId: 'image-test', code: 'ACCESSIBILITY' }),
+      ]),
+    );
+  });
 });

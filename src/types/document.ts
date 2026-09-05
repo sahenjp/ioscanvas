@@ -6,6 +6,7 @@ export type NodeKind =
   | 'button'
   | 'toggle'
   | 'textfield'
+  | 'image'
   | 'divider'
   | 'spacer';
 
@@ -46,6 +47,12 @@ export interface TextFieldNode extends BaseNode {
   minHeight: number;
 }
 
+export interface ImageNode extends BaseNode {
+  kind: 'image';
+  systemName: string;
+  accessibilityLabel: string;
+}
+
 export interface ContainerNode extends BaseNode {
   kind: 'vstack' | 'hstack' | 'section';
   spacing?: number;
@@ -66,6 +73,7 @@ export type CanvasNode =
   | ButtonNode
   | ToggleNode
   | TextFieldNode
+  | ImageNode
   | ContainerNode
   | DividerNode
   | SpacerNode;

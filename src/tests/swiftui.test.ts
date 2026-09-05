@@ -47,4 +47,22 @@ describe('SwiftUI generator', () => {
     expect(output).toContain('isOn: $shared');
     expect(output).toContain('text: $shared2');
   });
+
+  it('exports SF Symbols with an accessibility label', () => {
+    const document = structuredClone(defaultDocument);
+    const screen = document.screens[0];
+    if (!screen) throw new Error('Fixture screen missing');
+    screen.root.children.push({
+      id: 'image-test',
+      kind: 'image',
+      systemName: 'person.crop.circle',
+      accessibilityLabel: 'Profile',
+    });
+
+    const output = generateSwiftUI(document);
+
+    expect(output).toContain('Image(systemName: "person.crop.circle")');
+    expect(output).toContain('.accessibilityLabel("Profile")');
+    expect(output).not.toContain('..accessibilityLabel');
+  });
 });

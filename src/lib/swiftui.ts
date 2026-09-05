@@ -46,6 +46,12 @@ function renderNode(node: CanvasNode, depth: number, bindings: Map<string, Bindi
       return `${pad}Toggle(${quoted(node.label)}, isOn: $${bindings.get(bindingKey(node))?.name ?? swiftIdentifier(node.binding, 'isEnabled')})\n${pad}    .frame(minHeight: ${node.minHeight})`;
     case 'textfield':
       return `${pad}TextField(${quoted(node.label)}, text: $${bindings.get(bindingKey(node))?.name ?? swiftIdentifier(node.binding, 'value')})\n${pad}    .textFieldStyle(.roundedBorder)\n${pad}    .frame(minHeight: ${node.minHeight})`;
+    case 'image': {
+      const accessibility = node.accessibilityLabel.trim().length > 0
+        ? `.accessibilityLabel(${quoted(node.accessibilityLabel)})`
+        : '.accessibilityHidden(true)';
+      return `${pad}Image(systemName: ${quoted(node.systemName)})\n${pad}    ${accessibility}`;
+    }
     case 'divider':
       return `${pad}Divider()`;
     case 'spacer':

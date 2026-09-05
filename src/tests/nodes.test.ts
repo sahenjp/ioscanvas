@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createNode, findNode, isContainerNode, moveNode } from '../lib/nodes';
+import { cloneNode, createNode, findNode, isContainerNode, moveNode } from '../lib/nodes';
 import type { CanvasNode } from '../types/document';
 
 describe('semantic node tree operations', () => {
@@ -36,5 +36,18 @@ describe('semantic node tree operations', () => {
     stack.children.push(text);
 
     expect(moveNode([stack], stack.id, stack.id)).toEqual([stack]);
+  });
+
+  it('duplicates a node tree with fresh IDs', () => {
+    const stack = createNode('vstack');
+    const text = createNode('text');
+    if (!isContainerNode(stack)) throw new Error('Fixture stack missing children');
+    stack.children.push(text);
+
+    const duplicate = cloneNode(stack);
+
+    expect(duplicate.id).not.toBe(stack.id);
+    expect(duplicate.children?.[0]?.id).not.toBe(text.id);
+    expect(duplicate.children?.[0]).toMatchObject({ kind: 'text' });
   });
 });

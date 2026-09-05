@@ -1,8 +1,8 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { defaultDocument } from '../lib/defaultDocument';
-import { createNode, findNode, insertNode, isContainerNode, moveNode as moveTreeNode, removeNode, updateNode } from '../lib/nodes';
-import type { CanvasDocument, CanvasNode, NodeKind } from '../types/document';
+import { cloneNode, createNode, findNode, findNodeLocation, insertNode, isContainerNode, moveNode as moveTreeNode, removeNode, updateNode } from '../lib/nodes';
+import type { CanvasDocument, CanvasNode, CanvasScreen, NodeKind } from '../types/document';
 
 const MAX_HISTORY = 50;
 
@@ -15,9 +15,12 @@ interface EditorState {
   selectNode: (id: string | null) => void;
   setExportOpen: (open: boolean) => void;
   addNode: (kind: NodeKind, parentId?: string | null, index?: number) => void;
+  duplicateSelectedNode: () => void;
   moveNode: (nodeId: string, parentId: string | null, index?: number) => void;
   updateSelectedNode: (patch: Partial<CanvasNode>) => void;
+  updateActiveScreen: (patch: Partial<Pick<CanvasScreen, 'name' | 'navigationTitle'>>) => void;
   deleteSelectedNode: () => void;
+  loadDocument: (document: CanvasDocument) => void;
   undo: () => void;
   redo: () => void;
   resetDocument: () => void;
@@ -78,6 +81,18 @@ export const useEditorStore = create<EditorState>()(
           return withHistory(state, replaceScreenChildren(state.document, screen.id, inserted), node.id);
         });
       },
+      duplicateSelectedNode: () => {
+        const id = get().selectedNodeId;
+        if (!id) return;
+        set((state) => {
+          const screen = activeScreen(state.document);
+          const source = screen && findNodeLocation(screen.root.children, id);
+          if (!screen || !source) return state;
+          const duplicate = cloneNode(source.node);
+          const nextChildren = insertNode(screen.root.children, source.parentId, duplicate, source.index + 1);
+          return withHistory(state, replaceScreenChildren(state.document, screen.id, nextChildren), duplicate.id);
+        });
+      },
       moveNode: (nodeId, parentId, index) => {
         set((state) => {
           const screen = activeScreen(state.document);
@@ -95,6 +110,19 @@ export const useEditorStore = create<EditorState>()(
           if (!screen || !findNode(screen.root.children, id)) return state;
           const nextChildren = updateNode(screen.root.children, id, patch);
           return withHistory(state, replaceScreenChildren(state.document, screen.id, nextChildren));
+        });
+      },
+      updateActiveScreen: (patch) => {
+        set((state) => {
+          const screen = activeScreen(state.document);
+          if (!screen) return state;
+          const document = {
+            ...state.document,
+            screens: state.document.screens.map((candidate) =>
+              candidate.id === screen.id ? { ...candidate, ...patch } : candidate,
+            ),
+          };
+          return withHistory(state, document);
         });
       },
       deleteSelectedNode: () => {
@@ -133,6 +161,9 @@ export const useEditorStore = create<EditorState>()(
       },
       resetDocument: () => {
         set((state) => withHistory(state, cloneDocument(defaultDocument), null));
+      },
+      loadDocument: (document) => {
+        set((state) => withHistory(state, cloneDocument(document), null));
       },
     }),
     {

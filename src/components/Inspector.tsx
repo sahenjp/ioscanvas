@@ -7,6 +7,8 @@ export function Inspector() {
   const document = useEditorStore((state) => state.document);
   const selectedNodeId = useEditorStore((state) => state.selectedNodeId);
   const updateSelectedNode = useEditorStore((state) => state.updateSelectedNode);
+  const updateActiveScreen = useEditorStore((state) => state.updateActiveScreen);
+  const duplicateSelectedNode = useEditorStore((state) => state.duplicateSelectedNode);
   const deleteSelectedNode = useEditorStore((state) => state.deleteSelectedNode);
   const screen = document.screens.find((candidate) => candidate.id === document.activeScreenId) ?? document.screens[0];
   const node = screen && selectedNodeId ? findNode(screen.root.children, selectedNodeId) : undefined;
@@ -16,7 +18,22 @@ export function Inspector() {
     <aside className="inspector panel-border-left">
       <div className="panel-heading">Inspector</div>
       {!node ? (
-        <div className="inspector-empty">Select an element on the canvas.</div>
+        <div className="inspector-scroll">
+          <section className="inspector-section">
+            <div className="section-label">Screen</div>
+            {screen && (
+              <>
+                <Field label="Name">
+                  <input value={screen.name} onChange={(event) => updateActiveScreen({ name: event.target.value })} />
+                </Field>
+                <Field label="Navigation">
+                  <input value={screen.navigationTitle} onChange={(event) => updateActiveScreen({ navigationTitle: event.target.value })} />
+                </Field>
+              </>
+            )}
+          </section>
+          <div className="inspector-empty">Select an element on the canvas to edit its properties.</div>
+        </div>
       ) : (
         <div className="inspector-scroll">
           <section className="inspector-section">
@@ -30,6 +47,16 @@ export function Inspector() {
               <Field label="Label">
                 <input value={node.label} onChange={(event) => updateSelectedNode({ label: event.target.value } as Partial<CanvasNode>)} />
               </Field>
+            )}
+            {node.kind === 'image' && (
+              <>
+                <Field label="Symbol">
+                  <input value={node.systemName} onChange={(event) => updateSelectedNode({ systemName: event.target.value } as Partial<CanvasNode>)} />
+                </Field>
+                <Field label="A11y label">
+                  <input value={node.accessibilityLabel} onChange={(event) => updateSelectedNode({ accessibilityLabel: event.target.value } as Partial<CanvasNode>)} />
+                </Field>
+              </>
             )}
             {node.kind === 'text' && (
               <>
@@ -85,6 +112,7 @@ export function Inspector() {
           )}
 
           <section className="inspector-section">
+            <button className="secondary-action-button" type="button" onClick={duplicateSelectedNode}>Duplicate element</button>
             <button className="delete-button" type="button" onClick={deleteSelectedNode}>Delete element</button>
           </section>
         </div>
