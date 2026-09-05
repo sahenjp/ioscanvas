@@ -36,7 +36,7 @@ function renderNode(node: CanvasNode, depth: number, bindings: Map<string, Bindi
   switch (node.kind) {
     case 'text': {
       const weight = node.weight === 'regular' ? '' : `, weight: .${node.weight}`;
-      return `${pad}Text(${quoted(node.text)})\n${pad}    .font(.system(size: ${node.fontSize}${weight}, relativeTo: .body))`;
+      return `${pad}Text(${quoted(node.text)})\n${pad}    .font(.system(size: ${node.fontSize}${weight}))`;
     }
     case 'button': {
       const role = node.role === 'normal' ? '' : `, role: .${node.role}`;

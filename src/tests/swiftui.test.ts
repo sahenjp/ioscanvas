@@ -28,7 +28,7 @@ describe('SwiftUI generator', () => {
     expect(output).toContain('@State private var _1_user_name: String = ""');
     expect(output).toContain('isOn: $_class');
     expect(output).toContain('text: $_1_user_name');
-    expect(output).toContain('relativeTo: .body');
+    expect(output).toContain('.font(.system(size: 28, weight: .semibold))');
   });
 
   it('keeps Boolean and String bindings separate when names collide', () => {

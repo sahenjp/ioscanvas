@@ -68,7 +68,7 @@ The first xtool build requires Swift, an iOS Swift SDK, and the one-time xtool s
 
 ## Versioning
 
-The project follows Semantic Versioning. The current release line is `1.0.0`.
+The project follows Semantic Versioning. The current release line is `1.0.1`.
 
 ## Inspiration
 
@@ -80,4 +80,4 @@ See [`ACKNOWLEDGEMENTS.md`](./ACKNOWLEDGEMENTS.md) for attribution details.
 
 ## Status
 
-Version 1.0.0 baseline. The semantic editor, nested drag-and-drop, structure tree, inspector, HIG checks, history controls, SwiftUI export, and an xtool SwiftUI target are present; component coverage is still limited.
+Version 1.0.1. The semantic editor, nested drag-and-drop, structure tree, inspector, HIG checks, history controls, SwiftUI export, and an xtool SwiftUI target are present; component coverage is still limited.
