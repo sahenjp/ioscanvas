@@ -1,13 +1,7 @@
 # Acknowledgements
 
-## M3E Canvas
+This project was inspired by **M3E Canvas by lnkiai**.
 
-This project was initially inspired by M3E Canvas by lnkiai:
+The idea of moving from a visual interface composition workflow toward implementation-oriented output was a useful reference for this project. This repository applies that direction to iOS- and SwiftUI-oriented interface design with its own data model, editor behavior, validation, and exporters.
 
-https://github.com/lnkiai/m3e-canvas
-
-M3E Canvas demonstrates a simple and useful loop: visually compose interface screens, connect intent, and export a prompt that can be handed to a coding agent.
-
-This project explores a different direction around SwiftUI semantics, Apple-platform constraints, accessibility checks, and deterministic code generation.
-
-This prototype does not copy M3E Canvas source code.
+No M3E Canvas source code is currently copied into this repository.
