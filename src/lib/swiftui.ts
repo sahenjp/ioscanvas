@@ -1,0 +1,59 @@
+import type { CanvasDocument, CanvasNode } from '../types/document';
+
+const indent = (depth: number) => '    '.repeat(depth);
+const quoted = (value: string) => JSON.stringify(value);
+
+function renderNode(node: CanvasNode, depth: number): string {
+  const pad = indent(depth);
+
+  switch (node.kind) {
+    case 'text': {
+      const weight = node.weight === 'regular' ? '' : `\n${pad}    .fontWeight(.${node.weight})`;
+      return `${pad}Text(${quoted(node.text)})\n${pad}    .font(.system(size: ${node.fontSize}))${weight}`;
+    }
+    case 'button': {
+      const role = node.role === 'normal' ? '' : `, role: .${node.role}`;
+      return `${pad}Button(${quoted(node.label)}${role}) {\n${pad}    // Action\n${pad}}\n${pad}.frame(minHeight: ${node.minHeight})`;
+    }
+    case 'toggle':
+      return `${pad}Toggle(${quoted(node.label)}, isOn: $${node.binding})\n${pad}    .frame(minHeight: ${node.minHeight})`;
+    case 'textfield':
+      return `${pad}TextField(${quoted(node.label)}, text: $${node.binding})\n${pad}    .textFieldStyle(.roundedBorder)\n${pad}    .frame(minHeight: ${node.minHeight})`;
+    case 'divider':
+      return `${pad}Divider()`;
+    case 'spacer':
+      return `${pad}Spacer()`;
+    case 'vstack':
+    case 'hstack': {
+      const type = node.kind === 'vstack' ? 'VStack' : 'HStack';
+      const children = node.children.map((child) => renderNode(child, depth + 1)).join('\n');
+      return `${pad}${type}(spacing: ${node.spacing ?? 0}) {\n${children}\n${pad}}`;
+    }
+    case 'section': {
+      const children = node.children.map((child) => renderNode(child, depth + 1)).join('\n');
+      return `${pad}Section(${quoted(node.title ?? 'Section')}) {\n${children}\n${pad}}`;
+    }
+  }
+}
+
+function collectBindings(nodes: CanvasNode[], result = new Map<string, 'Bool' | 'String'>()): Map<string, 'Bool' | 'String'> {
+  for (const node of nodes) {
+    if (node.kind === 'toggle') result.set(node.binding, 'Bool');
+    if (node.kind === 'textfield') result.set(node.binding, 'String');
+    if (node.children) collectBindings(node.children, result);
+  }
+  return result;
+}
+
+export function generateSwiftUI(document: CanvasDocument): string {
+  const screen = document.screens.find((candidate) => candidate.id === document.activeScreenId) ?? document.screens[0];
+  if (!screen) return '';
+
+  const bindings = collectBindings(screen.root.children);
+  const stateLines = [...bindings.entries()]
+    .map(([name, type]) => `    @State private var ${name}: ${type} = ${type === 'Bool' ? 'false' : '\"\"'}`)
+    .join('\n');
+  const body = screen.root.children.map((node) => renderNode(node, 4)).join('\n');
+
+  return `import SwiftUI\n\nstruct ${screen.name.replace(/[^A-Za-z0-9_]/g, '') || 'Content'}View: View {\n${stateLines ? `${stateLines}\n\n` : ''}    var body: some View {\n        NavigationStack {\n            ScrollView {\n                VStack(alignment: .leading, spacing: ${screen.root.spacing ?? 16}) {\n${body}\n                }\n                .padding()\n            }\n            .navigationTitle(${quoted(screen.navigationTitle)})\n        }\n    }\n}\n`;
+}
