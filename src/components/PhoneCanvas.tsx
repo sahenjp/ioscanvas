@@ -23,16 +23,19 @@ function NodeView({ node, allNodes }: { node: CanvasNode; allNodes: CanvasNode[]
   const selectNode = useEditorStore((state) => state.selectNode);
   const addNode = useEditorStore((state) => state.addNode);
   const moveNode = useEditorStore((state) => state.moveNode);
+  const previewMode = useEditorStore((state) => state.previewMode);
   const [isDropTarget, setIsDropTarget] = useState(false);
-  const selected = selectedNodeId === node.id;
+  const selected = !previewMode && selectedNodeId === node.id;
   const glassClass = node.glass && node.kind !== 'button' ? `glass-${node.glass}` : '';
 
   const select = (event: React.MouseEvent) => {
+    if (previewMode) return;
     event.stopPropagation();
     selectNode(node.id);
   };
 
   const startDrag = (event: React.DragEvent) => {
+    if (previewMode) return;
     event.stopPropagation();
     event.dataTransfer.effectAllowed = 'move';
     const value = encodeDragData({ kind: 'move', nodeId: node.id });
@@ -42,6 +45,7 @@ function NodeView({ node, allNodes }: { node: CanvasNode; allNodes: CanvasNode[]
   };
 
   const dragOver = (event: React.DragEvent) => {
+    if (previewMode) return;
     if (!hasNodeDragData(event)) return;
     event.preventDefault();
     event.stopPropagation();
@@ -50,6 +54,7 @@ function NodeView({ node, allNodes }: { node: CanvasNode; allNodes: CanvasNode[]
   };
 
   const drop = (event: React.DragEvent) => {
+    if (previewMode) return;
     event.preventDefault();
     event.stopPropagation();
     setIsDropTarget(false);
@@ -90,14 +95,14 @@ function NodeView({ node, allNodes }: { node: CanvasNode; allNodes: CanvasNode[]
   return (
     <div
       className={`canvas-node ${glassClass} ${selected ? 'is-selected' : ''} ${isDropTarget ? 'is-drop-target' : ''}`}
-      draggable
-      onClick={select}
-      onDragEnd={() => setIsDropTarget(false)}
-      onDragEnter={dragOver}
-      onDragLeave={() => setIsDropTarget(false)}
-      onDragOver={dragOver}
-      onDragStart={startDrag}
-      onDrop={drop}
+      draggable={!previewMode}
+      onClick={previewMode ? undefined : select}
+      onDragEnd={previewMode ? undefined : () => setIsDropTarget(false)}
+      onDragEnter={previewMode ? undefined : dragOver}
+      onDragLeave={previewMode ? undefined : () => setIsDropTarget(false)}
+      onDragOver={previewMode ? undefined : dragOver}
+      onDragStart={previewMode ? undefined : startDrag}
+      onDrop={previewMode ? undefined : drop}
     >
       {content}
     </div>
@@ -165,13 +170,16 @@ export function PhoneCanvas() {
   const selectNode = useEditorStore((state) => state.selectNode);
   const addNode = useEditorStore((state) => state.addNode);
   const moveNode = useEditorStore((state) => state.moveNode);
+  const previewMode = useEditorStore((state) => state.previewMode);
   const screen = document.screens.find((candidate) => candidate.id === document.activeScreenId) ?? document.screens[0];
   const [isOver, setIsOver] = useState(false);
+  const [zoom, setZoom] = useState(100);
+  const [showGrid, setShowGrid] = useState(true);
 
   if (!screen) return null;
 
   const dropOnScreen = (event: React.DragEvent) => {
-    if (!hasNodeDragData(event)) return;
+    if (previewMode || !hasNodeDragData(event)) return;
     event.preventDefault();
     setIsOver(false);
     const data = readDragData(event);
@@ -181,24 +189,39 @@ export function PhoneCanvas() {
   };
 
   return (
-    <main className="workspace" onClick={() => selectNode(null)}>
-      <div className="workspace-ruler"><span>iPhone</span><span>393 × 852 pt</span></div>
-      <div
-        className={`phone-shell ${isOver ? 'is-over' : ''}`}
-        onDragEnter={(event) => { if (hasNodeDragData(event)) setIsOver(true); }}
-        onDragLeave={() => setIsOver(false)}
-        onDragOver={(event) => { if (hasNodeDragData(event)) event.preventDefault(); }}
-        onDrop={dropOnScreen}
-      >
-        <div className="phone-screen">
-          <div className="statusbar"><span>9:41</span><span className="status-icons">● ◒</span></div>
-          <div className="dynamic-island" aria-hidden="true" />
-          <div className="navigation-title">{screen.navigationTitle}</div>
-          <div className="screen-content">
-            {screen.root.children.length === 0 && <div className="screen-drop-hint">Drop a component here</div>}
-            {screen.root.children.map((node) => <NodeView key={node.id} node={node} allNodes={screen.root.children} />)}
+    <main className={`workspace ${showGrid ? '' : 'no-grid'} ${previewMode ? 'preview-mode' : ''}`} onClick={previewMode ? undefined : () => selectNode(null)}>
+      <div className="workspace-toolbar">
+        <div className="workspace-title">
+          <strong>{previewMode ? 'Preview' : 'Canvas'}</strong>
+          <span>iPhone · 393 × 852 pt</span>
+        </div>
+        {!previewMode && <div className="workspace-controls" onClick={(event) => event.stopPropagation()}>
+          <button className="canvas-toolbar-button" type="button" onClick={() => setZoom((current) => Math.max(75, current - 25))} aria-label="Zoom out">−</button>
+          <button className="zoom-value" type="button" onClick={() => setZoom(100)}>{zoom}%</button>
+          <button className="canvas-toolbar-button" type="button" onClick={() => setZoom((current) => Math.min(125, current + 25))} aria-label="Zoom in">+</button>
+          <span className="toolbar-divider" aria-hidden="true" />
+          <button className={`canvas-toolbar-button grid-toggle ${showGrid ? 'active' : ''}`} type="button" aria-pressed={showGrid} onClick={() => setShowGrid((current) => !current)}>Grid</button>
+        </div>}
+      </div>
+      <div className="workspace-ruler"><span>Preview</span><span>{zoom}%</span></div>
+      <div className="phone-stage" style={{ transform: `scale(${zoom / 100})` }}>
+        <div
+          className={`phone-shell ${isOver ? 'is-over' : ''}`}
+          onDragEnter={previewMode ? undefined : (event) => { if (hasNodeDragData(event)) setIsOver(true); }}
+          onDragLeave={previewMode ? undefined : () => setIsOver(false)}
+          onDragOver={previewMode ? undefined : (event) => { if (hasNodeDragData(event)) event.preventDefault(); }}
+          onDrop={previewMode ? undefined : dropOnScreen}
+        >
+          <div className="phone-screen">
+            <div className="statusbar"><span>9:41</span><span className="status-icons">● ◒</span></div>
+            <div className="dynamic-island" aria-hidden="true" />
+            <div className="navigation-title">{screen.navigationTitle}</div>
+            <div className="screen-content">
+              {screen.root.children.length === 0 && <div className="screen-drop-hint">Drop a component here</div>}
+              {screen.root.children.map((node) => <NodeView key={node.id} node={node} allNodes={screen.root.children} />)}
+            </div>
+            <div className="home-indicator" aria-hidden="true" />
           </div>
-          <div className="home-indicator" aria-hidden="true" />
         </div>
       </div>
     </main>

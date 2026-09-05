@@ -9,6 +9,8 @@ import './styles/app.css';
 
 export default function App() {
   const selectedNodeId = useEditorStore((state) => state.selectedNodeId);
+  const previewMode = useEditorStore((state) => state.previewMode);
+  const setPreviewMode = useEditorStore((state) => state.setPreviewMode);
   const deleteSelectedNode = useEditorStore((state) => state.deleteSelectedNode);
   const duplicateSelectedNode = useEditorStore((state) => state.duplicateSelectedNode);
   const undo = useEditorStore((state) => state.undo);
@@ -37,6 +39,12 @@ export default function App() {
         return;
       }
 
+      if (!modifier && event.key.toLowerCase() === 'p') {
+        event.preventDefault();
+        setPreviewMode(!previewMode);
+        return;
+      }
+
       if (selectedNodeId && (event.key === 'Backspace' || event.key === 'Delete')) {
         event.preventDefault();
         deleteSelectedNode();
@@ -45,17 +53,17 @@ export default function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [deleteSelectedNode, duplicateSelectedNode, redo, selectedNodeId, undo]);
+  }, [deleteSelectedNode, duplicateSelectedNode, previewMode, redo, selectedNodeId, setPreviewMode, undo]);
 
   return (
     <div className="app-shell">
       <TopBar />
-      <div className="editor-grid">
-        <Palette />
+      <div className={`editor-grid ${previewMode ? 'preview-grid' : ''}`}>
+        {!previewMode && <Palette />}
         <PhoneCanvas />
-        <Inspector />
+        {!previewMode && <Inspector />}
       </div>
-      <ExportPanel />
+      {!previewMode && <ExportPanel />}
     </div>
   );
 }

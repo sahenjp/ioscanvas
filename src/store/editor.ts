@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { defaultDocument } from '../lib/defaultDocument';
-import { cloneNode, createNode, findNode, findNodeLocation, insertNode, isContainerNode, moveNode as moveTreeNode, removeNode, updateNode } from '../lib/nodes';
+import { cloneNode, createId, createNode, findNode, findNodeLocation, insertNode, isContainerNode, moveNode as moveTreeNode, removeNode, updateNode } from '../lib/nodes';
 import type { CanvasDocument, CanvasNode, CanvasScreen, NodeKind } from '../types/document';
 
 const MAX_HISTORY = 50;
@@ -10,11 +10,17 @@ interface EditorState {
   document: CanvasDocument;
   selectedNodeId: string | null;
   exportOpen: boolean;
+  previewMode: boolean;
   past: CanvasDocument[];
   future: CanvasDocument[];
   selectNode: (id: string | null) => void;
+  selectScreen: (id: string) => void;
+  setPreviewMode: (open: boolean) => void;
   setExportOpen: (open: boolean) => void;
   addNode: (kind: NodeKind, parentId?: string | null, index?: number) => void;
+  addScreen: () => void;
+  duplicateActiveScreen: () => void;
+  deleteActiveScreen: () => void;
   duplicateSelectedNode: () => void;
   moveNode: (nodeId: string, parentId: string | null, index?: number) => void;
   updateSelectedNode: (patch: Partial<CanvasNode>) => void;
@@ -58,9 +64,16 @@ export const useEditorStore = create<EditorState>()(
       document: cloneDocument(defaultDocument),
       selectedNodeId: null,
       exportOpen: false,
+      previewMode: false,
       past: [],
       future: [],
       selectNode: (id) => set({ selectedNodeId: id }),
+      selectScreen: (id) => {
+        set((state) => state.document.screens.some((screen) => screen.id === id)
+          ? { document: { ...state.document, activeScreenId: id }, selectedNodeId: null }
+          : state);
+      },
+      setPreviewMode: (open) => set({ previewMode: open, selectedNodeId: open ? null : get().selectedNodeId }),
       setExportOpen: (open) => set({ exportOpen: open }),
       addNode: (kind, parentId = null, index) => {
         const node = createNode(kind);
@@ -79,6 +92,56 @@ export const useEditorStore = create<EditorState>()(
           if (!target || !isContainerNode(target)) return state;
           const inserted = insertNode(screen.root.children, parentId, node, index);
           return withHistory(state, replaceScreenChildren(state.document, screen.id, inserted), node.id);
+        });
+      },
+      addScreen: () => {
+        set((state) => {
+          const number = state.document.screens.length + 1;
+          const screen: CanvasScreen = {
+            id: createId('screen'),
+            name: `Screen ${number}`,
+            navigationTitle: `Screen ${number}`,
+            root: { id: createId('root'), kind: 'vstack', spacing: 16, children: [] },
+          };
+          return withHistory(state, {
+            ...state.document,
+            screens: [...state.document.screens, screen],
+            activeScreenId: screen.id,
+          }, null);
+        });
+      },
+      duplicateActiveScreen: () => {
+        set((state) => {
+          const screen = activeScreen(state.document);
+          if (!screen) return state;
+          const root = cloneNode(screen.root);
+          if (!isContainerNode(root)) return state;
+          const duplicate: CanvasScreen = {
+            ...screen,
+            id: createId('screen'),
+            name: `${screen.name} Copy`,
+            root,
+          };
+          return withHistory(state, {
+            ...state.document,
+            screens: [...state.document.screens, duplicate],
+            activeScreenId: duplicate.id,
+          }, null);
+        });
+      },
+      deleteActiveScreen: () => {
+        set((state) => {
+          if (state.document.screens.length <= 1) return state;
+          const index = state.document.screens.findIndex((screen) => screen.id === state.document.activeScreenId);
+          if (index < 0) return state;
+          const screens = state.document.screens.filter((screen) => screen.id !== state.document.activeScreenId);
+          const nextScreen = screens[Math.max(0, index - 1)] ?? screens[0];
+          if (!nextScreen) return state;
+          return withHistory(state, {
+            ...state.document,
+            screens,
+            activeScreenId: nextScreen.id,
+          }, null);
         });
       },
       duplicateSelectedNode: () => {

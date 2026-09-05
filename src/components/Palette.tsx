@@ -41,33 +41,52 @@ function startDrag(event: React.DragEvent, data: Parameters<typeof encodeDragDat
 export function Palette() {
   const document = useEditorStore((state) => state.document);
   const addNode = useEditorStore((state) => state.addNode);
+  const [tab, setTab] = useState<'layers' | 'components'>('layers');
+  const [query, setQuery] = useState('');
   const screen = document.screens.find((candidate) => candidate.id === document.activeScreenId) ?? document.screens[0];
+  const normalizedQuery = query.trim().toLowerCase();
+  const filteredGroups = groups
+    .map((group) => ({ ...group, items: group.items.filter((item) => item.label.toLowerCase().includes(normalizedQuery)) }))
+    .filter((group) => group.items.length > 0);
 
   return (
     <aside className="palette panel-border-right" aria-label="Components and SwiftUI structure">
-      <div className="panel-heading">Components</div>
+      <div className="panel-heading"><span>Library</span><span className="panel-heading-meta">{tab === 'layers' ? 'Layers' : `${filteredGroups.reduce((total, group) => total + group.items.length, 0)} items`}</span></div>
+      <div className="panel-tabs" role="tablist" aria-label="Library views">
+        <button className={tab === 'layers' ? 'active' : ''} type="button" role="tab" aria-selected={tab === 'layers'} onClick={() => setTab('layers')}>Layers</button>
+        <button className={tab === 'components' ? 'active' : ''} type="button" role="tab" aria-selected={tab === 'components'} onClick={() => setTab('components')}>Components</button>
+      </div>
       <div className="palette-scroll">
-        {screen && <StructureTree root={screen.root} onDragStart={startDrag} />}
-        {groups.map((group) => (
-          <section className="palette-group" key={group.title}>
-            <div className="palette-group-title">{group.title}</div>
-            <div className="palette-items">
-              {group.items.map((item) => (
-                <button
-                  className="palette-item"
-                  draggable
-                  key={item.kind}
-                  onClick={() => addNode(item.kind)}
-                  onDragStart={(event) => startDrag(event, { kind: 'new', nodeKind: item.kind })}
-                  type="button"
-                >
-                  <span className="palette-symbol" aria-hidden="true">{item.symbol}</span>
-                  <span>{item.label}</span>
-                </button>
-              ))}
-            </div>
-          </section>
-        ))}
+        {tab === 'layers' && screen && <StructureTree root={screen.root} onDragStart={startDrag} />}
+        {tab === 'components' && (
+          <>
+            <label className="component-search">
+              <span aria-hidden="true">⌕</span>
+              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Filter components" aria-label="Filter components" />
+            </label>
+            {filteredGroups.map((group) => (
+              <section className="palette-group" key={group.title}>
+                <div className="palette-group-title">{group.title}</div>
+                <div className="palette-items">
+                  {group.items.map((item) => (
+                    <button
+                      className="palette-item"
+                      draggable
+                      key={item.kind}
+                      onClick={() => addNode(item.kind)}
+                      onDragStart={(event) => startDrag(event, { kind: 'new', nodeKind: item.kind })}
+                      type="button"
+                    >
+                      <span className="palette-symbol" aria-hidden="true">{item.symbol}</span>
+                      <span>{item.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </section>
+            ))}
+            {filteredGroups.length === 0 && <div className="palette-empty">No components match “{query}”.</div>}
+          </>
+        )}
       </div>
     </aside>
   );
