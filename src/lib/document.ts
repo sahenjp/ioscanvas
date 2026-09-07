@@ -1,5 +1,5 @@
 import { isContainerNode } from './nodes';
-import type { CanvasDocument, CanvasNode, CanvasScreen, GlassStyle, NodeKind } from '../types/document';
+import type { AccentColor, CanvasDocument, CanvasNode, CanvasScreen, ColorScheme, GlassStyle, NodeKind } from '../types/document';
 
 type RecordValue = Record<string, unknown>;
 
@@ -106,6 +106,13 @@ export function parseCanvasDocument(value: unknown): CanvasDocument | null {
     return null;
   }
 
+  const appearance = value.appearance;
+  if (appearance !== undefined && (!isRecord(appearance)
+    || !isOneOf(appearance.colorScheme, ['system', 'light', 'dark'])
+    || !isOneOf(appearance.accentColor, ['blue', 'purple', 'pink', 'orange', 'green']))) {
+    return null;
+  }
+
   const ids = new Set<string>();
   const screens = value.screens.map((screen) => readScreen(screen, ids));
   if (screens.some((screen): screen is null => screen === null)) return null;
@@ -116,6 +123,12 @@ export function parseCanvasDocument(value: unknown): CanvasDocument | null {
     name: value.name,
     platform: 'iOS',
     minimumOS: '26.0',
+    appearance: appearance === undefined
+      ? { colorScheme: 'system', accentColor: 'blue' }
+      : {
+          colorScheme: appearance.colorScheme as ColorScheme,
+          accentColor: appearance.accentColor as AccentColor,
+        },
     activeScreenId: value.activeScreenId,
     screens: screens as CanvasScreen[],
   };

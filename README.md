@@ -1,6 +1,6 @@
-# ioscanvas
+# S3E Canvas
 
-A browser-based canvas for composing iOS-style interfaces as a semantic SwiftUI-like tree, checking basic Human Interface Guidelines constraints, and exporting implementation-ready SwiftUI.
+**SwiftUI Experience Engineering Editor** — a browser-based canvas for composing iOS interfaces as a semantic SwiftUI-like tree, checking Human Interface Guidelines constraints, and exporting implementation-ready SwiftUI.
 
 ## What it does
 
@@ -8,13 +8,16 @@ A browser-based canvas for composing iOS-style interfaces as a semantic SwiftUI-
 - Preview iPhone-style layouts in the browser.
 - Edit properties from an inspector.
 - Drag components into the screen or into layout containers, then reorder or reparent them.
+- Move the selected element up or down precisely from the Inspector when drag-and-drop is not convenient.
 - Inspect the generated structure tree and use Undo/Redo or Delete/Backspace while editing.
 - Duplicate selected elements with Cmd/Ctrl+D, including nested children.
 - Save and open validated `.ioscanvas.json` project files.
 - Opt into iOS 26 Liquid Glass styles from the Inspector and export the corresponding SwiftUI modifiers.
+- Set the app color scheme and tint once, then keep Preview, SwiftUI output, and the implementation brief aligned.
+- See a material backdrop in the canvas when Liquid Glass is present, while keeping the exported view native SwiftUI.
 - Add, duplicate, switch, and remove screens, then inspect them in a read-only Preview mode.
 - Follow NavigationLink transitions directly in Preview to check the screen flow.
-- Use a Layers / Components library with component filtering, canvas zoom, and grid visibility controls.
+- Use a Layers / Parts library with filtering, canvas zoom, and grid visibility controls.
 - Compose native `List`, `Form`, and `NavigationLink` patterns across screens, then export the linked SwiftUI views together.
 - Run lightweight HIG checks such as minimum tap-target sizing.
 - Export SwiftUI code from the document tree.
@@ -79,7 +82,7 @@ The first xtool build requires Swift, an iOS Swift SDK, and the one-time xtool s
 
 ## Versioning
 
-The project follows Semantic Versioning. The current release line is `1.4.0`.
+S3E Canvas follows Semantic Versioning from `1.0.0`. Earlier `ioscanvas` tags remain as legacy project history.
 
 ## Inspiration
 
@@ -91,4 +94,4 @@ See [`ACKNOWLEDGEMENTS.md`](./ACKNOWLEDGEMENTS.md) for attribution details.
 
 ## Status
 
-Version 1.4.0. The semantic editor, multi-screen workspace, nested drag-and-drop, structure tree, inspector, Preview mode with screen flow, history controls, project files, SF Symbol images, Liquid Glass styles, native List/Form/NavigationLink patterns, HIG checks, linked SwiftUI export, and an xtool SwiftUI target are present.
+Version 1.0.0. The semantic editor, multi-screen workspace, nested drag-and-drop, precise element ordering, structure tree, inspector, Appearance controls, Preview mode with screen flow, history controls, project files, SF Symbol images, Liquid Glass material preview, native List/Form/NavigationLink patterns, HIG checks, linked SwiftUI export, and an xtool SwiftUI target are present.

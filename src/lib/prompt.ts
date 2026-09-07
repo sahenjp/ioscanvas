@@ -40,6 +40,7 @@ export function generateImplementationPrompt(document: CanvasDocument): string {
     `対象: iOS ${document.minimumOS}以降 / SwiftUI`,
     `画面: ${screen.name}`,
     `ナビゲーションタイトル: ${screen.navigationTitle}`,
+    `外観: ${document.appearance.colorScheme} / tint=${document.appearance.accentColor}`,
     '',
     '構造:',
     ...screen.root.children.flatMap((node) => describe(node)),

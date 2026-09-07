@@ -196,6 +196,8 @@ export function PhoneCanvas() {
 
   if (!screen) return null;
 
+  const hasGlass = containsGlass(screen.root.children);
+
   const dropOnScreen = (event: React.DragEvent) => {
     if (previewMode || !hasNodeDragData(event)) return;
     event.preventDefault();
@@ -211,7 +213,7 @@ export function PhoneCanvas() {
       <div className="workspace-toolbar">
         <div className="workspace-title">
           <strong>{previewMode ? 'Preview' : 'Canvas'}</strong>
-          <span>{screen.name} · iPhone · 393 × 852 pt</span>
+          <span>{screen.name} · iPhone · 393 × 852 pt{hasGlass ? ' · Liquid Glass' : ''}</span>
         </div>
         {!previewMode && <div className="workspace-controls" onClick={(event) => event.stopPropagation()}>
           <button className="canvas-toolbar-button" type="button" onClick={() => setZoom((current) => Math.max(75, current - 25))} aria-label="Zoom out">−</button>
@@ -230,7 +232,7 @@ export function PhoneCanvas() {
           onDragOver={previewMode ? undefined : (event) => { if (hasNodeDragData(event)) event.preventDefault(); }}
           onDrop={previewMode ? undefined : dropOnScreen}
         >
-          <div className="phone-screen" aria-label={`${screen.name} iPhone preview`}>
+          <div className={`phone-screen scheme-${document.appearance.colorScheme} accent-${document.appearance.accentColor} ${hasGlass ? 'has-glass' : ''}`} aria-label={`${screen.name} iPhone preview`}>
             <div className="statusbar"><span>9:41</span><span className="status-icons">● ◒</span></div>
             <div className="dynamic-island" aria-hidden="true" />
             <div className="navigation-title">{screen.navigationTitle}</div>
@@ -244,4 +246,8 @@ export function PhoneCanvas() {
       </div>
     </main>
   );
+}
+
+function containsGlass(nodes: CanvasNode[]): boolean {
+  return nodes.some((node) => Boolean(node.glass) || (node.children ? containsGlass(node.children) : false));
 }

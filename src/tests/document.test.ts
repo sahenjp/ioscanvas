@@ -23,4 +23,12 @@ describe('project document parsing', () => {
     expect(parseCanvasDocument(document)).toBeNull();
     expect(parseCanvasDocument({ version: 1 })).toBeNull();
   });
+
+  it('adds default appearance to legacy documents and validates new values', () => {
+    const legacy = structuredClone(defaultDocument) as Partial<typeof defaultDocument>;
+    delete legacy.appearance;
+
+    expect(parseCanvasDocument(legacy)?.appearance).toEqual({ colorScheme: 'system', accentColor: 'blue' });
+    expect(parseCanvasDocument({ ...defaultDocument, appearance: { colorScheme: 'sepia', accentColor: 'blue' } })).toBeNull();
+  });
 });

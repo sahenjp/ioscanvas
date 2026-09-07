@@ -82,6 +82,16 @@ describe('SwiftUI generator', () => {
     expect(output).toContain('.buttonStyle(.glass)');
   });
 
+  it('exports the document appearance on the root navigation stack', () => {
+    const document = structuredClone(defaultDocument);
+    document.appearance = { colorScheme: 'dark', accentColor: 'purple' };
+
+    const output = generateSwiftUI(document);
+
+    expect(output).toContain('.tint(.purple)');
+    expect(output).toContain('.preferredColorScheme(.dark)');
+  });
+
   it('exports native list containers and links between screens', () => {
     const document = structuredClone(defaultDocument);
     const home = document.screens[0];

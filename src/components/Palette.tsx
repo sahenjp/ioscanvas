@@ -63,11 +63,11 @@ export function Palette() {
   };
 
   return (
-    <aside className="palette panel-border-right" aria-label="Components and SwiftUI structure">
+    <aside className="palette panel-border-right" aria-label="Parts and SwiftUI structure">
       <div className="panel-heading"><span>Library</span><span className="panel-heading-meta">{tab === 'layers' ? 'Layers' : `${filteredGroups.reduce((total, group) => total + group.items.length, 0)} items`}</span></div>
       <div className="panel-tabs" role="tablist" aria-label="Library views">
         <button className={tab === 'layers' ? 'active' : ''} type="button" role="tab" aria-selected={tab === 'layers'} onClick={() => setTab('layers')}>Layers</button>
-        <button className={tab === 'components' ? 'active' : ''} type="button" role="tab" aria-selected={tab === 'components'} onClick={() => setTab('components')}>Components</button>
+        <button className={tab === 'components' ? 'active' : ''} type="button" role="tab" aria-selected={tab === 'components'} onClick={() => setTab('components')}>Parts</button>
       </div>
       <div className="palette-scroll">
         {tab === 'layers' && screen && <StructureTree screen={screen} onDragStart={startDrag} />}
@@ -79,7 +79,7 @@ export function Palette() {
             </div>
             <label className="component-search">
               <span aria-hidden="true">⌕</span>
-              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Filter components" aria-label="Filter components" />
+              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Filter parts" aria-label="Filter parts" />
             </label>
             {filteredGroups.map((group) => (
               <section className="palette-group" key={group.title}>
@@ -102,7 +102,7 @@ export function Palette() {
                 </div>
               </section>
             ))}
-            {filteredGroups.length === 0 && <div className="palette-empty">No components match “{query}”.</div>}
+            {filteredGroups.length === 0 && <div className="palette-empty">No parts match “{query}”.</div>}
           </>
         )}
       </div>

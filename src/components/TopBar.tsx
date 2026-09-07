@@ -68,7 +68,7 @@ export function TopBar() {
   return (
     <header className="topbar">
       <div className="topbar-brand">
-        <div className="brand-mark" aria-label="iOS canvas"><span className="brand-square" />iOS canvas</div>
+        <div className="brand-mark" aria-label="S3E Canvas"><span className="brand-square" />S3E Canvas</div>
         <div className="topbar-document">
           <span className="topbar-eyebrow">Design file</span>
           <span className="document-name">{document.name}</span>

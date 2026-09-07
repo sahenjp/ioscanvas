@@ -1,8 +1,9 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { defaultDocument } from '../lib/defaultDocument';
+import { parseCanvasDocument } from '../lib/document';
 import { cloneNode, createId, createNode, findNode, findNodeLocation, insertNode, isContainerNode, moveNode as moveTreeNode, removeNode, updateNode } from '../lib/nodes';
-import type { CanvasDocument, CanvasNode, CanvasScreen, NodeKind } from '../types/document';
+import type { CanvasDocument, CanvasNode, CanvasScreen, DocumentAppearance, NodeKind } from '../types/document';
 
 const MAX_HISTORY = 50;
 
@@ -23,8 +24,10 @@ interface EditorState {
   deleteActiveScreen: () => void;
   duplicateSelectedNode: () => void;
   moveNode: (nodeId: string, parentId: string | null, index?: number) => void;
+  moveSelectedNode: (direction: 'up' | 'down') => void;
   updateSelectedNode: (patch: Partial<CanvasNode>) => void;
   updateActiveScreen: (patch: Partial<Pick<CanvasScreen, 'name' | 'navigationTitle'>>) => void;
+  updateAppearance: (patch: Partial<DocumentAppearance>) => void;
   deleteSelectedNode: () => void;
   loadDocument: (document: CanvasDocument) => void;
   undo: () => void;
@@ -165,6 +168,27 @@ export const useEditorStore = create<EditorState>()(
           return withHistory(state, replaceScreenChildren(state.document, screen.id, nextChildren), nodeId);
         });
       },
+      moveSelectedNode: (direction) => {
+        const id = get().selectedNodeId;
+        if (!id) return;
+        set((state) => {
+          const screen = activeScreen(state.document);
+          const source = screen && findNodeLocation(screen.root.children, id);
+          if (!screen || !source) return state;
+
+          const parent = source.parentId ? findNode(screen.root.children, source.parentId) : undefined;
+          const siblings = source.parentId === null
+            ? screen.root.children
+            : parent && isContainerNode(parent) ? parent.children : undefined;
+          if (!siblings) return state;
+
+          const index = direction === 'up' ? source.index - 1 : source.index + 2;
+          if (index < 0 || index > siblings.length) return state;
+
+          const nextChildren = moveTreeNode(screen.root.children, id, source.parentId, index);
+          return withHistory(state, replaceScreenChildren(state.document, screen.id, nextChildren), id);
+        });
+      },
       updateSelectedNode: (patch) => {
         const id = get().selectedNodeId;
         if (!id) return;
@@ -187,6 +211,12 @@ export const useEditorStore = create<EditorState>()(
           };
           return withHistory(state, document);
         });
+      },
+      updateAppearance: (patch) => {
+        set((state) => withHistory(state, {
+          ...state.document,
+          appearance: { ...state.document.appearance, ...patch },
+        }));
       },
       deleteSelectedNode: () => {
         const id = get().selectedNodeId;
@@ -231,6 +261,13 @@ export const useEditorStore = create<EditorState>()(
     }),
     {
       name: 'ioscanvas-document',
+      version: 1,
+      migrate: (persistedState) => {
+        const document = typeof persistedState === 'object' && persistedState !== null && 'document' in persistedState
+          ? parseCanvasDocument(persistedState.document)
+          : null;
+        return { document: document ?? cloneDocument(defaultDocument) };
+      },
       partialize: (state) => ({ document: state.document }),
     },
   ),

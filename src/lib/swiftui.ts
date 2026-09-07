@@ -132,7 +132,13 @@ function buildViewNames(screens: CanvasScreen[]): Map<string, string> {
   return viewNames;
 }
 
-function renderScreen(screen: CanvasScreen, context: RenderContext, isRoot: boolean, viewName: string): string {
+function renderScreen(
+  screen: CanvasScreen,
+  context: RenderContext,
+  isRoot: boolean,
+  viewName: string,
+  appearance: CanvasDocument['appearance'],
+): string {
   const stateLines = [...context.bindings.values()]
     .map(({ name, type }) => `    @State private var ${name}: ${type} = ${type === 'Bool' ? 'false' : '""'}`)
     .join('\n');
@@ -147,7 +153,12 @@ function renderScreen(screen: CanvasScreen, context: RenderContext, isRoot: bool
     const body = screen.root.children.map((node) => renderNode(node, 3, context)).join('\n');
     content = `        ScrollView {\n            VStack(alignment: .leading, spacing: ${screen.root.spacing ?? 16}) {\n${body}\n            }\n            .padding()\n        }\n        .navigationTitle(${quoted(screen.navigationTitle)})`;
   }
-  const rootBody = isRoot ? `        NavigationStack {\n${content}\n        }` : content;
+  const colorScheme = appearance.colorScheme === 'system'
+    ? ''
+    : `\n        .preferredColorScheme(.${appearance.colorScheme})`;
+  const rootBody = isRoot
+    ? `        NavigationStack {\n${content}\n        }\n        .tint(.${appearance.accentColor})${colorScheme}`
+    : content;
 
   return `struct ${viewName}: View {\n${stateLines ? `${stateLines}\n\n` : ''}    var body: some View {\n${rootBody}\n    }\n}`;
 }
@@ -160,7 +171,7 @@ export function generateSwiftUI(document: CanvasDocument): string {
   const views = document.screens.map((candidate) => {
     const bindings = collectBindings(candidate.root.children);
     const viewName = viewNames.get(candidate.id) ?? 'ContentView';
-    return renderScreen(candidate, { bindings, viewNames }, candidate.id === screen.id, viewName);
+    return renderScreen(candidate, { bindings, viewNames }, candidate.id === screen.id, viewName, document.appearance);
   }).join('\n\n');
 
   return `import SwiftUI\n\n${views}\n`;

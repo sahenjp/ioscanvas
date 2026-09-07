@@ -5,6 +5,10 @@ export const defaultDocument: CanvasDocument = {
   name: 'Untitled',
   platform: 'iOS',
   minimumOS: '26.0',
+  appearance: {
+    colorScheme: 'system',
+    accentColor: 'blue',
+  },
   activeScreenId: 'screen-home',
   screens: [
     {
@@ -36,6 +40,7 @@ export const defaultDocument: CanvasDocument = {
             label: 'Continue',
             role: 'normal',
             minHeight: 44,
+            glass: 'regular',
           },
           {
             id: 'settings-link',

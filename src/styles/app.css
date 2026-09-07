@@ -102,7 +102,14 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .phone-stage { transform-origin: top center; transition: transform 120ms ease; }
 .phone-shell { width: 423px; min-height: 882px; padding: 15px; border-radius: 61px; border: 1px solid #34383e; background: #08090a; box-shadow: 0 26px 70px rgba(0,0,0,.42); transition: border-color 100ms ease; }
 .phone-shell.is-over { border-color: #666; }
-.phone-screen { position: relative; width: 393px; height: 852px; overflow: hidden; border-radius: 48px; background: #f2f2f7; color: #111; }
+.phone-screen { --preview-accent: #007aff; position: relative; width: 393px; height: 852px; overflow: hidden; border-radius: 48px; background: #f2f2f7; color: #111; }
+.phone-screen.accent-purple { --preview-accent: #af52de; }
+.phone-screen.accent-pink { --preview-accent: #ff2d55; }
+.phone-screen.accent-orange { --preview-accent: #ff9500; }
+.phone-screen.accent-green { --preview-accent: #34c759; }
+.phone-screen.has-glass { background-color: #e8ecf2; background-image: radial-gradient(circle at 16% 22%, rgba(92,151,214,.24) 0 34px, transparent 35px), radial-gradient(circle at 88% 34%, rgba(204,160,199,.22) 0 44px, transparent 45px), radial-gradient(circle at 74% 78%, rgba(231,190,121,.18) 0 52px, transparent 53px); }
+.phone-screen.scheme-dark, .phone-screen.scheme-system { background-color: #000; color: #f5f5f7; color-scheme: dark; }
+.phone-screen.scheme-dark.has-glass, .phone-screen.scheme-system.has-glass { background-color: #080b10; background-image: radial-gradient(circle at 16% 22%, rgba(70,145,230,.3) 0 34px, transparent 35px), radial-gradient(circle at 88% 34%, rgba(192,92,184,.24) 0 44px, transparent 45px), radial-gradient(circle at 74% 78%, rgba(219,151,46,.2) 0 52px, transparent 53px); }
 .statusbar { height: 54px; display: flex; align-items: flex-start; justify-content: space-between; padding: 17px 29px 0; font-size: 12px; font-weight: 650; }
 .status-icons { font-size: 10px; letter-spacing: 2px; }
 .dynamic-island { position: absolute; top: 11px; left: 50%; transform: translateX(-50%); width: 112px; height: 31px; border-radius: 19px; background: #050505; }
@@ -114,21 +121,21 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .canvas-node:hover { outline-color: rgba(10,132,255,.35); }
 .canvas-node.is-selected { outline: 2px solid var(--blue); }
 .canvas-node.is-drop-target { outline: 2px dashed var(--blue); background: rgba(10,132,255,.08); }
-.canvas-node.glass-regular, .canvas-node.glass-clear { padding: 6px; border: 1px solid rgba(255,255,255,.55); border-radius: 16px; background: rgba(255,255,255,.34); backdrop-filter: blur(16px) saturate(1.15); }
-.canvas-node.glass-clear { background: rgba(255,255,255,.18); }
+.canvas-node.glass-regular, .canvas-node.glass-clear { padding: 6px; border: 1px solid rgba(255,255,255,.7); border-radius: 16px; background: rgba(255,255,255,.42); box-shadow: 0 6px 18px rgba(57,69,88,.14), inset 0 1px 0 rgba(255,255,255,.8); backdrop-filter: blur(16px) saturate(1.15); }
+.canvas-node.glass-clear { background: rgba(255,255,255,.24); }
 .canvas-text { display: block; width: 100%; padding: 2px 0; color: #111; text-align: left; line-height: 1.22; }
 .ios-image { min-height: 44px; display: flex; align-items: center; gap: 9px; padding: 8px 12px; border: 1px solid #d4d4d7; border-radius: 10px; background: #fff; color: #555; font-size: 12px; }
 .ios-image-symbol { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 7px; background: #e8e8ed; color: #555; font-size: 17px; }
-.ios-button { width: 100%; border: 0; border-radius: 11px; padding: 8px 14px; background: #0a84ff; color: #fff; font-weight: 600; cursor: default; }
+.ios-button { width: 100%; border: 0; border-radius: 11px; padding: 8px 14px; background: var(--preview-accent); color: #fff; font-weight: 600; cursor: default; }
 .ios-button.destructive { background: #ff3b30; }
-.ios-button.ios-button-regular, .ios-button.ios-button-clear { border: 1px solid rgba(255,255,255,.72); background: rgba(255,255,255,.42); color: #111; backdrop-filter: blur(16px) saturate(1.15); }
+.ios-button.ios-button-regular, .ios-button.ios-button-clear { border: 1px solid rgba(255,255,255,.72); background: rgba(255,255,255,.42); color: var(--preview-accent); backdrop-filter: blur(16px) saturate(1.15); }
 .ios-button.ios-button-clear { background: rgba(255,255,255,.2); }
 .ios-row { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 0 13px; border: 0; border-radius: 10px; background: #fff; color: #111; text-align: left; cursor: default; }
-.ios-navigation-link { color: #0a65c7; }
+.ios-navigation-link { color: var(--preview-accent); }
 button.ios-navigation-link { font: inherit; cursor: pointer; }
 button.ios-navigation-link:hover { background: #f5f5f7; }
 .ios-link-indicator { color: #8e8e93; font-size: 11px; }
-.ios-switch { width: 51px; height: 31px; padding: 2px; border-radius: 19px; background: #34c759; }
+.ios-switch { width: 51px; height: 31px; padding: 2px; border-radius: 19px; background: var(--preview-accent); }
 .ios-switch span { display: block; width: 27px; height: 27px; margin-left: 20px; border-radius: 50%; background: white; box-shadow: 0 1px 3px rgba(0,0,0,.25); }
 .ios-field { width: 100%; border: 1px solid #d4d4d7; border-radius: 10px; padding: 0 12px; background: white; color: #8e8e93; text-align: left; cursor: default; }
 .ios-divider { width: 100%; height: 1px; min-height: 1px; padding: 0; border: 0; background: #c6c6c8; cursor: default; }
@@ -142,6 +149,20 @@ button.ios-navigation-link:hover { background: #f5f5f7; }
 .empty-container { padding: 12px; color: #8e8e93; text-align: center; font-size: 11px; }
 .screen-drop-hint { padding: 18px; border: 1px dashed #aaaab0; border-radius: 9px; color: #8e8e93; text-align: center; font-size: 11px; }
 .section-title { margin-bottom: 6px; color: #6d6d72; font-size: 12px; text-transform: uppercase; }
+
+.phone-screen.scheme-dark .canvas-text, .phone-screen.scheme-system .canvas-text { color: #f5f5f7; }
+.phone-screen.scheme-dark .ios-image, .phone-screen.scheme-system .ios-image,
+.phone-screen.scheme-dark .ios-row, .phone-screen.scheme-system .ios-row,
+.phone-screen.scheme-dark .ios-field, .phone-screen.scheme-system .ios-field { border-color: #3a3a3c; background: #1c1c1e; color: #f5f5f7; }
+.phone-screen.scheme-dark .ios-image-symbol, .phone-screen.scheme-system .ios-image-symbol { background: #2c2c2e; color: #d1d1d6; }
+.phone-screen.scheme-dark button.ios-navigation-link:hover, .phone-screen.scheme-system button.ios-navigation-link:hover { background: #2c2c2e; }
+.phone-screen.scheme-dark .ios-field, .phone-screen.scheme-system .ios-field,
+.phone-screen.scheme-dark .ios-link-indicator, .phone-screen.scheme-system .ios-link-indicator,
+.phone-screen.scheme-dark .section-title, .phone-screen.scheme-system .section-title { color: #aeaeb2; }
+.phone-screen.scheme-dark .canvas-container, .phone-screen.scheme-system .canvas-container { border-color: #545458; background: rgba(44,44,46,.55); }
+.phone-screen.scheme-dark .canvas-list, .phone-screen.scheme-system .canvas-list,
+.phone-screen.scheme-dark .canvas-form, .phone-screen.scheme-system .canvas-form { border-color: #3a3a3c; background: rgba(28,28,30,.8); }
+.phone-screen.scheme-dark .home-indicator, .phone-screen.scheme-system .home-indicator { background: #f5f5f7; }
 
 .structure-section { padding: 14px 0 18px; border-top: 1px solid #202327; }
 .structure-heading { display: flex; align-items: center; justify-content: space-between; padding: 0 14px 10px; color: var(--muted); font-size: 10px; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; }
@@ -173,6 +194,9 @@ button.ios-navigation-link:hover { background: #f5f5f7; }
 .hig-issue-button:hover { color: #e2c894; }
 .secondary-action-button { width: 100%; min-height: 32px; margin-bottom: 8px; border: 1px solid var(--line-strong); border-radius: 6px; background: #171717; color: #c9c9c9; font-size: 11px; cursor: pointer; }
 .secondary-action-button:hover { background: #202020; }
+.secondary-action-button:disabled { cursor: default; opacity: .35; }
+.reorder-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.reorder-actions .secondary-action-button { margin-bottom: 10px; }
 .delete-button { width: 100%; min-height: 32px; border: 1px solid #3a2423; border-radius: 6px; background: #1b1110; color: #e07770; font-size: 11px; cursor: pointer; }
 .delete-button:hover { background: #221311; }
 .project-error { color: #e07770; font-size: 10px; }
@@ -259,6 +283,16 @@ button.ios-navigation-link:hover { background: #f5f5f7; }
   .canvas-toolbar-button, .zoom-value { color: #5b6168; }
   .canvas-toolbar-button:hover, .zoom-value:hover { background: #eef0f2; color: #202124; }
   .phone-shell { border-color: #c8cbd0; background: #181a1d; }
+  .phone-screen.scheme-system { background-color: #f2f2f7; color: #111; color-scheme: light; }
+  .phone-screen.scheme-system.has-glass { background-color: #e8ecf2; background-image: radial-gradient(circle at 16% 22%, rgba(92,151,214,.24) 0 34px, transparent 35px), radial-gradient(circle at 88% 34%, rgba(204,160,199,.22) 0 44px, transparent 45px), radial-gradient(circle at 74% 78%, rgba(231,190,121,.18) 0 52px, transparent 53px); }
+  .phone-screen.scheme-system .canvas-text { color: #111; }
+  .phone-screen.scheme-system .ios-image, .phone-screen.scheme-system .ios-row, .phone-screen.scheme-system .ios-field { border-color: #d4d4d7; background: #fff; color: #111; }
+  .phone-screen.scheme-system .ios-image-symbol { background: #e8e8ed; color: #555; }
+  .phone-screen.scheme-system button.ios-navigation-link:hover { background: #f5f5f7; }
+  .phone-screen.scheme-system .ios-field, .phone-screen.scheme-system .ios-link-indicator, .phone-screen.scheme-system .section-title { color: #8e8e93; }
+  .phone-screen.scheme-system .canvas-container { border-color: #b9b9bd; background: rgba(255,255,255,.35); }
+  .phone-screen.scheme-system .canvas-list, .phone-screen.scheme-system .canvas-form { border-color: #d4d4d7; background: rgba(255,255,255,.72); }
+  .phone-screen.scheme-system .home-indicator { background: #111; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -1,4 +1,4 @@
-import { findNode } from '../lib/nodes';
+import { findNode, findNodeLocation, isContainerNode } from '../lib/nodes';
 import { lintDocument } from '../lib/hig';
 import { useEditorStore } from '../store/editor';
 import type { CanvasNode, GlassStyle } from '../types/document';
@@ -8,11 +8,20 @@ export function Inspector() {
   const selectedNodeId = useEditorStore((state) => state.selectedNodeId);
   const updateSelectedNode = useEditorStore((state) => state.updateSelectedNode);
   const updateActiveScreen = useEditorStore((state) => state.updateActiveScreen);
+  const updateAppearance = useEditorStore((state) => state.updateAppearance);
   const selectNode = useEditorStore((state) => state.selectNode);
+  const moveSelectedNode = useEditorStore((state) => state.moveSelectedNode);
   const duplicateSelectedNode = useEditorStore((state) => state.duplicateSelectedNode);
   const deleteSelectedNode = useEditorStore((state) => state.deleteSelectedNode);
   const screen = document.screens.find((candidate) => candidate.id === document.activeScreenId) ?? document.screens[0];
   const node = screen && selectedNodeId ? findNode(screen.root.children, selectedNodeId) : undefined;
+  const location = screen && selectedNodeId ? findNodeLocation(screen.root.children, selectedNodeId) : undefined;
+  const parent = screen && location?.parentId ? findNode(screen.root.children, location.parentId) : undefined;
+  const siblingCount = location?.parentId && parent && isContainerNode(parent)
+    ? parent.children.length
+    : screen?.root.children.length ?? 0;
+  const canMoveUp = Boolean(location && location.index > 0);
+  const canMoveDown = Boolean(location && location.index < siblingCount - 1);
   const allIssues = lintDocument(document);
   const issues = allIssues.filter((issue) => issue.nodeId === selectedNodeId);
   const screenIssues = screen
@@ -36,6 +45,25 @@ export function Inspector() {
                 </Field>
               </>
             )}
+          </section>
+          <section className="inspector-section">
+            <div className="section-label">Appearance</div>
+            <Field label="Mode">
+              <select value={document.appearance.colorScheme} onChange={(event) => updateAppearance({ colorScheme: event.target.value as typeof document.appearance.colorScheme })}>
+                <option value="system">System</option>
+                <option value="light">Light</option>
+                <option value="dark">Dark</option>
+              </select>
+            </Field>
+            <Field label="Tint">
+              <select value={document.appearance.accentColor} onChange={(event) => updateAppearance({ accentColor: event.target.value as typeof document.appearance.accentColor })}>
+                <option value="blue">Blue</option>
+                <option value="purple">Purple</option>
+                <option value="pink">Pink</option>
+                <option value="orange">Orange</option>
+                <option value="green">Green</option>
+              </select>
+            </Field>
           </section>
           {screenIssues.length > 0 && (
             <section className="inspector-section warnings-section">
@@ -154,6 +182,11 @@ export function Inspector() {
           )}
 
           <section className="inspector-section">
+            <div className="section-label">Order</div>
+            <div className="reorder-actions">
+              <button className="secondary-action-button" type="button" onClick={() => moveSelectedNode('up')} disabled={!canMoveUp}>↑ Move up</button>
+              <button className="secondary-action-button" type="button" onClick={() => moveSelectedNode('down')} disabled={!canMoveDown}>↓ Move down</button>
+            </div>
             <button className="secondary-action-button" type="button" onClick={duplicateSelectedNode}>Duplicate element</button>
             <button className="delete-button" type="button" onClick={deleteSelectedNode}>Delete element</button>
           </section>

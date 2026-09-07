@@ -39,4 +39,28 @@ describe('editor screen workflow', () => {
 
     expect(useEditorStore.getState().document.screens).toHaveLength(1);
   });
+
+  it('moves the selected node without leaving the semantic parent', () => {
+    const store = useEditorStore.getState();
+
+    store.selectNode('welcome-button');
+    store.moveSelectedNode('up');
+
+    let children = useEditorStore.getState().document.screens[0]?.root.children;
+    expect(children?.map((node) => node.id)).toEqual(['welcome-title', 'welcome-button', 'welcome-body', 'settings-link']);
+
+    store.moveSelectedNode('down');
+    children = useEditorStore.getState().document.screens[0]?.root.children;
+    expect(children?.map((node) => node.id)).toEqual(['welcome-title', 'welcome-body', 'welcome-button', 'settings-link']);
+  });
+
+  it('keeps appearance changes in undo history', () => {
+    const store = useEditorStore.getState();
+
+    store.updateAppearance({ colorScheme: 'dark', accentColor: 'orange' });
+    expect(useEditorStore.getState().document.appearance).toEqual({ colorScheme: 'dark', accentColor: 'orange' });
+
+    store.undo();
+    expect(useEditorStore.getState().document.appearance).toEqual({ colorScheme: 'system', accentColor: 'blue' });
+  });
 });

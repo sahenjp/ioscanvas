@@ -15,6 +15,13 @@ export type NodeKind =
 
 export type ButtonRole = 'normal' | 'destructive' | 'cancel';
 export type GlassStyle = 'regular' | 'clear';
+export type ColorScheme = 'system' | 'light' | 'dark';
+export type AccentColor = 'blue' | 'purple' | 'pink' | 'orange' | 'green';
+
+export interface DocumentAppearance {
+  colorScheme: ColorScheme;
+  accentColor: AccentColor;
+}
 
 export interface BaseNode {
   id: string;
@@ -103,6 +110,7 @@ export interface CanvasDocument {
   name: string;
   platform: 'iOS';
   minimumOS: '26.0';
+  appearance: DocumentAppearance;
   screens: CanvasScreen[];
   activeScreenId: string;
 }
