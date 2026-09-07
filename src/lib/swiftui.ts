@@ -18,6 +18,7 @@ const swiftKeywords = new Set([
 interface BindingInfo {
   name: string;
   type: 'Bool' | 'String';
+  initial: string;
 }
 
 interface RenderContext {
@@ -25,7 +26,7 @@ interface RenderContext {
   viewNames: Map<string, string>;
 }
 
-function bindingKey(node: Extract<CanvasNode, { kind: 'toggle' | 'textfield' }>): string {
+function bindingKey(node: Extract<CanvasNode, { kind: 'toggle' | 'textfield' | 'picker' }>): string {
   return `${node.kind === 'toggle' ? 'Bool' : 'String'}:${node.binding}`;
 }
 
@@ -62,6 +63,13 @@ function renderNodeContent(node: CanvasNode, depth: number, context: RenderConte
       return `${pad}Toggle(${quoted(node.label)}, isOn: $${context.bindings.get(bindingKey(node))?.name ?? swiftIdentifier(node.binding, 'isEnabled')})\n${pad}    .frame(minHeight: ${node.minHeight})`;
     case 'textfield':
       return `${pad}TextField(${quoted(node.label)}, text: $${context.bindings.get(bindingKey(node))?.name ?? swiftIdentifier(node.binding, 'value')})\n${pad}    .textFieldStyle(.roundedBorder)\n${pad}    .frame(minHeight: ${node.minHeight})`;
+    case 'picker': {
+      const binding = context.bindings.get(bindingKey(node))?.name ?? swiftIdentifier(node.binding, 'selection');
+      const options = node.options.map((option) => `${pad}        Text(${quoted(option)}).tag(${quoted(option)})`).join('\n');
+      return `${pad}Picker(${quoted(node.label)}, selection: $${binding}) {\n${options}\n${pad}}\n${pad}.frame(minHeight: ${node.minHeight})`;
+    }
+    case 'progress':
+      return `${pad}ProgressView(value: ${node.value}) {\n${pad}    Text(${quoted(node.label)})\n${pad}}`;
     case 'navigation-link': {
       const destination = context.viewNames.get(node.destinationScreenId) ?? 'EmptyView';
       return `${pad}NavigationLink(${quoted(node.label)}) {\n${pad}    ${destination}()\n${pad}}\n${pad}.frame(minHeight: ${node.minHeight})`;
@@ -99,16 +107,17 @@ function collectBindings(
   usedNames = new Set<string>(),
 ): Map<string, BindingInfo> {
   for (const node of nodes) {
-    if (node.kind === 'toggle' || node.kind === 'textfield') {
+    if (node.kind === 'toggle' || node.kind === 'textfield' || node.kind === 'picker') {
       const key = bindingKey(node);
       if (!result.has(key)) {
         const type = node.kind === 'toggle' ? 'Bool' : 'String';
+        const initial = node.kind === 'toggle' ? 'false' : node.kind === 'picker' ? quoted(node.options[0] ?? '') : '""';
         const base = swiftIdentifier(node.binding, `value_${swiftIdentifier(node.id, 'node')}`);
         let name = base;
         let suffix = 2;
         while (usedNames.has(name)) name = `${base}${suffix++}`;
         usedNames.add(name);
-        result.set(key, { name, type });
+        result.set(key, { name, type, initial });
       }
     }
     if (node.children) collectBindings(node.children, result, usedNames);
@@ -140,7 +149,7 @@ function renderScreen(
   appearance: CanvasDocument['appearance'],
 ): string {
   const stateLines = [...context.bindings.values()]
-    .map(({ name, type }) => `    @State private var ${name}: ${type} = ${type === 'Bool' ? 'false' : '""'}`)
+    .map(({ name, type, initial }) => `    @State private var ${name}: ${type} = ${initial}`)
     .join('\n');
   const firstChild = screen.root.children[0];
   const directScrollContainer = screen.root.children.length === 1

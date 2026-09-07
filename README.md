@@ -16,6 +16,7 @@
 - Set the app color scheme and tint once, then keep Preview, SwiftUI output, and the implementation brief aligned.
 - See a material backdrop in the canvas when Liquid Glass is present, while keeping the exported view native SwiftUI.
 - Add, duplicate, switch, and remove screens, then inspect them in a read-only Preview mode.
+- Follow outgoing NavigationLink relationships from the screen flow rail without leaving the canvas.
 - Follow NavigationLink transitions directly in Preview to check the screen flow.
 - Use a Layers / Parts library with filtering, canvas zoom, and grid visibility controls.
 - Compose native `List`, `Form`, and `NavigationLink` patterns across screens, then export the linked SwiftUI views together.
@@ -33,6 +34,8 @@ The first prototype includes a small set of primitives such as:
 - Button
 - Toggle
 - TextField
+- Picker
+- ProgressView
 - VStack
 - HStack
 - Section
@@ -94,4 +97,4 @@ See [`ACKNOWLEDGEMENTS.md`](./ACKNOWLEDGEMENTS.md) for attribution details.
 
 ## Status
 
-Version 1.0.0. The semantic editor, multi-screen workspace, nested drag-and-drop, precise element ordering, structure tree, inspector, Appearance controls, Preview mode with screen flow, history controls, project files, SF Symbol images, Liquid Glass material preview, native List/Form/NavigationLink patterns, HIG checks, linked SwiftUI export, and an xtool SwiftUI target are present.
+Version 1.1.0. The semantic editor, multi-screen flow workspace, nested drag-and-drop, precise element ordering, structure tree, expanded Parts library, inspector, Appearance controls, Preview mode with screen flow, history controls, project files, SF Symbol images, Liquid Glass material preview, native SwiftUI patterns, HIG checks, linked SwiftUI export, and an xtool SwiftUI target are present.

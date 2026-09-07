@@ -147,6 +147,20 @@ function renderNodeContent(node: CanvasNode, allNodes: CanvasNode[], onNavigate?
           {node.label || 'Text field'}
         </div>
       );
+    case 'picker':
+      return (
+        <div className="ios-row ios-picker" style={{ minHeight: node.minHeight }}>
+          <span>{node.label || 'Selection'}</span>
+          <span className="ios-picker-value">{node.options[0]} <span aria-hidden="true">⌄</span></span>
+        </div>
+      );
+    case 'progress':
+      return (
+        <div className="ios-progress" aria-label={node.label || 'Progress'}>
+          <div className="ios-progress-label"><span>{node.label || 'Progress'}</span><span>{Math.round(node.value * 100)}%</span></div>
+          <div className="ios-progress-track"><span style={{ width: `${node.value * 100}%` }} /></div>
+        </div>
+      );
     case 'navigation-link':
       return onNavigate ? (
         <button type="button" className="ios-row ios-navigation-link" style={{ minHeight: node.minHeight }} onClick={onNavigate}>
@@ -186,6 +200,7 @@ function renderNodeContent(node: CanvasNode, allNodes: CanvasNode[], onNavigate?
 export function PhoneCanvas() {
   const document = useEditorStore((state) => state.document);
   const selectNode = useEditorStore((state) => state.selectNode);
+  const selectScreen = useEditorStore((state) => state.selectScreen);
   const addNode = useEditorStore((state) => state.addNode);
   const moveNode = useEditorStore((state) => state.moveNode);
   const previewMode = useEditorStore((state) => state.previewMode);
@@ -197,6 +212,7 @@ export function PhoneCanvas() {
   if (!screen) return null;
 
   const hasGlass = containsGlass(screen.root.children);
+  const screenNames = new Map(document.screens.map((candidate) => [candidate.id, candidate.name]));
 
   const dropOnScreen = (event: React.DragEvent) => {
     if (previewMode || !hasNodeDragData(event)) return;
@@ -222,6 +238,27 @@ export function PhoneCanvas() {
           <span className="toolbar-divider" aria-hidden="true" />
           <button className={`canvas-toolbar-button grid-toggle ${showGrid ? 'active' : ''}`} type="button" aria-pressed={showGrid} onClick={() => setShowGrid((current) => !current)}>Grid</button>
         </div>}
+      </div>
+      <div className="screen-flow" onClick={(event) => event.stopPropagation()}>
+        <span className="screen-flow-label">Flow</span>
+        <div className="screen-flow-list">
+          {document.screens.map((candidate) => {
+            const destinations = navigationDestinations(candidate.root.children)
+              .map((id) => screenNames.get(id))
+              .filter((name): name is string => Boolean(name));
+            return (
+              <button
+                className={`screen-flow-item ${candidate.id === screen.id ? 'active' : ''}`}
+                key={candidate.id}
+                onClick={() => selectScreen(candidate.id)}
+                type="button"
+              >
+                <strong>{candidate.name}</strong>
+                <span>{destinations.length > 0 ? `To ${destinations.join(', ')}` : 'End screen'}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
       <div className="workspace-ruler"><span>{previewMode ? 'Read-only preview' : 'iPhone frame'}</span><span>393 × 852 pt · {zoom}%</span></div>
       <div className="phone-stage" style={{ transform: `scale(${zoom / 100})` }}>
@@ -250,4 +287,11 @@ export function PhoneCanvas() {
 
 function containsGlass(nodes: CanvasNode[]): boolean {
   return nodes.some((node) => Boolean(node.glass) || (node.children ? containsGlass(node.children) : false));
+}
+
+function navigationDestinations(nodes: CanvasNode[]): string[] {
+  return [...new Set(nodes.flatMap((node) => [
+    ...(node.kind === 'navigation-link' && node.destinationScreenId ? [node.destinationScreenId] : []),
+    ...(node.children ? navigationDestinations(node.children) : []),
+  ]))];
 }

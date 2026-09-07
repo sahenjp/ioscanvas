@@ -133,14 +133,38 @@ export function Inspector() {
                 </Field>
               </>
             )}
-            {(node.kind === 'button' || node.kind === 'toggle' || node.kind === 'textfield' || node.kind === 'navigation-link') && (
+            {(node.kind === 'button' || node.kind === 'toggle' || node.kind === 'textfield' || node.kind === 'picker' || node.kind === 'navigation-link') && (
               <Field label="Min height">
                 <div className="input-with-unit"><DraftInput key={`${node.id}-height-${node.minHeight}`} type="number" min="20" max="120" value={node.minHeight} onCommit={(value) => updateSelectedNode({ minHeight: numericValue(value, node.minHeight, 20, 120) } as Partial<CanvasNode>)} /><span>pt</span></div>
               </Field>
             )}
-            {(node.kind === 'toggle' || node.kind === 'textfield') && (
+            {(node.kind === 'toggle' || node.kind === 'textfield' || node.kind === 'picker') && (
               <Field label="Binding">
                 <DraftInput key={`${node.id}-binding-${node.binding}`} value={node.binding} onCommit={(value) => updateSelectedNode({ binding: value.replace(/\s+/g, '') } as Partial<CanvasNode>)} />
+              </Field>
+            )}
+            {node.kind === 'picker' && (
+              <Field label="Options">
+                <DraftInput
+                  key={`${node.id}-options-${node.options.join(',')}`}
+                  value={node.options.join(', ')}
+                  onCommit={(value) => updateSelectedNode({ options: parseOptions(value, node.options) } as Partial<CanvasNode>)}
+                />
+              </Field>
+            )}
+            {node.kind === 'progress' && (
+              <Field label="Progress">
+                <div className="input-with-unit">
+                  <DraftInput
+                    key={`${node.id}-progress-${node.value}`}
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={Math.round(node.value * 100)}
+                    onCommit={(value) => updateSelectedNode({ value: numericValue(value, node.value * 100, 0, 100) / 100 } as Partial<CanvasNode>)}
+                  />
+                  <span>%</span>
+                </div>
               </Field>
             )}
             {node.kind === 'button' && (
@@ -227,6 +251,11 @@ function numericValue(raw: string, fallback: number, min: number, max: number): 
   return Number.isFinite(value) ? Math.min(max, Math.max(min, value)) : fallback;
 }
 
+function parseOptions(raw: string, fallback: string[]): string[] {
+  const options = raw.split(',').map((option) => option.trim()).filter(Boolean);
+  return options.length > 0 ? options : fallback;
+}
+
 function nodeKindLabel(kind: CanvasNode['kind']): string {
   switch (kind) {
     case 'vstack': return 'VStack';
@@ -235,6 +264,8 @@ function nodeKindLabel(kind: CanvasNode['kind']): string {
     case 'form': return 'Form';
     case 'section': return 'Section';
     case 'textfield': return 'TextField';
+    case 'picker': return 'Picker';
+    case 'progress': return 'ProgressView';
     case 'navigation-link': return 'NavigationLink';
     case 'divider': return 'Divider';
     case 'spacer': return 'Spacer';

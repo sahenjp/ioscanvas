@@ -48,6 +48,19 @@ function readNode(value: unknown, ids: Set<string>): CanvasNode | null {
       return isString(value.label) && isString(value.binding) && isNumber(value.minHeight)
         ? { id: value.id, kind: 'textfield', label: value.label, binding: value.binding, minHeight: value.minHeight, ...glassProperties }
         : null;
+    case 'picker':
+      return isString(value.label)
+        && isString(value.binding)
+        && Array.isArray(value.options)
+        && value.options.length > 0
+        && value.options.every(isString)
+        && isNumber(value.minHeight)
+        ? { id: value.id, kind: 'picker', label: value.label, binding: value.binding, options: value.options, minHeight: value.minHeight, ...glassProperties }
+        : null;
+    case 'progress':
+      return isString(value.label) && isNumber(value.value) && value.value >= 0 && value.value <= 1
+        ? { id: value.id, kind: 'progress', label: value.label, value: value.value, ...glassProperties }
+        : null;
     case 'navigation-link':
       return isString(value.label) && isString(value.destinationScreenId) && isNumber(value.minHeight)
         ? { id: value.id, kind: 'navigation-link', label: value.label, destinationScreenId: value.destinationScreenId, minHeight: value.minHeight, ...glassProperties }

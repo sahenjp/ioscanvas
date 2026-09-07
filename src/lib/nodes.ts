@@ -7,7 +7,7 @@ export type DragData =
   | { kind: 'move'; nodeId: string };
 
 const nodeKinds = new Set<NodeKind>([
-  'vstack', 'hstack', 'list', 'form', 'section', 'text', 'button', 'toggle', 'textfield', 'navigation-link', 'image', 'divider', 'spacer',
+  'vstack', 'hstack', 'list', 'form', 'section', 'text', 'button', 'toggle', 'textfield', 'picker', 'progress', 'navigation-link', 'image', 'divider', 'spacer',
 ]);
 
 let sequence = 0;
@@ -28,6 +28,10 @@ export function createNode(kind: NodeKind): CanvasNode {
       return { id, kind, label: 'Toggle', binding: 'isEnabled', minHeight: 44 };
     case 'textfield':
       return { id, kind, label: 'Text field', binding: 'value', minHeight: 44 };
+    case 'picker':
+      return { id, kind, label: 'Selection', binding: 'selection', options: ['Option 1', 'Option 2'], minHeight: 44 };
+    case 'progress':
+      return { id, kind, label: 'Progress', value: 0.6 };
     case 'navigation-link':
       return { id, kind, label: 'Open screen', destinationScreenId: '', minHeight: 44 };
     case 'image':

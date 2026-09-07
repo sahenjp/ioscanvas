@@ -98,6 +98,15 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .canvas-toolbar-button:hover, .zoom-value:hover { border-color: var(--line-strong); background: #252a30; color: #edf0f2; }
 .canvas-toolbar-button.active { background: #28384b; color: #8fc6ff; }
 .zoom-value { min-width: 44px; color: #c6cbd1; font-variant-numeric: tabular-nums; }
+.screen-flow { width: min(100%, 720px); display: flex; align-items: stretch; gap: 8px; margin: -8px 0 16px; padding: 6px; border: 1px solid var(--line); border-radius: 9px; background: rgba(20,23,26,.86); }
+.screen-flow-label { display: flex; align-items: center; padding: 0 7px; color: #686e76; font-size: 9px; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; }
+.screen-flow-list { min-width: 0; display: flex; flex: 1; gap: 5px; overflow-x: auto; }
+.screen-flow-item { min-width: 112px; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 6px 9px; border: 1px solid transparent; border-radius: 6px; background: #171a1e; color: #8b9199; cursor: pointer; text-align: left; }
+.screen-flow-item:hover { border-color: #343941; color: #e6e8ea; }
+.screen-flow-item.active { border-color: #3e78b3; background: #1d3044; color: #eaf4ff; }
+.screen-flow-item strong { max-width: 100%; overflow: hidden; font-size: 10px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.screen-flow-item span { max-width: 100%; overflow: hidden; color: #69717a; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.screen-flow-item.active span { color: #8eb8df; }
 .workspace-ruler { width: 393px; display: flex; justify-content: space-between; margin-bottom: 9px; color: #70767e; font-size: 10px; letter-spacing: .02em; }
 .phone-stage { transform-origin: top center; transition: transform 120ms ease; }
 .phone-shell { width: 423px; min-height: 882px; padding: 15px; border-radius: 61px; border: 1px solid #34383e; background: #08090a; box-shadow: 0 26px 70px rgba(0,0,0,.42); transition: border-color 100ms ease; }
@@ -138,6 +147,12 @@ button.ios-navigation-link:hover { background: #f5f5f7; }
 .ios-switch { width: 51px; height: 31px; padding: 2px; border-radius: 19px; background: var(--preview-accent); }
 .ios-switch span { display: block; width: 27px; height: 27px; margin-left: 20px; border-radius: 50%; background: white; box-shadow: 0 1px 3px rgba(0,0,0,.25); }
 .ios-field { width: 100%; border: 1px solid #d4d4d7; border-radius: 10px; padding: 0 12px; background: white; color: #8e8e93; text-align: left; cursor: default; }
+.ios-picker-value { color: var(--preview-accent); }
+.ios-progress { display: flex; flex-direction: column; gap: 7px; padding: 9px 2px; }
+.ios-progress-label { display: flex; justify-content: space-between; gap: 12px; color: #3a3a3c; font-size: 12px; }
+.ios-progress-label span:last-child { color: #8e8e93; font-variant-numeric: tabular-nums; }
+.ios-progress-track { height: 4px; overflow: hidden; border-radius: 3px; background: #d1d1d6; }
+.ios-progress-track span { display: block; height: 100%; border-radius: inherit; background: var(--preview-accent); }
 .ios-divider { width: 100%; height: 1px; min-height: 1px; padding: 0; border: 0; background: #c6c6c8; cursor: default; }
 .ios-spacer { width: 100%; height: 30px; border: 1px dashed #c8c8cc; background: transparent; color: #8e8e93; font-size: 10px; cursor: default; }
 .canvas-container { border: 1px dashed #b9b9bd; border-radius: 12px; padding: 9px; background: rgba(255,255,255,.35); }
@@ -159,6 +174,8 @@ button.ios-navigation-link:hover { background: #f5f5f7; }
 .phone-screen.scheme-dark .ios-field, .phone-screen.scheme-system .ios-field,
 .phone-screen.scheme-dark .ios-link-indicator, .phone-screen.scheme-system .ios-link-indicator,
 .phone-screen.scheme-dark .section-title, .phone-screen.scheme-system .section-title { color: #aeaeb2; }
+.phone-screen.scheme-dark .ios-progress-label, .phone-screen.scheme-system .ios-progress-label { color: #f5f5f7; }
+.phone-screen.scheme-dark .ios-progress-track, .phone-screen.scheme-system .ios-progress-track { background: #48484a; }
 .phone-screen.scheme-dark .canvas-container, .phone-screen.scheme-system .canvas-container { border-color: #545458; background: rgba(44,44,46,.55); }
 .phone-screen.scheme-dark .canvas-list, .phone-screen.scheme-system .canvas-list,
 .phone-screen.scheme-dark .canvas-form, .phone-screen.scheme-system .canvas-form { border-color: #3a3a3c; background: rgba(28,28,30,.8); }
@@ -278,6 +295,11 @@ button.ios-navigation-link:hover { background: #f5f5f7; }
   .export-header, .export-tabs, .export-footer { border-color: #e3e4e7; }
   .export-code { background: #f5f6f7; color: #202124; }
   .workspace-toolbar { border-color: #d5d8dc; background: rgba(255,255,255,.9); }
+  .screen-flow { border-color: #d5d8dc; background: rgba(255,255,255,.9); }
+  .screen-flow-item { background: #f3f4f6; color: #454a50; }
+  .screen-flow-item:hover { border-color: #c5c9ce; color: #111; }
+  .screen-flow-item.active { border-color: #73a8dc; background: #e8f3ff; color: #163b60; }
+  .screen-flow-item.active span { color: #49769e; }
   .workspace-title strong { color: #30343a; }
   .workspace-title span, .workspace-ruler { color: #7a8087; }
   .canvas-toolbar-button, .zoom-value { color: #5b6168; }
@@ -290,6 +312,8 @@ button.ios-navigation-link:hover { background: #f5f5f7; }
   .phone-screen.scheme-system .ios-image-symbol { background: #e8e8ed; color: #555; }
   .phone-screen.scheme-system button.ios-navigation-link:hover { background: #f5f5f7; }
   .phone-screen.scheme-system .ios-field, .phone-screen.scheme-system .ios-link-indicator, .phone-screen.scheme-system .section-title { color: #8e8e93; }
+  .phone-screen.scheme-system .ios-progress-label { color: #3a3a3c; }
+  .phone-screen.scheme-system .ios-progress-track { background: #d1d1d6; }
   .phone-screen.scheme-system .canvas-container { border-color: #b9b9bd; background: rgba(255,255,255,.35); }
   .phone-screen.scheme-system .canvas-list, .phone-screen.scheme-system .canvas-form { border-color: #d4d4d7; background: rgba(255,255,255,.72); }
   .phone-screen.scheme-system .home-indicator { background: #111; }

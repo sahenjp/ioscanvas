@@ -90,4 +90,17 @@ describe('HIG linter', () => {
       ]),
     );
   });
+
+  it('flags unlabeled picker and progress parts', () => {
+    const document = structuredClone(defaultDocument);
+    document.screens[0]?.root.children.push(
+      { id: 'picker-test', kind: 'picker', label: '', binding: 'selection', options: ['One'], minHeight: 44 },
+      { id: 'progress-test', kind: 'progress', label: '', value: 0.5 },
+    );
+
+    expect(lintDocument(document)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ nodeId: 'picker-test', code: 'EMPTY_LABEL' }),
+      expect.objectContaining({ nodeId: 'progress-test', code: 'ACCESSIBILITY' }),
+    ]));
+  });
 });

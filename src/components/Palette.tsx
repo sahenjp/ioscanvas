@@ -29,6 +29,8 @@ const groups: { title: string; items: { kind: NodeKind; label: string; symbol: s
       { kind: 'button', label: 'Button', symbol: 'B' },
       { kind: 'toggle', label: 'Toggle', symbol: 'To' },
       { kind: 'textfield', label: 'Text Field', symbol: 'TF' },
+      { kind: 'picker', label: 'Picker', symbol: 'Pk' },
+      { kind: 'progress', label: 'Progress', symbol: 'Pr' },
       { kind: 'navigation-link', label: 'Navigation Link', symbol: 'NL' },
     ],
   },
@@ -245,6 +247,8 @@ function nodeLabel(node: CanvasNode): string {
     case 'button':
     case 'toggle':
     case 'textfield':
+    case 'picker':
+    case 'progress':
     case 'navigation-link': return node.label || nodeKindLabel(node.kind);
     case 'section': return node.title || 'Section';
     case 'image': return node.systemName || 'Image';
@@ -260,6 +264,8 @@ function nodeKindLabel(kind: NodeKind): string {
     case 'form': return 'Form';
     case 'section': return 'Section';
     case 'textfield': return 'TextField';
+    case 'picker': return 'Picker';
+    case 'progress': return 'ProgressView';
     case 'navigation-link': return 'NavigationLink';
     case 'divider': return 'Divider';
     case 'spacer': return 'Spacer';

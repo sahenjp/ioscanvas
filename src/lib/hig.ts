@@ -19,7 +19,7 @@ export interface LintIssue {
 }
 
 function lintNode(node: CanvasNode, issues: LintIssue[], screenIds: Set<string>): void {
-  if (node.kind === 'button' || node.kind === 'toggle' || node.kind === 'textfield' || node.kind === 'navigation-link') {
+  if (node.kind === 'button' || node.kind === 'toggle' || node.kind === 'textfield' || node.kind === 'picker' || node.kind === 'navigation-link') {
     if (node.minHeight < 44) {
       issues.push({
         nodeId: node.id,
@@ -44,6 +44,15 @@ function lintNode(node: CanvasNode, issues: LintIssue[], screenIds: Set<string>)
         message: '操作要素には表示ラベルとVoiceOverで理解できる名前を付けてください。',
       });
     }
+  }
+
+  if (node.kind === 'progress' && node.label.trim().length === 0) {
+    issues.push({
+      nodeId: node.id,
+      severity: 'warning',
+      code: 'ACCESSIBILITY',
+      message: 'ProgressViewには進行状況の意味が伝わるラベルを付けてください。',
+    });
   }
 
   if (node.kind === 'navigation-link' && !screenIds.has(node.destinationScreenId)) {
@@ -102,7 +111,7 @@ function lintNode(node: CanvasNode, issues: LintIssue[], screenIds: Set<string>)
 
   if (node.kind === 'hstack') {
     const controls = node.children.filter((child) =>
-      child.kind === 'button' || child.kind === 'toggle' || child.kind === 'textfield',
+      child.kind === 'button' || child.kind === 'toggle' || child.kind === 'textfield' || child.kind === 'picker',
     );
     if (controls.length > 1 && (node.spacing ?? 0) < 8) {
       issues.push({

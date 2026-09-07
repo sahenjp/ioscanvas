@@ -13,6 +13,10 @@ function describe(node: CanvasNode, depth = 0): string[] {
       return [`${common}: ${node.label} / binding=${node.binding}`];
     case 'textfield':
       return [`${common}: ${node.label} / binding=${node.binding}`];
+    case 'picker':
+      return [`${common}: ${node.label} / binding=${node.binding} / options=${node.options.join(', ')}`];
+    case 'progress':
+      return [`${common}: ${node.label} / value=${Math.round(node.value * 100)}%`];
     case 'navigation-link':
       return [`${common}: ${node.label} / destination=${node.destinationScreenId || 'unset'}`];
     case 'image':

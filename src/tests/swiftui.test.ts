@@ -92,6 +92,21 @@ describe('SwiftUI generator', () => {
     expect(output).toContain('.preferredColorScheme(.dark)');
   });
 
+  it('exports native picker and progress views', () => {
+    const document = structuredClone(defaultDocument);
+    document.screens[0]?.root.children.push(
+      { id: 'picker-test', kind: 'picker', label: 'Theme', binding: 'theme', options: ['Light', 'Dark'], minHeight: 44 },
+      { id: 'progress-test', kind: 'progress', label: 'Upload', value: 0.75 },
+    );
+
+    const output = generateSwiftUI(document);
+
+    expect(output).toContain('@State private var theme: String = "Light"');
+    expect(output).toContain('Picker("Theme", selection: $theme)');
+    expect(output).toContain('Text("Dark").tag("Dark")');
+    expect(output).toContain('ProgressView(value: 0.75)');
+  });
+
   it('exports native list containers and links between screens', () => {
     const document = structuredClone(defaultDocument);
     const home = document.screens[0];

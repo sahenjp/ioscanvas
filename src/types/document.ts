@@ -8,6 +8,8 @@ export type NodeKind =
   | 'button'
   | 'toggle'
   | 'textfield'
+  | 'picker'
+  | 'progress'
   | 'navigation-link'
   | 'image'
   | 'divider'
@@ -59,6 +61,20 @@ export interface TextFieldNode extends BaseNode {
   minHeight: number;
 }
 
+export interface PickerNode extends BaseNode {
+  kind: 'picker';
+  label: string;
+  binding: string;
+  options: string[];
+  minHeight: number;
+}
+
+export interface ProgressNode extends BaseNode {
+  kind: 'progress';
+  label: string;
+  value: number;
+}
+
 export interface NavigationLinkNode extends BaseNode {
   kind: 'navigation-link';
   label: string;
@@ -92,6 +108,8 @@ export type CanvasNode =
   | ButtonNode
   | ToggleNode
   | TextFieldNode
+  | PickerNode
+  | ProgressNode
   | NavigationLinkNode
   | ImageNode
   | ContainerNode
