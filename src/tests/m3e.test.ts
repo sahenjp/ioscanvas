@@ -208,6 +208,19 @@ describe('M3E compatibility importer', () => {
     const card = findNode(nodes, 'm3e-card');
     if (!card) throw new Error('Card fixture missing');
     expect(card.children?.[0]).toMatchObject({ kind: 'hstack' });
+    expect(output).toContain('.frame(width: 96)');
+    expect(output).toContain('.frame(maxWidth: .infinity, alignment: .center)');
+  });
+
+  it('keeps a camera import as a semantic camera control', () => {
+    const document = convertM3eDocument({
+      frames: [{ id: 'home', name: 'ホーム', x: 0, y: 0 }],
+      groups: [{ id: 'capture', x: 16, y: 80, axis: 'y', items: [{ id: 'camera', kind: 'camera', label: '料理を撮影' }] }],
+    });
+
+    expect(findNode(document?.screens[0]?.root.children ?? [], 'm3e-camera')).toMatchObject({ kind: 'camera', label: '料理を撮影' });
+    if (!document) throw new Error('Camera fixture was not converted');
+    expect(generateSwiftUI(document)).toContain('AVFoundation: AVCaptureSessionをカメラプレビューへ接続する');
   });
 
   it('keeps MapKit, Snackbar actions, and navigation selection state semantic', () => {

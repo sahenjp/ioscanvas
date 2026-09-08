@@ -1,4 +1,4 @@
-import type { CanvasDocument, CanvasNode, CanvasScreen, SwipeDirection, ToolbarItem } from '../types/document';
+import type { CanvasDocument, CanvasNode, CanvasScreen, ContainerNode, SwipeDirection, ToolbarItem } from '../types/document';
 
 const indent = (depth: number) => '    '.repeat(depth);
 const indentBlock = (value: string, depth: number) => value
@@ -34,6 +34,7 @@ interface BindingInfo {
 interface RenderContext {
   bindings: Map<string, BindingInfo>;
   viewNames: Map<string, string>;
+  nodeModifiers?: Map<string, string[]>;
 }
 
 interface SwipeState {
@@ -136,7 +137,45 @@ function renderNode(node: CanvasNode, depth: number, context: RenderContext): st
   if (node.kind === 'button' && node.accessibilityLabel?.trim()) {
     modifiers.push(`${pad}.accessibilityLabel(${quoted(node.accessibilityLabel)})`);
   }
+  modifiers.push(...(context.nodeModifiers?.get(node.id) ?? []).map((modifier) => `${pad}${modifier}`));
   return modifiers.length > 0 ? `${rendered}\n${modifiers.join('\n')}` : rendered;
+}
+
+function cardRenderContext(
+  node: ContainerNode,
+  context: RenderContext,
+): RenderContext {
+  if (node.cardImagePosition === undefined && node.cardImageSize === undefined && node.cardContentAlignment === undefined) return context;
+
+  const wrapper = node.children.find((child) => child.kind === 'hstack' || child.kind === 'zstack');
+  const candidates = wrapper?.children ?? node.children;
+  const image = candidates.find((child) => child.kind === 'image');
+  const content = candidates.find((child) => child.kind === 'vstack');
+  const nodeModifiers = new Map(context.nodeModifiers ?? []);
+  const add = (target: CanvasNode | undefined, modifier: string) => {
+    if (!target) return;
+    nodeModifiers.set(target.id, [...(nodeModifiers.get(target.id) ?? []), modifier]);
+  };
+
+  if (image && node.cardImageSize !== undefined) {
+    if (node.cardImagePosition === 'leading' || node.cardImagePosition === 'trailing') {
+      add(image, `.frame(width: ${node.cardImageSize})`);
+    } else if (node.cardImagePosition === 'background') {
+      add(image, '.frame(maxWidth: .infinity, maxHeight: .infinity).clipped()');
+      add(wrapper, `.frame(minHeight: ${node.cardImageSize})`);
+    } else {
+      add(image, `.frame(maxWidth: .infinity, height: ${node.cardImageSize})`);
+    }
+  }
+
+  if (content && node.cardContentAlignment !== undefined) {
+    const alignment = node.cardContentAlignment === 'center' ? 'center' : node.cardContentAlignment === 'end' ? 'bottom' : 'top';
+    add(content, node.cardImagePosition === 'background'
+      ? `.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .${alignment})`
+      : `.frame(maxWidth: .infinity, alignment: .${alignment})`);
+  }
+
+  return { ...context, nodeModifiers };
 }
 
 function glassModifier(node: CanvasNode, depth: number): string {
@@ -473,6 +512,8 @@ function renderNodeContent(node: CanvasNode, depth: number, context: RenderConte
         : `Image(systemName: ${quoted(node.systemName)})`;
       return `${pad}${image}\n${pad}    ${accessibility}`;
     }
+    case 'camera':
+      return `${pad}Button {\n${pad}    // AVFoundation: AVCaptureSessionをカメラプレビューへ接続する\n${pad}} label: {\n${pad}    Label(${quoted(node.label || 'カメラ')}, systemImage: "camera.fill")\n${pad}}\n${pad}.frame(minHeight: ${node.minHeight})\n${pad}.accessibilityLabel(${quoted(node.label || 'カメラ')})`;
     case 'map':
       return `${pad}Map()\n${pad}    .frame(minHeight: 220)\n${pad}    .accessibilityLabel(${quoted(node.label || '地図')})`;
     case 'label': {
@@ -537,9 +578,11 @@ function renderNodeContent(node: CanvasNode, depth: number, context: RenderConte
       if (node.kind === 'glass-container') return `${pad}GlassEffectContainer(spacing: ${node.spacing ?? 12}) {\n${children}\n${pad}}`;
       if (node.kind === 'group') return `${pad}Group {\n${children}\n${pad}}`;
       if (node.kind === 'groupbox') {
+        const cardContext = cardRenderContext(node, context);
+        const cardChildren = node.children.map((child) => renderNode(child, depth + 1, cardContext)).join('\n');
         const groupBox = node.title?.trim()
-          ? `${pad}GroupBox(${quoted(node.title)}) {\n${children}\n${pad}}`
-          : `${pad}GroupBox {\n${children}\n${pad}}`;
+          ? `${pad}GroupBox(${quoted(node.title)}) {\n${cardChildren}\n${pad}}`
+          : `${pad}GroupBox {\n${cardChildren}\n${pad}}`;
         if (!node.isBottomSheet) return groupBox;
         return `${pad}// M3Eのボトムシート表現。画面遷移時は .sheet と presentationDetents を追加する。\n${pad}VStack(spacing: 8) {\n${pad}    Capsule()\n${pad}        .fill(.secondary)\n${pad}        .frame(width: 36, height: 5)\n${pad}        .accessibilityHidden(true)\n${indentBlock(groupBox, 1)}\n${pad}}`;
       }

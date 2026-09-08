@@ -33,6 +33,16 @@ describe('HIG linter', () => {
     ]));
   });
 
+  it('checks camera controls like other labeled actions', () => {
+    const document = structuredClone(defaultDocument);
+    document.screens[0]?.root.children.push({ id: 'camera-test', kind: 'camera', label: ' ', minHeight: 32 });
+
+    expect(lintDocument(document)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ nodeId: 'camera-test', code: 'HIT_TARGET' }),
+      expect.objectContaining({ nodeId: 'camera-test', code: 'EMPTY_LABEL' }),
+    ]));
+  });
+
   it('flags text smaller than 11pt', () => {
     const document = structuredClone(defaultDocument);
     const text = document.screens[0]?.root.children.find((node) => node.kind === 'text');

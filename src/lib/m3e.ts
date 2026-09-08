@@ -459,7 +459,7 @@ function mapItem(item: JsonObject, context: ConversionContext): CanvasNode | nul
       return linkM3eNode(node, item, context, '画像');
     }
     case 'camera':
-      return appendNotes(imageNode(id, 'camera.fill', 'symbol', label || 'カメラ'), item, ['M3EのカメラプレースホルダーをImageとして読み込みました。']);
+      return appendNotes({ id, kind: 'camera', label: label || 'カメラ', minHeight: 44 }, item, ['カメラ入力は標準ButtonからAVFoundationの実装へ接続してください。']);
     case 'map':
       return appendNotes({ id, kind: 'map', label: label || '地図' }, item, ['M3Eの地図をMapKitのMapへ変換しました。位置情報や注釈は実装側で追加してください。']);
     case 'divider':

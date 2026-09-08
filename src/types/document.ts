@@ -39,6 +39,7 @@ export type NodeKind =
   | 'link'
   | 'datepicker'
   | 'image'
+  | 'camera'
   | 'map'
   | 'divider'
   | 'spacer';
@@ -289,6 +290,12 @@ export interface ImageNode extends BaseNode {
   source?: ImageSource;
 }
 
+export interface CameraNode extends BaseNode {
+  kind: 'camera';
+  label: string;
+  minHeight: number;
+}
+
 export interface MapNode extends BaseNode {
   kind: 'map';
   label: string;
@@ -353,6 +360,7 @@ export type CanvasNode =
   | LinkNode
   | DatePickerNode
   | ImageNode
+  | CameraNode
   | MapNode
   | ContainerNode
   | DividerNode

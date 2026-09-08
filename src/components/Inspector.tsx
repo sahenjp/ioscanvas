@@ -1261,6 +1261,7 @@ function nodeKindLabel(kind: CanvasNode['kind']): string {
     case 'confirmation-dialog': return 'ConfirmationDialog';
     case 'toggle': return 'Toggle';
     case 'image': return 'Image';
+    case 'camera': return 'Camera';
     case 'map': return 'MapKit Map';
   }
 }

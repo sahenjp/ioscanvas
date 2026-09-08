@@ -379,6 +379,17 @@ describe('SwiftUI generator', () => {
     expect(output).toContain('Button("Delete")');
   });
 
+  it('exports camera input as a labeled Button with an AVFoundation handoff note', () => {
+    const document = structuredClone(defaultDocument);
+    document.screens[0]?.root.children.push({ id: 'camera-test', kind: 'camera', label: '写真を撮る', minHeight: 44 });
+
+    const output = generateSwiftUI(document);
+
+    expect(output).toContain('AVFoundation: AVCaptureSessionをカメラプレビューへ接続する');
+    expect(output).toContain('Label("写真を撮る", systemImage: "camera.fill")');
+    expect(output).toContain('.accessibilityLabel("写真を撮る")');
+  });
+
   it('exports native list containers and links between screens', () => {
     const document = structuredClone(defaultDocument);
     const home = document.screens[0];

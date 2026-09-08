@@ -48,6 +48,8 @@ function describe(node: CanvasNode, depth = 0): string[] {
       return [`${common}: ${node.label} / binding=${node.binding}`];
     case 'image':
       return [`${common}: ${node.systemName} / source=${node.source ?? 'symbol'} / accessibility=${node.accessibilityLabel || 'decorative'}`];
+    case 'camera':
+      return [`${common}: ${node.label} / ButtonからAVFoundationのカメラ入力へ接続`];
     case 'map':
       return [`${common}: ${node.label || '地図'} / MapKit`];
     case 'section':

@@ -249,6 +249,20 @@ function renderNodeContent(
           ) : <span className="ios-image-symbol" aria-hidden="true">{symbolGlyph(node.systemName)}</span>}
         </div>
       );
+    case 'camera':
+      return (
+        <button
+          className="ios-row ios-camera"
+          type="button"
+          style={{ minHeight: node.minHeight }}
+          aria-label={node.label || 'カメラ'}
+          onClick={controls ? (event) => event.stopPropagation() : undefined}
+        >
+          <span className="ios-camera-symbol" aria-hidden="true">{symbolGlyph('camera.fill')}</span>
+          <span>{node.label || 'カメラ'}</span>
+          <span className="ios-link-indicator" aria-hidden="true">›</span>
+        </button>
+      );
     case 'map':
       return (
         <div className="ios-map" role="img" aria-label={node.label || '地図'}>
@@ -749,11 +763,17 @@ function renderNodeContent(
         ...(node.kind === 'lazyhgrid' ? { gridTemplateRows: `repeat(${node.rows ?? 2}, minmax(0, 1fr))`, gridAutoFlow: 'column' } : {}),
         ...containerAlignmentStyle(node),
       };
+      const cardClass = node.kind === 'groupbox'
+        ? ` card-image-${node.cardImagePosition ?? 'top'} card-content-${node.cardContentAlignment ?? 'start'}${node.cardNoImage ? ' card-no-image' : ''}`
+        : '';
+      const cardStyle = node.kind === 'groupbox' && node.cardImageSize !== undefined
+        ? { ...childrenStyle, '--card-image-size': `${node.cardImageSize}px` } as CSSProperties
+        : childrenStyle;
       return (
-        <div className={`canvas-container ${horizontal ? 'horizontal' : ''} ${overlay ? 'overlay' : ''} canvas-${node.kind}`}>
+        <div className={`canvas-container ${horizontal ? 'horizontal' : ''} ${overlay ? 'overlay' : ''} canvas-${node.kind}${cardClass}`}>
           {node.kind === 'groupbox' && node.isBottomSheet && <div className="canvas-bottom-sheet-handle" aria-hidden="true" />}
           {(node.kind === 'section' || node.kind === 'disclosure-group' || node.kind === 'groupbox') && <div className="section-title">{node.title || 'Section'}</div>}
-          <div className={childrenClass} style={childrenStyle}>
+          <div className={childrenClass} style={cardStyle}>
             {node.children.length === 0
               ? <div className="empty-container">ここへパーツをドロップ</div>
               : node.children.map((child) => <NodeView key={child.id} node={child} allNodes={allNodes} screenId={screenId} onOpenSheet={onOpenSheet} onNavigateScreen={onNavigateScreen} />)}
@@ -1324,6 +1344,7 @@ function symbolGlyph(systemName: string): string {
     'trash': '♲',
     'pencil': '✎',
     'photo': '▧',
+    'camera.fill': '▣',
     'map.fill': '⌖',
     'folder.fill': '▰',
     'doc.fill': '▤',

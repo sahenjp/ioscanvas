@@ -326,6 +326,10 @@ function readNode(value: unknown, ids: Set<string>): CanvasNode | null {
         && (value.source === undefined || isOneOf(value.source, ['symbol', 'asset', 'remote']))
         ? { id: value.id, kind: 'image', systemName: value.systemName, accessibilityLabel: value.accessibilityLabel, ...(value.source === undefined ? {} : { source: value.source as ImageSource }), ...nodeProperties }
         : null;
+    case 'camera':
+      return isString(value.label) && isNonNegativeNumber(value.minHeight)
+        ? { id: value.id, kind: 'camera', label: value.label, minHeight: value.minHeight, ...nodeProperties }
+        : null;
     case 'map':
       return isString(value.label)
         ? { id: value.id, kind: 'map', label: value.label, ...nodeProperties }

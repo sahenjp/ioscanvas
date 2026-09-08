@@ -195,6 +195,7 @@ describe('project document parsing', () => {
       { id: 'menu-test', kind: 'menu', label: 'Actions', options: ['Edit', 'Delete'], minHeight: 44 },
       { id: 'gauge-test', kind: 'gauge', label: '進捗', value: 0.6, minimum: 0, maximum: 1, minHeight: 44 },
       { id: 'empty-state-test', kind: 'content-unavailable', title: '項目なし', systemName: 'tray', description: 'まだ項目がありません。' },
+      { id: 'camera-test', kind: 'camera', label: '写真を撮る', minHeight: 44 },
       { id: 'alert-test', kind: 'alert', label: '削除', title: '削除しますか？', message: 'この操作は取り消せません。', primaryButton: '削除', primaryRole: 'destructive', secondaryButton: 'キャンセル', secondaryRole: 'cancel', minHeight: 44 },
       { id: 'confirmation-test', kind: 'confirmation-dialog', label: '操作', title: '操作を選択', message: '実行する操作を選んでください。', options: ['編集', '削除'], cancelButton: 'キャンセル', minHeight: 44 },
     );

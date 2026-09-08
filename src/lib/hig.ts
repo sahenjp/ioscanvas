@@ -54,7 +54,7 @@ function lintNode(
     });
   }
 
-  if (node.kind === 'button' || node.kind === 'alert' || node.kind === 'confirmation-dialog' || node.kind === 'toggle' || node.kind === 'textfield' || node.kind === 'searchfield' || node.kind === 'securefield' || node.kind === 'texteditor' || node.kind === 'picker' || node.kind === 'colorpicker' || node.kind === 'slider' || node.kind === 'stepper' || node.kind === 'menu' || node.kind === 'navigation-link' || node.kind === 'link' || node.kind === 'datepicker') {
+  if (node.kind === 'button' || node.kind === 'alert' || node.kind === 'confirmation-dialog' || node.kind === 'toggle' || node.kind === 'textfield' || node.kind === 'searchfield' || node.kind === 'securefield' || node.kind === 'texteditor' || node.kind === 'picker' || node.kind === 'colorpicker' || node.kind === 'slider' || node.kind === 'stepper' || node.kind === 'menu' || node.kind === 'navigation-link' || node.kind === 'link' || node.kind === 'datepicker' || node.kind === 'camera') {
     if (node.minHeight < 44) {
       issues.push({
         nodeId: node.id,
