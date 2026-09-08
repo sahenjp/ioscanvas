@@ -71,6 +71,7 @@ export function TopBar() {
         const details = [
           report.invalidFrameCount > 0 ? `無効な画面${report.invalidFrameCount}件` : '',
           report.invalidGroupCount > 0 ? `無効なグループ${report.invalidGroupCount}件` : '',
+          report.orphanedGroupCount > 0 ? `画面外グループ${report.orphanedGroupCount}件` : '',
           report.discardedItemCount > 0 ? `破棄した項目${report.discardedItemCount}件` : '',
           report.unresolvedDestinationCount > 0 ? `未解決の遷移${report.unresolvedDestinationCount}件` : '',
           report.unsupportedKinds.length > 0 ? `未対応パーツ: ${report.unsupportedKinds.join(', ')}` : '',

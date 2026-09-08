@@ -9,6 +9,7 @@ const m3eDocument = {
   title: 'レシピ',
   paletteKey: 'teal',
   theme: { dark: true, font: 'robotoSerif' },
+  frame: 'detail',
   frames: [
     { id: 'home', name: 'ホーム', x: 0, y: 0, note: '一覧画面', place: 'center', bg: 'surfaceContainerLow' },
     { id: 'detail', name: '詳細', x: 492, y: 0, swipe: { right: 'home' } },
@@ -100,6 +101,7 @@ describe('M3E compatibility importer', () => {
       }],
     };
 
+    expect(exportM3eDocument(document).frames[0]?.swipe).toBeUndefined();
     expect(inspectM3eExportCompatibility(document)).toEqual({
       flattenedItemCount: 4,
       unsupportedNodeKinds: ['glass-container', 'vstack'],
@@ -107,6 +109,44 @@ describe('M3E compatibility importer', () => {
       unresolvedDestinationCount: 2,
       normalizedScreenCount: 1,
     });
+  });
+
+  it('preserves card presentation and indeterminate circular progress on export', () => {
+    const document: CanvasDocument = {
+      version: 1,
+      name: 'M3E表示状態',
+      platform: 'iOS',
+      minimumOS: '26.0',
+      appearance: { colorScheme: 'system', accentColor: 'blue' },
+      activeScreenId: 'home',
+      screens: [{
+        id: 'home',
+        name: 'ホーム',
+        navigationTitle: 'ホーム',
+        root: {
+          id: 'root',
+          kind: 'vstack',
+          children: [
+            {
+              id: 'card',
+              kind: 'groupbox',
+              title: 'おすすめ',
+              cardImagePosition: 'leading',
+              cardImageSize: 96,
+              cardContentAlignment: 'center',
+              children: [],
+            },
+            { id: 'loading', kind: 'progress', label: '読み込み中', value: 0.5, style: 'circular', indeterminate: true },
+          ],
+        },
+      }],
+    };
+
+    const items = exportM3eDocument(document).groups.flatMap((group) => group.items);
+    expect(items).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: 'card', label: 'おすすめ', imagePos: 'leading', imageSize: 96, contentAlign: 'center' }),
+      expect.objectContaining({ kind: 'loadingIndicator', label: '読み込み中' }),
+    ]));
   });
 
   it('recognizes and converts M3E screen groups into a semantic iOS document', () => {
@@ -140,8 +180,13 @@ describe('M3E compatibility importer', () => {
       children: [expect.objectContaining({ kind: 'hstack' })],
     });
     expect(generateSwiftUI(document)).toContain('NavigationLink {');
+    const exportedItems = exportM3eDocument(document).groups.flatMap((group) => group.items);
+    expect(exportedItems).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: 'listItem', label: 'スープ', icon: 'fork.knife', supporting: '30分', action: { to: 'screen-detail', transition: 'slide' } }),
+    ]));
 
     expect(detail?.swipe).toEqual({ right: home?.id });
+    expect(document.activeScreenId).toBe(detail?.id);
   });
 
   it('maps M3E frame sizes to semantic iPhone and iPad preview devices', () => {
@@ -178,6 +223,52 @@ describe('M3E compatibility importer', () => {
     expect(document ? generateSwiftUI(document) : '').toContain('dismiss()');
   });
 
+  it('does not create invalid empty NavigationLinks for incomplete rails', () => {
+    const document = convertM3eDocument({
+      frames: [{ id: 'home', name: 'ホーム', x: 0, y: 0 }],
+      groups: [{
+        id: 'rail',
+        x: 0,
+        y: 0,
+        axis: 'y',
+        items: [{
+          id: 'rail',
+          kind: 'navRail',
+          label: '',
+          icon: null,
+          variant: 'filled',
+          tabs: [{ label: 'ホーム' }, { label: '未解決' }],
+          actions: { 'tab:1': { to: 'missing' } },
+        }],
+      }],
+    });
+
+    const rail = findNode(document?.screens[0]?.root.children ?? [], 'm3e-rail');
+    const entries = rail?.children?.[0]?.children ?? [];
+    expect(entries).toEqual([
+      expect.objectContaining({ kind: 'button', label: 'ホーム' }),
+      expect.objectContaining({ kind: 'button', label: '未解決', notes: 'M3Eの遷移先を解決できませんでした。' }),
+    ]);
+    expect(entries.some((entry) => entry.kind === 'navigation-link' && entry.destinationScreenId === '')).toBe(false);
+  });
+
+  it('keeps text-only top bar actions as semantic toolbar items', () => {
+    const document = convertM3eDocument({
+      frames: [{ id: 'home', name: 'ホーム', x: 0, y: 0 }, { id: 'settings', name: '設定', x: 492, y: 0 }],
+      groups: [{
+        id: 'bar',
+        x: 0,
+        y: 0,
+        axis: 'x',
+        items: [{ id: 'bar', kind: 'topAppBar', label: 'ホーム', icon: null, variant: 'filled', actions: { icon: { to: 'settings', transition: 'fade' } } }],
+      }],
+    });
+
+    expect(document?.screens[0]?.toolbarItems).toEqual([
+      expect.objectContaining({ title: '操作', placement: 'topBarLeading', destinationScreenId: 'screen-settings', navigationTransition: 'fade' }),
+    ]);
+  });
+
   it('rejects values that are not M3E project documents', () => {
     expect(isM3eDocument({ screens: [] })).toBe(false);
     expect(convertM3eDocument({ frames: [], groups: [] })).toBeNull();
@@ -208,10 +299,21 @@ describe('M3E compatibility importer', () => {
     expect(report).toEqual({
       invalidFrameCount: 1,
       invalidGroupCount: 1,
+      orphanedGroupCount: 0,
       discardedItemCount: 1,
       unresolvedDestinationCount: 2,
       unsupportedKinds: ['unknownPart'],
     });
+  });
+
+  it('reports and drops groups that are outside every valid frame', () => {
+    const value = {
+      frames: [{ id: 'home', name: 'ホーム', x: 0, y: 0, w: 412, h: 892 }],
+      groups: [{ id: 'outside', x: 900, y: 0, axis: 'y', items: [{ id: 'text', kind: 'text', label: '画面外' }] }],
+    };
+
+    expect(inspectM3eCompatibility(value)).toMatchObject({ orphanedGroupCount: 1 });
+    expect(convertM3eDocument(value)?.screens[0]?.root.children).toEqual([]);
   });
 
   it('keeps a toggle button valid when its M3E action also names a destination', () => {
