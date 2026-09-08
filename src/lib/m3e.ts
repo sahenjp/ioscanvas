@@ -11,6 +11,9 @@ import type {
   CardImagePosition,
   ContentPlacement,
   ImageSource,
+  M3eAction,
+  M3eCorners,
+  M3eItemMetadata,
   NavigationTransition,
   ScreenBackground,
   ScreenDevice,
@@ -68,28 +71,39 @@ interface M3eExportItem {
   supporting?: string;
   size?: number;
   size2?: number;
-  bold?: boolean;
-  checked?: boolean;
-  value?: number;
   minimum?: number;
   maximum?: number;
   step?: number;
+  radiusTop?: number;
+  radiusBottom?: number;
+  corners?: M3eCorners;
+  bold?: boolean;
+  checked?: boolean;
+  value?: number;
   tabs?: M3eExportTab[];
   selected?: number;
   action?: M3eExportAction;
   actions?: Record<string, M3eExportAction>;
   note?: string;
+  noteHistory?: string[];
   wavy?: boolean;
   trackThickness?: number;
   contained?: boolean;
   switch?: boolean;
   noCheck?: boolean;
   fill?: ScreenBackground;
+  iconFill?: ScreenBackground | 'none';
+  textColor?: 'primary' | 'secondary' | 'onSurface' | 'onSurfaceVariant' | 'onPrimaryContainer' | 'onSecondaryContainer' | 'onTertiaryContainer' | 'inverseOnSurface';
   noImage?: boolean;
   imagePos?: CardImagePosition;
   imageSize?: number;
   contentAlign?: CardContentAlignment;
   src?: string;
+  toggle?: {
+    icon?: string | null;
+    variant?: M3eVariant;
+    label?: string;
+  };
 }
 
 interface M3eExportFrame {
@@ -151,8 +165,12 @@ export interface M3eCompatibilityReport {
   orphanedGroupCount: number;
   discardedItemCount: number;
   unresolvedDestinationCount: number;
+  unresolvedActionCount: number;
   unsupportedKinds: string[];
   approximatedKinds: string[];
+  preservedFields: string[];
+  approximatedFields: string[];
+  lostFields: string[];
 }
 
 export interface M3eExportCompatibilityReport {
@@ -160,6 +178,10 @@ export interface M3eExportCompatibilityReport {
   unsupportedNodeKinds: string[];
   approximatedKinds: string[];
   unresolvedDestinationCount: number;
+  unresolvedActionCount: number;
+  preservedFields: string[];
+  approximatedFields: string[];
+  lostFields: string[];
   normalizedScreenCount: number;
 }
 
@@ -179,6 +201,19 @@ const supportedM3eKinds = new Set([
   'searchBar', 'card', 'listItem', 'dialog', 'snackbar', 'textField', 'select', 'switch', 'checkbox',
   'slider', 'text', 'image', 'camera', 'map', 'divider', 'loadingIndicator', 'linearProgress',
   'circularProgress', 'splitButton', 'fabMenu', 'toolbar', 'tabs', 'radio', 'badge',
+]);
+
+const m3ePreservableFields = [
+  'supporting', 'icon2', 'size', 'size2', 'minimum', 'maximum', 'step', 'radiusTop', 'radiusBottom', 'corners',
+  'tabs', 'selected', 'action', 'actions', 'checked', 'switch', 'noCheck', 'noImage', 'imagePos', 'imageSize',
+  'contentAlign', 'textColor', 'fill', 'iconFill', 'src', 'wavy', 'trackThickness', 'contained', 'railExpanded',
+  'railModal', 'railExpansionSide', 'toggle', 'noteHistory',
+] as const;
+type M3ePreservableField = typeof m3ePreservableFields[number];
+
+const approximatedM3eFields = new Set<M3ePreservableField>([
+  'size', 'size2', 'minimum', 'maximum', 'step', 'radiusTop', 'radiusBottom', 'corners', 'textColor', 'iconFill',
+  'src', 'noCheck', 'contained', 'railExpansionSide',
 ]);
 
 const approximatedM3eKinds = new Set([
@@ -389,6 +424,114 @@ function actionTarget(item: JsonObject, context: ConversionContext): { destinati
   return destination ? { destination, back: false, ...(transition === undefined ? {} : { transition }) } : { back: false };
 }
 
+function m3eAction(value: unknown): M3eAction | undefined {
+  if (!isRecord(value) || !stringValue(value, 'to')) return undefined;
+  const transition = value.transition;
+  return isOneOf(transition, ['slide', 'slideLeft', 'slideUp', 'slideDown', 'fade', 'expand', 'none'])
+    ? { to: value.to as string, transition }
+    : transition === undefined
+      ? { to: value.to as string, transition: 'slide' }
+      : undefined;
+}
+
+function readM3eMetadata(item: JsonObject): M3eItemMetadata | undefined {
+  const metadata: M3eItemMetadata = {};
+  const copyNumber = (key: 'size' | 'size2' | 'minimum' | 'maximum' | 'step' | 'radiusTop' | 'radiusBottom' | 'imageSize'): void => {
+    const value = numberValue(item, key);
+    if (value !== undefined && value >= 0) metadata[key] = value;
+  };
+  for (const key of ['size', 'size2', 'minimum', 'maximum', 'step', 'radiusTop', 'radiusBottom', 'imageSize'] as const) copyNumber(key);
+
+  const supporting = stringValue(item, 'supporting');
+  const icon2 = item.icon2 === null ? null : stringValue(item, 'icon2');
+  const src = stringValue(item, 'src');
+  if (supporting !== undefined) metadata.supporting = supporting;
+  if (item.icon2 === null || icon2 !== undefined) metadata.icon2 = icon2 ?? null;
+  if (src !== undefined) metadata.src = src;
+
+  const selected = numberValue(item, 'selected');
+  if (selected !== undefined && Number.isInteger(selected) && selected >= 0) metadata.selected = selected;
+  for (const key of ['checked', 'switch', 'noCheck', 'noImage', 'wavy', 'contained', 'railExpanded', 'railModal'] as const) {
+    const value = booleanValue(item, key);
+    if (value !== undefined) metadata[key] = value;
+  }
+  const railExpansionSide = stringValue(item, 'railExpansionSide');
+  if (railExpansionSide === 'left' || railExpansionSide === 'right') metadata.railExpansionSide = railExpansionSide;
+
+  const imagePos = stringValue(item, 'imagePos');
+  if (isOneOf(imagePos, ['top', 'leading', 'trailing', 'background'])) metadata.imagePos = imagePos;
+  const contentAlign = stringValue(item, 'contentAlign');
+  if (isOneOf(contentAlign, ['start', 'center', 'end'])) metadata.contentAlign = contentAlign;
+  const fill = stringValue(item, 'fill');
+  if (isOneOf(fill, ['surface', 'surfaceContainerLow', 'surfaceContainer', 'surfaceContainerHigh', 'surfaceContainerHighest', 'primaryContainer', 'secondaryContainer', 'tertiaryContainer', 'primary', 'inverseSurface'])) metadata.fill = fill;
+  const iconFill = item.iconFill === 'none' ? 'none' : stringValue(item, 'iconFill');
+  if (iconFill === 'none' || isOneOf(iconFill, ['surface', 'surfaceContainerLow', 'surfaceContainer', 'surfaceContainerHigh', 'surfaceContainerHighest', 'primaryContainer', 'secondaryContainer', 'tertiaryContainer', 'primary', 'inverseSurface'])) metadata.iconFill = iconFill;
+  const textColor = stringValue(item, 'textColor');
+  if (isOneOf(textColor, ['primary', 'secondary', 'onSurface', 'onSurfaceVariant', 'onPrimaryContainer', 'onSecondaryContainer', 'onTertiaryContainer', 'inverseOnSurface'])) metadata.textColor = textColor;
+  const trackThickness = numberValue(item, 'trackThickness');
+  if (trackThickness !== undefined && Number.isInteger(trackThickness) && trackThickness >= 2 && trackThickness <= 16) metadata.trackThickness = trackThickness;
+
+  const corners = recordValue(item, 'corners');
+  if (corners && ['tl', 'tr', 'bl', 'br'].every((key) => numberValue(corners, key) !== undefined && (numberValue(corners, key) ?? -1) >= 0)) {
+    metadata.corners = {
+      tl: numberValue(corners, 'tl') as number,
+      tr: numberValue(corners, 'tr') as number,
+      bl: numberValue(corners, 'bl') as number,
+      br: numberValue(corners, 'br') as number,
+    };
+  }
+
+  if (Array.isArray(item.tabs)) {
+    const tabs = item.tabs.filter(isRecord).map((tab) => ({
+      label: stringValue(tab, 'label') ?? '',
+      icon: tab.icon === null ? null : stringValue(tab, 'icon') ?? null,
+    }));
+    metadata.tabs = tabs;
+  }
+  const action = m3eAction(item.action);
+  if (action) metadata.action = action;
+  const rawActions = recordValue(item, 'actions');
+  if (rawActions) {
+    const actions = Object.fromEntries(Object.entries(rawActions).flatMap(([slot, value]) => {
+      const parsed = m3eAction(value);
+      return parsed ? [[slot, parsed]] : [];
+    }));
+    if (Object.keys(actions).length > 0) metadata.actions = actions;
+  }
+
+  const toggle = recordValue(item, 'toggle');
+  if (toggle) {
+    const parsed: M3eItemMetadata['toggle'] = {
+      ...(toggle.icon === null ? { icon: null } : stringValue(toggle, 'icon') === undefined ? {} : { icon: stringValue(toggle, 'icon') }),
+      ...(isOneOf(toggle.variant, ['filled', 'tonal', 'elevated', 'outlined', 'text']) ? { variant: toggle.variant } : {}),
+      ...(stringValue(toggle, 'label') === undefined ? {} : { label: stringValue(toggle, 'label') }),
+    };
+    if (Object.keys(parsed).length > 0) metadata.toggle = parsed;
+  }
+
+  if (Array.isArray(item.noteHistory) && item.noteHistory.every((entry) => typeof entry === 'string')) {
+    metadata.noteHistory = item.noteHistory as string[];
+  }
+  return Object.keys(metadata).length > 0 ? metadata : undefined;
+}
+
+function inspectM3eItemFields(item: JsonObject): { preserved: string[]; approximated: string[]; lost: string[] } {
+  const metadata = readM3eMetadata(item);
+  const preserved: string[] = [];
+  const approximated: string[] = [];
+  const lost: string[] = [];
+  for (const field of m3ePreservableFields) {
+    if (!Object.prototype.hasOwnProperty.call(item, field)) continue;
+    if (metadata && Object.prototype.hasOwnProperty.call(metadata, field)) {
+      preserved.push(field);
+      if (approximatedM3eFields.has(field)) approximated.push(field);
+    } else {
+      lost.push(field);
+    }
+  }
+  return { preserved, approximated, lost };
+}
+
 function appendNotes(node: CanvasNode, item: JsonObject, extra: string[] = []): CanvasNode {
   const notes = [
     node.notes?.trim() ?? '',
@@ -406,6 +549,8 @@ function appendNotes(node: CanvasNode, item: JsonObject, extra: string[] = []): 
   const variant = isOneOf(item.variant, ['filled', 'tonal', 'elevated', 'outlined', 'text'] as const) ? item.variant : undefined;
   if (m3eKind) node.m3eKind = m3eKind as M3ePresentationKind;
   if (variant) node.m3eVariant = variant as M3eVariant;
+  const m3eMetadata = readM3eMetadata(item);
+  if (m3eMetadata) node.m3eMetadata = m3eMetadata;
   return node;
 }
 
@@ -438,6 +583,9 @@ function linkM3eNode(node: CanvasNode, item: JsonObject, context: ConversionCont
       role: 'normal',
       minHeight: 44,
       ...(node.kind === 'image' && node.systemName.trim() ? { systemName: node.systemName } : {}),
+      ...(annotated.m3eKind === undefined ? {} : { m3eKind: annotated.m3eKind }),
+      ...(annotated.m3eVariant === undefined ? {} : { m3eVariant: annotated.m3eVariant }),
+      ...(annotated.m3eMetadata === undefined ? {} : { m3eMetadata: annotated.m3eMetadata }),
       navigationAction: 'back',
       ...(action.transition === undefined ? {} : { navigationTransition: action.transition }),
       notes: [annotated.notes, 'タップで前の画面へ戻る'].filter(Boolean).join('\n'),
@@ -452,6 +600,9 @@ function linkM3eNode(node: CanvasNode, item: JsonObject, context: ConversionCont
     destinationScreenId: action.destination,
     minHeight: 44,
     children: [annotated],
+    ...(annotated.m3eKind === undefined ? {} : { m3eKind: annotated.m3eKind }),
+    ...(annotated.m3eVariant === undefined ? {} : { m3eVariant: annotated.m3eVariant }),
+    ...(annotated.m3eMetadata === undefined ? {} : { m3eMetadata: annotated.m3eMetadata }),
     ...(action.transition === undefined ? {} : { navigationTransition: action.transition }),
     notes: 'タップで画面へ遷移',
   };
@@ -941,12 +1092,15 @@ function convertScreen(frame: M3eFrame, groups: M3eGroup[], frames: M3eFrame[], 
   const bodyNodes: CanvasNode[] = [];
   let splitView: ContainerNode | undefined;
   let navigationTitle = frame.name;
+  let m3eTopAppBar: M3eItemMetadata | undefined;
+  let m3eBottomNav: M3eItemMetadata | undefined;
 
   for (const group of groupsForScreen(groups, frame, frames)) {
     const groupNodes: CanvasNode[] = [];
     for (const item of group.items) {
       if (item.kind === 'topAppBar') {
         navigationTitle = labelOf(item, frame.name);
+        m3eTopAppBar = readM3eMetadata(item);
         const leading = toolbarItem(item, iconOf(item), 'topBarLeading', 'icon', context);
         const trailing = toolbarItem(item, iconOf(item, 'icon2'), 'topBarTrailing', 'icon2', context);
         if (leading) toolbarItems.push(leading);
@@ -954,6 +1108,7 @@ function convertScreen(frame: M3eFrame, groups: M3eGroup[], frames: M3eFrame[], 
         continue;
       }
       if (item.kind === 'bottomNav') {
+        m3eBottomNav = readM3eMetadata(item);
         tabBarItems.push(...bottomNavigationItems(item, context));
         continue;
       }
@@ -1004,6 +1159,8 @@ function convertScreen(frame: M3eFrame, groups: M3eGroup[], frames: M3eFrame[], 
     previewOrientation: frame.previewOrientation,
     ...(toolbarItems.length > 0 ? { toolbarItems } : {}),
     ...(tabBarItems.length > 0 ? { tabBarItems } : {}),
+    ...(m3eTopAppBar === undefined ? {} : { m3eTopAppBar }),
+    ...(m3eBottomNav === undefined ? {} : { m3eBottomNav }),
     ...(frame.swipe ? {
       swipe: Object.fromEntries(
         Object.entries(frame.swipe).flatMap(([direction, target]) => context.frameIds.has(target) ? [[direction, context.frameIds.get(target) as string]] : []),
@@ -1025,10 +1182,14 @@ export function inspectM3eCompatibility(value: unknown): M3eCompatibilityReport 
   const frameIds = new Set(frames.map((frame) => frame.id));
   const unsupportedKinds = new Set<string>();
   const approximatedKinds = new Set<string>();
+  const preservedFields = new Set<string>();
+  const approximatedFields = new Set<string>();
+  const lostFields = new Set<string>();
   let invalidGroupCount = 0;
   let orphanedGroupCount = 0;
   let discardedItemCount = 0;
   let unresolvedDestinationCount = 0;
+  let unresolvedActionCount = 0;
 
   for (const rawGroup of value.groups as unknown[]) {
     if (!isRecord(rawGroup) || !Array.isArray(rawGroup.items)) {
@@ -1049,20 +1210,30 @@ export function inspectM3eCompatibility(value: unknown): M3eCompatibilityReport 
       const kind = stringValue(rawItem, 'kind');
       if (!kind || !supportedM3eKinds.has(kind)) unsupportedKinds.add(kind || 'unknown');
       if (kind && approximatedM3eKinds.has(kind)) approximatedKinds.add(kind);
+      const fieldSummary = inspectM3eItemFields(rawItem);
+      fieldSummary.preserved.forEach((field) => preservedFields.add(field));
+      fieldSummary.approximated.forEach((field) => approximatedFields.add(field));
+      fieldSummary.lost.forEach((field) => lostFields.add(field));
       const actionTargets = [
         recordValue(rawItem, 'action'),
         ...Object.values(recordValue(rawItem, 'actions') ?? {}).filter(isRecord),
       ].filter(isRecord);
       for (const action of actionTargets) {
         const target = stringValue(action, 'to');
-        if (target && target !== 'back' && !frameIds.has(target)) unresolvedDestinationCount += 1;
+        if (target && target !== 'back' && !frameIds.has(target)) {
+          unresolvedDestinationCount += 1;
+          unresolvedActionCount += 1;
+        }
       }
     }
   }
 
   for (const frame of frames) {
     for (const destination of Object.values(frame.swipe ?? {})) {
-      if (destination && !frameIds.has(destination)) unresolvedDestinationCount += 1;
+      if (destination && !frameIds.has(destination)) {
+        unresolvedDestinationCount += 1;
+        unresolvedActionCount += 1;
+      }
     }
   }
 
@@ -1072,8 +1243,12 @@ export function inspectM3eCompatibility(value: unknown): M3eCompatibilityReport 
     orphanedGroupCount,
     discardedItemCount,
     unresolvedDestinationCount,
+    unresolvedActionCount,
     unsupportedKinds: [...unsupportedKinds].sort(),
     approximatedKinds: [...approximatedKinds].sort(),
+    preservedFields: [...preservedFields].sort(),
+    approximatedFields: [...approximatedFields].sort(),
+    lostFields: [...lostFields].sort(),
   };
 }
 
@@ -1166,9 +1341,61 @@ function exportFill(background: BackgroundStyle | undefined): ScreenBackground |
   }
 }
 
+function exportNodeFill(node: CanvasNode): ScreenBackground | undefined {
+  const original = node.m3eMetadata?.fill;
+  if (original) {
+    const importedBackground = backgroundStyle({ fill: original });
+    if (node.background === importedBackground) return original;
+  }
+  return exportFill(node.background);
+}
+
 function exportNote(node: CanvasNode, extra?: string): string | undefined {
   const notes = [node.notes?.trim() ?? '', extra?.trim() ?? ''].filter(Boolean);
   return notes.length > 0 ? notes.join('\n') : undefined;
+}
+
+function exportM3eMetadata(metadata: M3eItemMetadata | undefined): Partial<M3eExportItem> {
+  if (!metadata) return {};
+  return {
+    ...(metadata.supporting === undefined ? {} : { supporting: metadata.supporting }),
+    ...(metadata.icon2 === undefined ? {} : { icon2: metadata.icon2 }),
+    ...(metadata.size === undefined ? {} : { size: metadata.size }),
+    ...(metadata.size2 === undefined ? {} : { size2: metadata.size2 }),
+    ...(metadata.minimum === undefined ? {} : { minimum: metadata.minimum }),
+    ...(metadata.maximum === undefined ? {} : { maximum: metadata.maximum }),
+    ...(metadata.step === undefined ? {} : { step: metadata.step }),
+    ...(metadata.radiusTop === undefined ? {} : { radiusTop: metadata.radiusTop }),
+    ...(metadata.radiusBottom === undefined ? {} : { radiusBottom: metadata.radiusBottom }),
+    ...(metadata.corners === undefined ? {} : { corners: metadata.corners }),
+    ...(metadata.tabs === undefined ? {} : { tabs: metadata.tabs }),
+    ...(metadata.selected === undefined ? {} : { selected: metadata.selected }),
+    ...(metadata.action === undefined ? {} : { action: metadata.action }),
+    ...(metadata.actions === undefined ? {} : { actions: metadata.actions }),
+    ...(metadata.checked === undefined ? {} : { checked: metadata.checked }),
+    ...(metadata.switch === undefined ? {} : { switch: metadata.switch }),
+    ...(metadata.noCheck === undefined ? {} : { noCheck: metadata.noCheck }),
+    ...(metadata.noImage === undefined ? {} : { noImage: metadata.noImage }),
+    ...(metadata.imagePos === undefined ? {} : { imagePos: metadata.imagePos }),
+    ...(metadata.imageSize === undefined ? {} : { imageSize: metadata.imageSize }),
+    ...(metadata.contentAlign === undefined ? {} : { contentAlign: metadata.contentAlign }),
+    ...(metadata.textColor === undefined ? {} : { textColor: metadata.textColor }),
+    ...(metadata.fill === undefined ? {} : { fill: metadata.fill }),
+    ...(metadata.iconFill === undefined ? {} : { iconFill: metadata.iconFill }),
+    ...(metadata.src === undefined ? {} : { src: metadata.src }),
+    ...(metadata.wavy === undefined ? {} : { wavy: metadata.wavy }),
+    ...(metadata.trackThickness === undefined ? {} : { trackThickness: metadata.trackThickness }),
+    ...(metadata.contained === undefined ? {} : { contained: metadata.contained }),
+    ...(metadata.railExpanded === undefined ? {} : { railExpanded: metadata.railExpanded }),
+    ...(metadata.railModal === undefined ? {} : { railModal: metadata.railModal }),
+    ...(metadata.railExpansionSide === undefined ? {} : { railExpansionSide: metadata.railExpansionSide }),
+    ...(metadata.toggle === undefined ? {} : { toggle: metadata.toggle }),
+    ...(metadata.noteHistory === undefined ? {} : { noteHistory: metadata.noteHistory }),
+  };
+}
+
+function withM3eMetadata(item: M3eExportItem, metadata: M3eItemMetadata | undefined): M3eExportItem {
+  return { ...exportM3eMetadata(metadata), ...item };
 }
 
 function exportAction(node: CanvasNode, frameIds: Map<string, string>): M3eExportAction | undefined {
@@ -1220,6 +1447,7 @@ function exportItem(node: CanvasNode, frameIds: Map<string, string>, inheritedNo
     label,
     icon,
     variant: exportVariant(node),
+    ...exportM3eMetadata(node.m3eMetadata),
     ...extra,
     ...(exportNote(node, inheritedNote) ? { note: exportNote(node, inheritedNote) } : {}),
   });
@@ -1231,17 +1459,26 @@ function exportItem(node: CanvasNode, frameIds: Map<string, string>, inheritedNo
       const buttonKind = node.m3eKind === 'button' || node.m3eKind === 'iconButton' || node.m3eKind === 'fab' || node.m3eKind === 'extendedFab' || node.m3eKind === 'chip' || node.m3eKind === 'splitButton'
         ? node.m3eKind
         : node.label.trim() ? 'button' : node.systemName ? 'iconButton' : 'button';
+      const action = exportAction(node, frameIds);
       return base(buttonKind, node.label, node.systemName ?? null, {
         ...(node.toggle ? { checked: node.toggle.isOn } : {}),
-        action: exportAction(node, frameIds),
+        ...(action ? { action } : {}),
+        ...(node.toggle ? {
+          toggle: {
+            ...(node.toggle.onSystemName === undefined ? {} : { icon: node.toggle.onSystemName }),
+            ...(node.toggle.onButtonStyle === undefined ? {} : { variant: exportVariant({ ...node, buttonStyle: node.toggle.onButtonStyle }) }),
+            ...(node.toggle.onLabel ? { label: node.toggle.onLabel } : {}),
+          },
+        } : {}),
       });
     }
     case 'navigation-link': {
       const presentation = exportListItemPresentation(node);
+      const action = exportAction(node, frameIds);
       return base('listItem', node.label, presentation.icon, {
         ...(presentation.icon2 ? { icon2: presentation.icon2 } : {}),
         ...(presentation.supporting ? { supporting: presentation.supporting } : {}),
-        action: exportAction(node, frameIds),
+        ...(action ? { action } : {}),
       });
     }
     case 'toggle':
@@ -1330,7 +1567,7 @@ function exportTabsNode(node: ContainerNode, frameIds: Map<string, string>, inhe
     const action = exportAction(child, frameIds);
     return action ? [[`tab:${index}`, action]] : [];
   }));
-  return {
+  return withM3eMetadata({
     id: node.id,
     kind: node.m3eKind === 'topAppBar' || node.m3eKind === 'bottomNav' || node.m3eKind === 'tabs' ? node.m3eKind : 'tabs',
     label: node.title || 'タブ',
@@ -1340,7 +1577,7 @@ function exportTabsNode(node: ContainerNode, frameIds: Map<string, string>, inhe
     ...(node.selectedIndex === undefined ? {} : { selected: node.selectedIndex }),
     ...(Object.keys(actions).length > 0 ? { actions } : {}),
     ...(exportNote(node, inheritedNote) ? { note: exportNote(node, inheritedNote) } : {}),
-  };
+  }, node.m3eMetadata);
 }
 
 function exportNavigationSplitNode(node: ContainerNode, frameIds: Map<string, string>, inheritedNote: string): M3eExportItem {
@@ -1351,7 +1588,7 @@ function exportNavigationSplitNode(node: ContainerNode, frameIds: Map<string, st
     const action = exportAction(child, frameIds);
     return action ? [[`tab:${index}`, action]] : [];
   }));
-  return {
+  return withM3eMetadata({
     id: node.id,
     kind: 'navRail',
     label: 'ナビゲーションレール',
@@ -1361,7 +1598,7 @@ function exportNavigationSplitNode(node: ContainerNode, frameIds: Map<string, st
     ...(node.selectedIndex === undefined ? {} : { selected: node.selectedIndex }),
     ...(Object.keys(actions).length > 0 ? { actions } : {}),
     ...(exportNote(node, inheritedNote) ? { note: exportNote(node, inheritedNote) } : {}),
-  };
+  }, node.m3eMetadata);
 }
 
 function exportCardPresentation(node: ContainerNode): Pick<M3eExportItem, 'icon' | 'supporting' | 'src'> {
@@ -1396,7 +1633,7 @@ function exportListItemNode(node: ContainerNode, inheritedNote: string): M3eExpo
   const supporting = texts.find((child) => child.text.trim() && child.text.trim() !== label)?.text.trim();
   const leading = images[0];
   const trailing = images[1];
-  return {
+  return withM3eMetadata({
     id: node.id,
     kind: 'listItem',
     label,
@@ -1406,7 +1643,7 @@ function exportListItemNode(node: ContainerNode, inheritedNote: string): M3eExpo
     ...(supporting ? { supporting } : {}),
     ...(toggle ? { switch: true, checked: toggle.isOn ?? false } : {}),
     ...(exportNote(node, inheritedNote) ? { note: exportNote(node, inheritedNote) } : {}),
-  };
+  }, node.m3eMetadata);
 }
 
 function exportFabMenuNode(node: ContainerNode, frameIds: Map<string, string>, inheritedNote: string): M3eExportItem {
@@ -1415,7 +1652,7 @@ function exportFabMenuNode(node: ContainerNode, frameIds: Map<string, string>, i
     const action = exportAction(button, frameIds);
     return action ? [[`tab:${index}`, action]] : [];
   }));
-  return {
+  return withM3eMetadata({
     id: node.id,
     kind: 'fabMenu',
     label: node.label ?? 'FABメニュー',
@@ -1424,7 +1661,7 @@ function exportFabMenuNode(node: ContainerNode, frameIds: Map<string, string>, i
     tabs: buttons.map((button) => exportTabItem(button)),
     ...(Object.keys(actions).length > 0 ? { actions } : {}),
     ...(exportNote(node, inheritedNote) ? { note: exportNote(node, inheritedNote) } : {}),
-  };
+  }, node.m3eMetadata);
 }
 
 function exportToolbarNode(node: ContainerNode, frameIds: Map<string, string>, inheritedNote: string): M3eExportItem | null {
@@ -1435,7 +1672,7 @@ function exportToolbarNode(node: ContainerNode, frameIds: Map<string, string>, i
     const action = exportAction(button, frameIds);
     return action ? [[`tab:${index}`, action]] : [];
   }));
-  return {
+  return withM3eMetadata({
     id: node.id,
     kind: 'toolbar',
     label: 'ツールバー',
@@ -1444,7 +1681,7 @@ function exportToolbarNode(node: ContainerNode, frameIds: Map<string, string>, i
     tabs: buttons.map((button) => exportTabItem(button)),
     ...(Object.keys(actions).length > 0 ? { actions } : {}),
     ...(exportNote(node, inheritedNote) ? { note: exportNote(node, inheritedNote) } : {}),
-  };
+  }, node.m3eMetadata);
 }
 
 function exportSnackbarNode(node: ContainerNode, inheritedNote: string): M3eExportItem | null {
@@ -1452,7 +1689,7 @@ function exportSnackbarNode(node: ContainerNode, inheritedNote: string): M3eExpo
   const message = node.children.find((child): child is Extract<CanvasNode, { kind: 'text' }> => child.kind === 'text');
   const action = node.children.find((child): child is Extract<CanvasNode, { kind: 'button' }> => child.kind === 'button');
   if (!message || node.children.some((child) => child !== message && child !== action)) return null;
-  return {
+  return withM3eMetadata({
     id: node.id,
     kind: 'snackbar',
     label: message.text,
@@ -1460,7 +1697,7 @@ function exportSnackbarNode(node: ContainerNode, inheritedNote: string): M3eExpo
     variant: exportVariant(node),
     ...(action ? { supporting: action.label } : {}),
     ...(exportNote(node, inheritedNote) ? { note: exportNote(node, inheritedNote) } : {}),
-  };
+  }, node.m3eMetadata);
 }
 
 function isExportContainer(node: CanvasNode): node is ContainerNode {
@@ -1495,13 +1732,13 @@ function exportContainerItems(node: ContainerNode, frameIds: Map<string, string>
   const isBottomSheet = node.isBottomSheet === true;
   const isCard = node.kind === 'groupbox' && !isBottomSheet && node.m3eKind !== 'box';
   const card = isCard ? exportCardPresentation(node) : { icon: null };
-  const containerItem: M3eExportItem = {
+  const containerItem = withM3eMetadata({
     id: `${node.id}-container`,
     kind: isCard ? 'card' : 'box',
     label: title,
     icon: card.icon,
     variant: node.background === 'accent' ? 'filled' : 'outlined',
-    ...(exportFill(node.background) ? { fill: exportFill(node.background) } : {}),
+    ...(exportNodeFill(node) ? { fill: exportNodeFill(node) } : {}),
     ...(isBottomSheet ? { checked: true } : {}),
     ...(isCard && node.cardNoImage ? { noImage: true } : {}),
     ...(isCard && node.cardImagePosition ? { imagePos: node.cardImagePosition } : {}),
@@ -1510,7 +1747,7 @@ function exportContainerItems(node: ContainerNode, frameIds: Map<string, string>
     ...(isCard && card.supporting ? { supporting: card.supporting } : {}),
     ...(isCard && card.src ? { src: card.src } : {}),
     note: exportNote(node, node.kind === 'sheet' ? 'SwiftUI sheetとして再構成します。' : undefined),
-  };
+  }, node.m3eMetadata);
   return [containerItem, ...children];
 }
 
@@ -1545,7 +1782,7 @@ function exportTopBar(screen: CanvasScreen, frameIds: Map<string, string>): M3eE
     leading ? ['icon', exportToolbarAction(leading, frameIds)] : [],
     trailing ? ['icon2', exportToolbarAction(trailing, frameIds)] : [],
   ].filter((entry): entry is [string, M3eExportAction] => entry[1] !== undefined));
-  return {
+  return withM3eMetadata({
     id: `${screen.id}-top-app-bar`,
     kind: 'topAppBar',
     label: screen.navigationTitle,
@@ -1553,7 +1790,7 @@ function exportTopBar(screen: CanvasScreen, frameIds: Map<string, string>): M3eE
     variant: 'filled',
     ...(trailing?.systemName ? { icon2: trailing.systemName } : {}),
     ...(Object.keys(actions).length > 0 ? { actions } : {}),
-  };
+  }, screen.m3eTopAppBar);
 }
 
 function exportBottomBar(screen: CanvasScreen, frameIds: Map<string, string>): M3eExportItem | null {
@@ -1566,7 +1803,7 @@ function exportBottomBar(screen: CanvasScreen, frameIds: Map<string, string>): M
     return action ? [[`tab:${index}`, action]] : [];
   }));
   const selected = items.findIndex((item) => item.selected);
-  return {
+  return withM3eMetadata({
     id: `${screen.id}-bottom-navigation`,
     kind: 'bottomNav',
     label: 'タブバー',
@@ -1575,7 +1812,7 @@ function exportBottomBar(screen: CanvasScreen, frameIds: Map<string, string>): M
     tabs: items.map((item) => ({ label: item.title, icon: item.systemName ?? null })),
     ...(selected >= 0 ? { selected } : {}),
     ...(Object.keys(actions).length > 0 ? { actions } : {}),
-  };
+  }, screen.m3eBottomNav);
 }
 
 function exportGroupsForScreen(screen: CanvasScreen, frameIds: Map<string, string>, size: { width: number; height: number }): M3eExportGroup[] {
@@ -1666,16 +1903,32 @@ export function inspectM3eExportCompatibility(document: CanvasDocument): M3eExpo
   const frameIds = new Set(document.screens.map((screen) => screen.id));
   const unsupportedNodeKinds = new Set<string>();
   const approximatedKinds = new Set<string>();
+  const sourceFields = new Set<string>();
+  const exportedFields = new Set<string>();
   let unresolvedDestinationCount = 0;
+  let unresolvedActionCount = 0;
+
+  const collectMetadataFields = (node: CanvasNode): void => {
+    Object.keys(node.m3eMetadata ?? {}).forEach((field) => sourceFields.add(field));
+    if (Array.isArray(node.children)) node.children.forEach(collectMetadataFields);
+  };
+  const collectExportedFields = (item: M3eExportItem): void => {
+    Object.keys(item).forEach((field) => exportedFields.add(field));
+  };
+  exported.groups.forEach((group) => group.items.forEach(collectExportedFields));
 
   for (const screen of document.screens) {
     collectExportCompatibilityKinds(screen.root, unsupportedNodeKinds, approximatedKinds);
+    collectMetadataFields(screen.root);
+    Object.keys(screen.m3eTopAppBar ?? {}).forEach((field) => sourceFields.add(field));
+    Object.keys(screen.m3eBottomNav ?? {}).forEach((field) => sourceFields.add(field));
     for (const node of screen.root.children) {
       const visit = (current: CanvasNode): void => {
         if ((current.kind === 'button' || current.kind === 'navigation-link')
           && current.destinationScreenId
           && !frameIds.has(current.destinationScreenId)) {
           unresolvedDestinationCount += 1;
+          unresolvedActionCount += 1;
         }
         if (Array.isArray(current.children)) {
           for (const child of current.children) visit(child);
@@ -1684,12 +1937,22 @@ export function inspectM3eExportCompatibility(document: CanvasDocument): M3eExpo
       visit(node);
     }
     for (const item of [...(screen.toolbarItems ?? []), ...(screen.tabBarItems ?? [])]) {
-      if (item.destinationScreenId && !frameIds.has(item.destinationScreenId)) unresolvedDestinationCount += 1;
+      if (item.destinationScreenId && !frameIds.has(item.destinationScreenId)) {
+        unresolvedDestinationCount += 1;
+        unresolvedActionCount += 1;
+      }
     }
     for (const destination of Object.values(screen.swipe ?? {})) {
-      if (destination && !frameIds.has(destination)) unresolvedDestinationCount += 1;
+      if (destination && !frameIds.has(destination)) {
+        unresolvedDestinationCount += 1;
+        unresolvedActionCount += 1;
+      }
     }
   }
+
+  const preservedFields = [...sourceFields].filter((field) => exportedFields.has(field)).sort();
+  const lostFields = [...sourceFields].filter((field) => !exportedFields.has(field)).sort();
+  const approximatedFields = [...sourceFields].filter((field): field is M3ePreservableField => approximatedM3eFields.has(field as M3ePreservableField)).sort();
 
   return {
     flattenedItemCount: exported.groups.reduce(
@@ -1699,6 +1962,10 @@ export function inspectM3eExportCompatibility(document: CanvasDocument): M3eExpo
     unsupportedNodeKinds: [...unsupportedNodeKinds].sort(),
     approximatedKinds: [...approximatedKinds].sort(),
     unresolvedDestinationCount,
+    unresolvedActionCount,
+    preservedFields,
+    approximatedFields,
+    lostFields,
     normalizedScreenCount: exported.frames.length,
   };
 }

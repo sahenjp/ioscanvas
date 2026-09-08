@@ -22,7 +22,8 @@ export function ExportPanel() {
   const value = tab === 'swiftui' ? swiftui : tab === 'prompt' ? prompt : m3e;
   const m3eHasWarnings = m3eReport.unsupportedNodeKinds.length > 0
     || m3eReport.approximatedKinds.length > 0
-    || m3eReport.unresolvedDestinationCount > 0;
+    || m3eReport.unresolvedDestinationCount > 0
+    || m3eReport.lostFields.length > 0;
 
   useEffect(() => {
     if (!open) return;
@@ -87,6 +88,10 @@ export function ExportPanel() {
             {m3eReport.unsupportedNodeKinds.length > 0 && <span>直接対応なし: {m3eReport.unsupportedNodeKinds.join(', ')}</span>}
             {m3eReport.approximatedKinds.length > 0 && <span>近似変換: {m3eReport.approximatedKinds.join(', ')}</span>}
             {m3eReport.unresolvedDestinationCount > 0 && <span>未解決の遷移: {m3eReport.unresolvedDestinationCount}件</span>}
+            {m3eReport.unresolvedActionCount > 0 && <span>未解決の操作: {m3eReport.unresolvedActionCount}件</span>}
+            {m3eReport.preservedFields.length > 0 && <span>保持フィールド: {m3eReport.preservedFields.join(', ')}</span>}
+            {m3eReport.approximatedFields.length > 0 && <span>近似フィールド: {m3eReport.approximatedFields.join(', ')}</span>}
+            {m3eReport.lostFields.length > 0 && <span>出力できないフィールド: {m3eReport.lostFields.join(', ')}</span>}
           </div>
         )}
         <pre className="export-code"><code>{value}</code></pre>

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { findNode } from '../lib/nodes';
 import { convertM3eDocument, exportM3eDocument, generateM3eJson, inspectM3eCompatibility, inspectM3eExportCompatibility, isM3eDocument } from '../lib/m3e';
 import { defaultDocument } from '../lib/defaultDocument';
+import { parseCanvasDocument } from '../lib/document';
 import { generateSwiftUI } from '../lib/swiftui';
 import type { CanvasDocument } from '../types/document';
 
@@ -107,6 +108,10 @@ describe('M3E compatibility importer', () => {
       unsupportedNodeKinds: ['glass-container', 'vstack'],
       approximatedKinds: ['securefield'],
       unresolvedDestinationCount: 2,
+      unresolvedActionCount: 2,
+      preservedFields: [],
+      approximatedFields: [],
+      lostFields: [],
       normalizedScreenCount: 1,
     });
   });
@@ -446,8 +451,12 @@ describe('M3E compatibility importer', () => {
       orphanedGroupCount: 0,
       discardedItemCount: 1,
       unresolvedDestinationCount: 2,
+      unresolvedActionCount: 2,
       unsupportedKinds: ['unknownPart'],
       approximatedKinds: ['fab'],
+      preservedFields: ['action'],
+      approximatedFields: [],
+      lostFields: [],
     });
   });
 
@@ -673,5 +682,122 @@ describe('M3E compatibility importer', () => {
       expect.objectContaining({ kind: 'map', label: '現在地' }),
       expect.objectContaining({ kind: 'snackbar', label: '保存しました', supporting: '元に戻す' }),
     ]));
+  });
+
+  it('retains typed M3E presentation fields through an editable round trip', () => {
+    const source = {
+      title: '互換プロジェクト',
+      frames: [{ id: 'home', name: 'ホーム', x: 0, y: 0 }],
+      groups: [
+        {
+          id: 'top',
+          x: 0,
+          y: 0,
+          axis: 'x',
+          items: [{
+            id: 'top-bar',
+            kind: 'topAppBar',
+            label: 'ホーム',
+            icon: 'menu',
+            icon2: 'settings',
+            variant: 'filled',
+            size: 56,
+            radiusTop: 8,
+            radiusBottom: 12,
+            fill: 'surfaceContainerHigh',
+            actions: { icon2: { to: 'back', transition: 'slideLeft' } },
+          }],
+        },
+        {
+          id: 'body',
+          x: 16,
+          y: 80,
+          axis: 'y',
+          items: [{
+            id: 'favorite',
+            kind: 'button',
+            label: 'お気に入り',
+            icon: 'favorite',
+            variant: 'tonal',
+            supporting: '保存済み',
+            size: 140,
+            size2: 52,
+            radiusTop: 10,
+            radiusBottom: 14,
+            corners: { tl: 10, tr: 12, bl: 14, br: 16 },
+            checked: true,
+            noCheck: true,
+            contained: true,
+            fill: 'primaryContainer',
+            iconFill: 'secondaryContainer',
+            textColor: 'onPrimaryContainer',
+            src: 'data:image/png;base64,fixture',
+            toggle: { icon: 'check', variant: 'filled', label: '解除' },
+            action: { to: 'back', transition: 'fade' },
+          }],
+        },
+        {
+          id: 'bottom',
+          x: 0,
+          y: 780,
+          axis: 'x',
+          items: [{
+            id: 'bottom-nav',
+            kind: 'bottomNav',
+            label: '',
+            icon: null,
+            variant: 'filled',
+            tabs: [{ label: 'ホーム', icon: 'home' }],
+            selected: 0,
+            contained: true,
+          }],
+        },
+      ],
+    };
+
+    const document = convertM3eDocument(source);
+    expect(document).not.toBeNull();
+    if (!document) throw new Error('Metadata fixture was not converted');
+
+    const favorite = findNode(document.screens[0]?.root.children ?? [], 'm3e-favorite');
+    expect(favorite?.m3eMetadata).toMatchObject({
+      size: 140,
+      size2: 52,
+      corners: { tl: 10, tr: 12, bl: 14, br: 16 },
+      noCheck: true,
+      contained: true,
+      textColor: 'onPrimaryContainer',
+    });
+    expect(parseCanvasDocument(document)).toEqual(document);
+
+    const exported = exportM3eDocument(document);
+    const items = exported.groups.flatMap((group) => group.items);
+    expect(items).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        kind: 'button',
+        size: 140,
+        size2: 52,
+        radiusTop: 10,
+        radiusBottom: 14,
+        corners: { tl: 10, tr: 12, bl: 14, br: 16 },
+        noCheck: true,
+        contained: true,
+        fill: 'primaryContainer',
+        iconFill: 'secondaryContainer',
+        textColor: 'onPrimaryContainer',
+        src: 'data:image/png;base64,fixture',
+        toggle: expect.objectContaining({ label: '解除' }),
+      }),
+      expect.objectContaining({ kind: 'topAppBar', size: 56, radiusTop: 8, radiusBottom: 12, fill: 'surfaceContainerHigh' }),
+      expect.objectContaining({ kind: 'bottomNav', contained: true, selected: 0 }),
+    ]));
+
+    const importReport = inspectM3eCompatibility(source);
+    expect(importReport?.lostFields).toEqual([]);
+    expect(importReport?.preservedFields).toEqual(expect.arrayContaining(['action', 'corners', 'fill', 'noCheck', 'size', 'toggle']));
+    expect(importReport?.approximatedFields).toEqual(expect.arrayContaining(['corners', 'noCheck', 'size']));
+    const exportReport = inspectM3eExportCompatibility(document);
+    expect(exportReport.lostFields).toEqual([]);
+    expect(exportReport.preservedFields).toEqual(expect.arrayContaining(['corners', 'fill', 'noCheck', 'size', 'toggle']));
   });
 });

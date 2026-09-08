@@ -108,6 +108,67 @@ export type M3ePresentationKind =
 export type M3eInsertKind = Exclude<M3ePresentationKind, 'topAppBar' | 'bottomNav' | 'navRail'>;
 export type M3eScreenPartKind = Extract<M3ePresentationKind, 'topAppBar' | 'bottomNav' | 'navRail'>;
 export type M3eVariant = 'filled' | 'tonal' | 'elevated' | 'outlined' | 'text';
+export type M3eTextColor = 'primary' | 'secondary' | 'onSurface' | 'onSurfaceVariant' | 'onPrimaryContainer' | 'onSecondaryContainer' | 'onTertiaryContainer' | 'inverseOnSurface';
+
+export interface M3eTab {
+  label: string;
+  icon: string | null;
+}
+
+export interface M3eAction {
+  to: string;
+  transition: NavigationTransition;
+}
+
+export interface M3eToggleAppearance {
+  icon?: string | null;
+  variant?: M3eVariant;
+  label?: string;
+}
+
+export interface M3eCorners {
+  tl: number;
+  tr: number;
+  bl: number;
+  br: number;
+}
+
+/** M3E fields that do not all have a direct SwiftUI equivalent. */
+export interface M3eItemMetadata {
+  supporting?: string;
+  icon2?: string | null;
+  size?: number;
+  size2?: number;
+  minimum?: number;
+  maximum?: number;
+  step?: number;
+  radiusTop?: number;
+  radiusBottom?: number;
+  corners?: M3eCorners;
+  tabs?: M3eTab[];
+  selected?: number;
+  action?: M3eAction;
+  actions?: Record<string, M3eAction>;
+  checked?: boolean;
+  switch?: boolean;
+  noCheck?: boolean;
+  noImage?: boolean;
+  imagePos?: CardImagePosition;
+  imageSize?: number;
+  contentAlign?: CardContentAlignment;
+  textColor?: M3eTextColor;
+  fill?: ScreenBackground;
+  iconFill?: ScreenBackground | 'none';
+  src?: string;
+  wavy?: boolean;
+  trackThickness?: number;
+  contained?: boolean;
+  railExpanded?: boolean;
+  railModal?: boolean;
+  railExpansionSide?: 'left' | 'right';
+  toggle?: M3eToggleAppearance;
+  noteHistory?: string[];
+}
 
 export interface DocumentAppearance {
   colorScheme: ColorScheme;
@@ -139,6 +200,7 @@ export interface BaseNode {
   m3eKind?: M3ePresentationKind;
   m3eVariant?: M3eVariant;
   m3eIcon?: string;
+  m3eMetadata?: M3eItemMetadata;
 }
 
 export interface TextNode extends BaseNode {
@@ -427,6 +489,8 @@ export interface CanvasScreen {
   previewOrientation?: ScreenOrientation;
   toolbarItems?: ToolbarItem[];
   tabBarItems?: ToolbarItem[];
+  m3eTopAppBar?: M3eItemMetadata;
+  m3eBottomNav?: M3eItemMetadata;
   swipe?: Partial<Record<SwipeDirection, string>>;
   root: ContainerNode;
 }

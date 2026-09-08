@@ -1,5 +1,5 @@
 import { isContainerNode } from './nodes';
-import type { AccentColor, AppearanceAccentColor, BackgroundStyle, ButtonStyle, ButtonToggle, CanvasDocument, CanvasNode, CanvasScreen, CardContentAlignment, CardImagePosition, ColorScheme, ContentPlacement, FontDesign, FrameWidth, GlassShape, GlassStyle, ImageSource, M3ePresentationKind, M3eVariant, NavigationTitleDisplayMode, NavigationTransition, NodeKind, ProgressStyle, ScreenBackground, ScreenDevice, ScreenOrientation, ShadowStyle, StackAlignment, SwipeDirection, TextAlignment, TextStyle, ToolbarItem, ToolbarPlacement } from '../types/document';
+import type { AccentColor, AppearanceAccentColor, BackgroundStyle, ButtonStyle, ButtonToggle, CanvasDocument, CanvasNode, CanvasScreen, CardContentAlignment, CardImagePosition, ColorScheme, ContentPlacement, FontDesign, FrameWidth, GlassShape, GlassStyle, ImageSource, M3eAction, M3eItemMetadata, M3ePresentationKind, M3eTab, M3eTextColor, M3eToggleAppearance, M3eVariant, NavigationTitleDisplayMode, NavigationTransition, NodeKind, ProgressStyle, ScreenBackground, ScreenDevice, ScreenOrientation, ShadowStyle, StackAlignment, SwipeDirection, TextAlignment, TextStyle, ToolbarItem, ToolbarPlacement } from '../types/document';
 
 type RecordValue = Record<string, unknown>;
 
@@ -65,6 +65,121 @@ function readM3eVariant(value: unknown): M3eVariant | null | undefined {
   return isOneOf(value, ['filled', 'tonal', 'elevated', 'outlined', 'text']) ? value : null;
 }
 
+function readM3eAction(value: unknown): M3eAction | null | undefined {
+  if (value === undefined) return undefined;
+  if (!isRecord(value) || !isString(value.to) || !isOneOf(value.transition, ['slide', 'slideLeft', 'slideUp', 'slideDown', 'fade', 'expand', 'none'])) return null;
+  return { to: value.to, transition: value.transition as NavigationTransition };
+}
+
+function readM3eMetadata(value: unknown): M3eItemMetadata | null | undefined {
+  if (value === undefined) return undefined;
+  if (!isRecord(value)) return null;
+
+  const metadata: M3eItemMetadata = {};
+  const copyNumber = (key: 'size' | 'size2' | 'minimum' | 'maximum' | 'step' | 'radiusTop' | 'radiusBottom' | 'imageSize'): boolean => {
+    if (value[key] === undefined) return true;
+    if (!isNonNegativeNumber(value[key])) return false;
+    metadata[key] = value[key];
+    return true;
+  };
+  for (const key of ['size', 'size2', 'minimum', 'maximum', 'step', 'radiusTop', 'radiusBottom', 'imageSize'] as const) {
+    if (!copyNumber(key)) return null;
+  }
+
+  if (value.supporting !== undefined && !isString(value.supporting)) return null;
+  if (value.icon2 !== undefined && value.icon2 !== null && !isString(value.icon2)) return null;
+  if (value.src !== undefined && !isString(value.src)) return null;
+  if (value.noteHistory !== undefined && (!Array.isArray(value.noteHistory) || value.noteHistory.some((entry) => !isString(entry)))) return null;
+  if (value.selected !== undefined && (!isNumber(value.selected) || !Number.isInteger(value.selected) || value.selected < 0)) return null;
+  if (value.checked !== undefined && typeof value.checked !== 'boolean') return null;
+  if (value.switch !== undefined && typeof value.switch !== 'boolean') return null;
+  if (value.noCheck !== undefined && typeof value.noCheck !== 'boolean') return null;
+  if (value.noImage !== undefined && typeof value.noImage !== 'boolean') return null;
+  if (value.wavy !== undefined && typeof value.wavy !== 'boolean') return null;
+  if (value.contained !== undefined && typeof value.contained !== 'boolean') return null;
+  if (value.railExpanded !== undefined && typeof value.railExpanded !== 'boolean') return null;
+  if (value.railModal !== undefined && typeof value.railModal !== 'boolean') return null;
+  if (value.railExpansionSide !== undefined && !isOneOf(value.railExpansionSide, ['left', 'right'])) return null;
+  if (value.trackThickness !== undefined && (!isNumber(value.trackThickness) || !Number.isInteger(value.trackThickness) || value.trackThickness < 2 || value.trackThickness > 16)) return null;
+  if (value.imagePos !== undefined && !isOneOf(value.imagePos, ['top', 'leading', 'trailing', 'background'])) return null;
+  if (value.contentAlign !== undefined && !isOneOf(value.contentAlign, ['start', 'center', 'end'])) return null;
+  if (value.textColor !== undefined && !isOneOf(value.textColor, ['primary', 'secondary', 'onSurface', 'onSurfaceVariant', 'onPrimaryContainer', 'onSecondaryContainer', 'onTertiaryContainer', 'inverseOnSurface'])) return null;
+  if (value.fill !== undefined && !isOneOf(value.fill, ['surface', 'surfaceContainerLow', 'surfaceContainer', 'surfaceContainerHigh', 'surfaceContainerHighest', 'primaryContainer', 'secondaryContainer', 'tertiaryContainer', 'primary', 'inverseSurface'])) return null;
+  if (value.iconFill !== undefined && value.iconFill !== 'none' && !isOneOf(value.iconFill, ['surface', 'surfaceContainerLow', 'surfaceContainer', 'surfaceContainerHigh', 'surfaceContainerHighest', 'primaryContainer', 'secondaryContainer', 'tertiaryContainer', 'primary', 'inverseSurface'])) return null;
+
+  if (value.corners !== undefined) {
+    const corners = value.corners;
+    if (!isRecord(corners) || !['tl', 'tr', 'bl', 'br'].every((key) => isNonNegativeNumber(corners[key]))) return null;
+    metadata.corners = {
+      tl: corners.tl as number,
+      tr: corners.tr as number,
+      bl: corners.bl as number,
+      br: corners.br as number,
+    };
+  }
+
+  if (value.tabs !== undefined) {
+    if (!Array.isArray(value.tabs)) return null;
+    const tabs: M3eTab[] = [];
+    for (const tab of value.tabs) {
+      if (!isRecord(tab) || !isString(tab.label) || (tab.icon !== undefined && tab.icon !== null && !isString(tab.icon))) return null;
+      tabs.push({ label: tab.label, icon: tab.icon === undefined ? null : tab.icon });
+    }
+    metadata.tabs = tabs;
+  }
+
+  const action = readM3eAction(value.action);
+  if (action === null) return null;
+  if (action !== undefined) metadata.action = action;
+  if (value.actions !== undefined) {
+    if (!isRecord(value.actions)) return null;
+    const actions: Record<string, M3eAction> = {};
+    for (const [slot, rawAction] of Object.entries(value.actions)) {
+      const parsedAction = readM3eAction(rawAction);
+      if (!parsedAction) return null;
+      actions[slot] = parsedAction;
+    }
+    metadata.actions = actions;
+  }
+
+  if (value.toggle !== undefined) {
+    if (!isRecord(value.toggle)
+      || (value.toggle.icon !== undefined && value.toggle.icon !== null && !isString(value.toggle.icon))
+      || (value.toggle.variant !== undefined && !isOneOf(value.toggle.variant, ['filled', 'tonal', 'elevated', 'outlined', 'text']))
+      || (value.toggle.label !== undefined && !isString(value.toggle.label))) return null;
+    const toggle: M3eToggleAppearance = {
+      ...(value.toggle.icon === undefined ? {} : { icon: value.toggle.icon as string | null }),
+      ...(value.toggle.variant === undefined ? {} : { variant: value.toggle.variant as M3eVariant }),
+      ...(value.toggle.label === undefined ? {} : { label: value.toggle.label }),
+    };
+    metadata.toggle = toggle;
+  }
+
+  Object.assign(metadata, {
+    ...(value.supporting === undefined ? {} : { supporting: value.supporting }),
+    ...(value.icon2 === undefined ? {} : { icon2: value.icon2 }),
+    ...(value.selected === undefined ? {} : { selected: value.selected }),
+    ...(value.checked === undefined ? {} : { checked: value.checked }),
+    ...(value.switch === undefined ? {} : { switch: value.switch }),
+    ...(value.noCheck === undefined ? {} : { noCheck: value.noCheck }),
+    ...(value.noImage === undefined ? {} : { noImage: value.noImage }),
+    ...(value.imagePos === undefined ? {} : { imagePos: value.imagePos }),
+    ...(value.contentAlign === undefined ? {} : { contentAlign: value.contentAlign }),
+    ...(value.textColor === undefined ? {} : { textColor: value.textColor as M3eTextColor }),
+    ...(value.fill === undefined ? {} : { fill: value.fill as ScreenBackground }),
+    ...(value.iconFill === undefined ? {} : { iconFill: value.iconFill as ScreenBackground | 'none' }),
+    ...(value.src === undefined ? {} : { src: value.src }),
+    ...(value.wavy === undefined ? {} : { wavy: value.wavy }),
+    ...(value.trackThickness === undefined ? {} : { trackThickness: value.trackThickness }),
+    ...(value.contained === undefined ? {} : { contained: value.contained }),
+    ...(value.railExpanded === undefined ? {} : { railExpanded: value.railExpanded }),
+    ...(value.railModal === undefined ? {} : { railModal: value.railModal }),
+    ...(value.railExpansionSide === undefined ? {} : { railExpansionSide: value.railExpansionSide }),
+    ...(value.noteHistory === undefined ? {} : { noteHistory: value.noteHistory }),
+  });
+  return Object.keys(metadata).length > 0 ? metadata : {};
+}
+
 function readNodeProperties(value: RecordValue): {
   tabTitle?: string;
   tabSystemName?: string;
@@ -84,6 +199,7 @@ function readNodeProperties(value: RecordValue): {
   m3eKind?: M3ePresentationKind;
   m3eVariant?: M3eVariant;
   m3eIcon?: string;
+  m3eMetadata?: M3eItemMetadata;
 } | null {
   const glass = readGlass(value.glass);
   if (glass === null) return null;
@@ -107,6 +223,8 @@ function readNodeProperties(value: RecordValue): {
   const m3eVariant = readM3eVariant(value.m3eVariant);
   if (m3eVariant === null) return null;
   if (value.m3eIcon !== undefined && !isString(value.m3eIcon)) return null;
+  const m3eMetadata = readM3eMetadata(value.m3eMetadata);
+  if (m3eMetadata === null) return null;
 
   return {
     ...(value.tabTitle === undefined ? {} : { tabTitle: value.tabTitle }),
@@ -127,6 +245,7 @@ function readNodeProperties(value: RecordValue): {
     ...(m3eKind === undefined ? {} : { m3eKind }),
     ...(m3eVariant === undefined ? {} : { m3eVariant }),
     ...(value.m3eIcon === undefined ? {} : { m3eIcon: value.m3eIcon }),
+    ...(m3eMetadata === undefined ? {} : { m3eMetadata }),
   };
 }
 
@@ -469,6 +588,10 @@ function readScreen(value: unknown, ids: Set<string>): CanvasScreen | null {
   if (toolbarItems === null) return null;
   const tabBarItems = readToolbarItems(value.tabBarItems, ids);
   if (tabBarItems === null || tabBarItems?.some((item) => item.placement !== 'bottomBar')) return null;
+  const m3eTopAppBar = readM3eMetadata(value.m3eTopAppBar);
+  if (m3eTopAppBar === null) return null;
+  const m3eBottomNav = readM3eMetadata(value.m3eBottomNav);
+  if (m3eBottomNav === null) return null;
   const swipe = readSwipe(value.swipe);
   if (swipe === null) return null;
   const root = readNode(value.root, ids);
@@ -485,6 +608,8 @@ function readScreen(value: unknown, ids: Set<string>): CanvasScreen | null {
         ...(value.previewOrientation === undefined ? {} : { previewOrientation: value.previewOrientation as ScreenOrientation }),
         ...(toolbarItems === undefined ? {} : { toolbarItems }),
         ...(tabBarItems === undefined ? {} : { tabBarItems }),
+        ...(m3eTopAppBar === undefined ? {} : { m3eTopAppBar }),
+        ...(m3eBottomNav === undefined ? {} : { m3eBottomNav }),
         ...(swipe === undefined ? {} : { swipe }),
         root,
       }

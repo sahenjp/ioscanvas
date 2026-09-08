@@ -74,8 +74,12 @@ export function TopBar() {
           report.orphanedGroupCount > 0 ? `画面外グループ${report.orphanedGroupCount}件` : '',
           report.discardedItemCount > 0 ? `破棄した項目${report.discardedItemCount}件` : '',
           report.unresolvedDestinationCount > 0 ? `未解決の遷移${report.unresolvedDestinationCount}件` : '',
+          report.unresolvedActionCount > 0 ? `未解決の操作${report.unresolvedActionCount}件` : '',
           report.unsupportedKinds.length > 0 ? `未対応パーツ: ${report.unsupportedKinds.join(', ')}` : '',
           report.approximatedKinds.length > 0 ? `近似変換: ${report.approximatedKinds.join(', ')}` : '',
+          report.preservedFields.length > 0 ? `保持: ${report.preservedFields.join(', ')}` : '',
+          report.approximatedFields.length > 0 ? `近似フィールド: ${report.approximatedFields.join(', ')}` : '',
+          report.lostFields.length > 0 ? `失われたフィールド: ${report.lostFields.join(', ')}` : '',
         ].filter(Boolean);
         setFileNotice(details.length > 0 ? `M3E互換確認: ${details.join(' / ')}` : null);
       } else {
