@@ -133,6 +133,8 @@ describe('M3E compatibility importer', () => {
         items: [
           { id: 'sort', kind: 'select', label: '並び順', icon: null, variant: 'filled', selected: 1, tabs: [{ label: '新しい順' }, { label: '古い順' }] },
           { id: 'loading', kind: 'loadingIndicator', label: '読み込み中', icon: null, variant: 'filled' },
+          { id: 'wave', kind: 'linearProgress', label: '同期', icon: null, variant: 'filled', value: 72, wavy: true, trackThickness: 8 },
+          { id: 'ring', kind: 'circularProgress', label: '処理', icon: null, variant: 'filled', value: 0.25, trackThickness: 6 },
           { id: 'custom-text', kind: 'text', label: '細かな見出し', size: 19, icon: null, variant: 'filled' },
         ],
       }],
@@ -141,10 +143,70 @@ describe('M3E compatibility importer', () => {
     const nodes = document?.screens[0]?.root.children ?? [];
     expect(findNode(nodes, 'm3e-sort')).toMatchObject({ kind: 'picker', initialOption: '古い順' });
     expect(findNode(nodes, 'm3e-loading')).toMatchObject({ kind: 'progress', indeterminate: true });
+    expect(findNode(nodes, 'm3e-wave')).toMatchObject({ kind: 'progress', style: 'linear', value: 0.72, wavy: true, trackThickness: 8 });
+    expect(findNode(nodes, 'm3e-ring')).toMatchObject({ kind: 'progress', style: 'circular', value: 0.25, trackThickness: 6 });
     expect(findNode(nodes, 'm3e-custom-text')).toMatchObject({ kind: 'text', textStyle: 'custom', fontSize: 19 });
     if (!document) throw new Error('M3E document was not converted');
     const output = generateSwiftUI(document);
     expect(output).toContain('@State private var selection_sort: String = "古い順"');
     expect(output).toContain('ProgressView {');
+    expect(output).toContain('.progressViewStyle(.circular)');
+    expect(output).toContain('M3Eの波形指定');
+  });
+
+  it('preserves the initial selected tab in Preview and generated SwiftUI', () => {
+    const document = convertM3eDocument({
+      frames: [{ id: 'home', name: 'ホーム', x: 0, y: 0 }],
+      groups: [{
+        id: 'tabs-group',
+        x: 16,
+        y: 80,
+        axis: 'y',
+        items: [{
+          id: 'tabs',
+          kind: 'tabs',
+          label: '',
+          icon: null,
+          variant: 'filled',
+          selected: 1,
+          tabs: [{ label: '概要', icon: 'home' }, { label: '詳細', icon: 'info' }],
+        }],
+      }],
+    });
+
+    const nodes = document?.screens[0]?.root.children ?? [];
+    expect(findNode(nodes, 'm3e-tabview-tabs')).toMatchObject({ kind: 'tabview', selectedIndex: 1 });
+    if (!document) throw new Error('M3E document was not converted');
+    const output = generateSwiftUI(document);
+    expect(output).toContain('@State private var selected_m3e_tabview_tabs: Int = 1');
+    expect(output).toContain('TabView(selection: $selected_m3e_tabview_tabs)');
+    expect(output).toContain('.tag(1)');
+  });
+
+  it('maps M3E box and card presentation state to SwiftUI structure', () => {
+    const document = convertM3eDocument({
+      frames: [{ id: 'home', name: 'ホーム', x: 0, y: 0 }],
+      groups: [{
+        id: 'content',
+        x: 16,
+        y: 80,
+        axis: 'y',
+        items: [
+          { id: 'sheet', kind: 'box', label: 'メニュー', icon: null, variant: 'filled', checked: true },
+          { id: 'card', kind: 'card', label: 'おすすめ', supporting: '説明', icon: 'star', variant: 'filled', imagePos: 'leading', contentAlign: 'center', imageSize: 96, noImage: false },
+        ],
+      }],
+    });
+
+    const nodes = document?.screens[0]?.root.children ?? [];
+    expect(findNode(nodes, 'm3e-sheet')).toMatchObject({ kind: 'groupbox', isBottomSheet: true });
+    expect(findNode(nodes, 'm3e-card')).toMatchObject({ kind: 'groupbox', cardImagePosition: 'leading', cardImageSize: 96, cardContentAlignment: 'center' });
+    if (!document) throw new Error('M3E document was not converted');
+    const output = generateSwiftUI(document);
+    expect(output).toContain('Capsule()');
+    expect(output).toContain('M3Eのボトムシート表現');
+    const card = findNode(nodes, 'm3e-card');
+    if (!card) throw new Error('Card fixture missing');
+    expect(card.children?.[0]).toMatchObject({ kind: 'hstack' });
   });
 });

@@ -53,6 +53,9 @@ export type StackAlignment = 'leading' | 'center' | 'trailing' | 'top' | 'bottom
 export type FrameWidth = 'fit' | 'max';
 export type BackgroundStyle = 'none' | 'secondary' | 'tertiary' | 'accent' | 'material';
 export type ShadowStyle = 'none' | 'subtle' | 'medium';
+export type ProgressStyle = 'linear' | 'circular';
+export type CardImagePosition = 'top' | 'leading' | 'trailing' | 'background';
+export type CardContentAlignment = 'start' | 'center' | 'end';
 export type ColorScheme = 'system' | 'light' | 'dark';
 export type AccentColor = 'blue' | 'purple' | 'pink' | 'orange' | 'green';
 export type AppearanceAccentColor = AccentColor | 'custom';
@@ -228,7 +231,10 @@ export interface ProgressNode extends BaseNode {
   kind: 'progress';
   label: string;
   value: number;
+  style?: ProgressStyle;
   indeterminate?: boolean;
+  wavy?: boolean;
+  trackThickness?: number;
 }
 
 export interface GaugeNode extends BaseNode {
@@ -298,6 +304,12 @@ export interface ContainerNode extends BaseNode {
   title?: string;
   columns?: number;
   rows?: number;
+  selectedIndex?: number;
+  isBottomSheet?: boolean;
+  cardImagePosition?: CardImagePosition;
+  cardImageSize?: number;
+  cardContentAlignment?: CardContentAlignment;
+  cardNoImage?: boolean;
   children: CanvasNode[];
 }
 

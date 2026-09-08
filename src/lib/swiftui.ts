@@ -27,7 +27,7 @@ const swiftKeywords = new Set([
 
 interface BindingInfo {
   name: string;
-  type: 'Bool' | 'String' | 'Double' | 'Date' | 'Color';
+  type: 'Bool' | 'String' | 'Double' | 'Int' | 'Date' | 'Color';
   initial: string;
 }
 
@@ -69,6 +69,10 @@ function alertBindingKey(node: Extract<CanvasNode, { kind: 'alert' }>): string {
 
 function confirmationDialogBindingKey(node: Extract<CanvasNode, { kind: 'confirmation-dialog' }>): string {
   return `ConfirmationDialog:${node.id}`;
+}
+
+function tabSelectionKey(node: CanvasNode): string {
+  return `TabView:${node.id}`;
 }
 
 function buttonToggleKey(node: Extract<CanvasNode, { kind: 'button' }>): string {
@@ -279,9 +283,10 @@ function renderSwipeSupport(content: string, states: SwipeState[], depth: number
     + gesture;
 }
 
-function renderTabChild(node: CanvasNode, depth: number, context: RenderContext): string {
+function renderTabChild(node: CanvasNode, index: number, depth: number, context: RenderContext, selection: boolean): string {
   const pad = indent(depth);
-  return `${renderNode(node, depth, context)}\n${pad}.tabItem {\n${indent(depth + 1)}Label(${quoted(tabTitle(node))}, systemImage: ${quoted(tabSystemName(node))})\n${pad}}`;
+  const tag = selection ? `\n${pad}.tag(${index})` : '';
+  return `${renderNode(node, depth, context)}\n${pad}.tabItem {\n${indent(depth + 1)}Label(${quoted(tabTitle(node))}, systemImage: ${quoted(tabSystemName(node))})\n${pad}}${tag}`;
 }
 
 function buttonStyleModifier(style: string | undefined, depth: number): string {
@@ -417,10 +422,17 @@ function renderNodeContent(node: CanvasNode, depth: number, context: RenderConte
       const options = node.options.map((option) => `${pad}    Button(${quoted(option)}) {\n${pad}        // Action\n${pad}    }`).join('\n');
       return `${pad}Menu(${quoted(node.label)}) {\n${options}\n${pad}}\n${pad}.frame(minHeight: ${node.minHeight})`;
     }
-    case 'progress':
-      return node.indeterminate
+    case 'progress': {
+      const progress = node.indeterminate
         ? `${pad}ProgressView {\n${pad}    Text(${quoted(node.label)})\n${pad}}`
         : `${pad}ProgressView(value: ${node.value}) {\n${pad}    Text(${quoted(node.label)})\n${pad}}`;
+      const style = node.style === 'circular' ? `\n${pad}.progressViewStyle(.circular)` : '';
+      const notes = [
+        node.wavy ? `${pad}// M3Eの波形指定。標準ProgressViewでは直接表現できないため、必要ならカスタムShapeへ置き換える。` : '',
+        node.trackThickness !== undefined ? `${pad}// M3Eのトラック太さ: ${node.trackThickness}pt。標準ProgressViewでは直接指定できない。` : '',
+      ].filter(Boolean);
+      return `${notes.length > 0 ? `${notes.join('\n')}\n` : ''}${progress}${style}`;
+    }
     case 'gauge':
       return `${pad}Gauge(value: ${node.value}, in: ${node.minimum}...${node.maximum}) {\n${pad}    Text(${quoted(node.label)})\n${pad}}\n${pad}.frame(minHeight: ${node.minHeight})`;
     case 'content-unavailable':
@@ -501,12 +513,20 @@ function renderNodeContent(node: CanvasNode, depth: number, context: RenderConte
       if (node.kind === 'zstack') return `${pad}ZStack {\n${children}\n${pad}}`;
       if (node.kind === 'glass-container') return `${pad}GlassEffectContainer(spacing: ${node.spacing ?? 12}) {\n${children}\n${pad}}`;
       if (node.kind === 'group') return `${pad}Group {\n${children}\n${pad}}`;
-      if (node.kind === 'groupbox') return `${pad}GroupBox(${quoted(node.title ?? 'Group Box')}) {\n${children}\n${pad}}`;
+      if (node.kind === 'groupbox') {
+        const groupBox = node.title?.trim()
+          ? `${pad}GroupBox(${quoted(node.title)}) {\n${children}\n${pad}}`
+          : `${pad}GroupBox {\n${children}\n${pad}}`;
+        if (!node.isBottomSheet) return groupBox;
+        return `${pad}// M3Eのボトムシート表現。画面遷移時は .sheet と presentationDetents を追加する。\n${pad}VStack(spacing: 8) {\n${pad}    Capsule()\n${pad}        .fill(.secondary)\n${pad}        .frame(width: 36, height: 5)\n${pad}        .accessibilityHidden(true)\n${indentBlock(groupBox, 1)}\n${pad}}`;
+      }
       if (node.kind === 'lazyvgrid') return `${pad}LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: ${node.columns ?? 2}), spacing: ${node.spacing ?? 12}) {\n${children}\n${pad}}`;
       if (node.kind === 'lazyhgrid') return `${pad}LazyHGrid(rows: Array(repeating: GridItem(.flexible()), count: ${node.rows ?? 2}), spacing: ${node.spacing ?? 12}) {\n${children}\n${pad}}`;
       if (node.kind === 'tabview') {
-        const tabs = node.children.map((child) => renderTabChild(child, depth + 1, context)).join('\n');
-        return `${pad}TabView {\n${tabs}\n${pad}}`;
+        const selection = node.selectedIndex !== undefined;
+        const tabs = node.children.map((child, index) => renderTabChild(child, index, depth + 1, context, selection)).join('\n');
+        const binding = selection ? context.bindings.get(tabSelectionKey(node))?.name : undefined;
+        return `${pad}TabView${binding ? `(selection: $${binding})` : ''} {\n${tabs}\n${pad}}`;
       }
       if (node.kind === 'disclosure-group') return `${pad}DisclosureGroup(${quoted(node.title ?? 'Details')}) {\n${children}\n${pad}}`;
       const type = node.kind === 'vstack' ? 'VStack' : node.kind === 'hstack' ? 'HStack' : node.kind === 'lazyvstack' ? 'LazyVStack' : 'LazyHStack';
@@ -588,6 +608,17 @@ function collectBindings(
         while (usedNames.has(name)) name = `${base}${suffix++}`;
         usedNames.add(name);
         result.set(key, { name, type: 'Bool', initial: 'false' });
+      }
+    }
+    if (node.kind === 'tabview' && node.selectedIndex !== undefined) {
+      const key = tabSelectionKey(node);
+      if (!result.has(key)) {
+        const base = swiftIdentifier(`selected_${node.id}`, 'selectedTab');
+        let name = base;
+        let suffix = 2;
+        while (usedNames.has(name)) name = `${base}${suffix++}`;
+        usedNames.add(name);
+        result.set(key, { name, type: 'Int', initial: String(node.selectedIndex) });
       }
     }
     if (node.children) collectBindings(node.children, result, usedNames);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cloneNode, createNode, createPattern, decodeDragData, encodeDragData, findNode, isContainerNode, moveNode } from '../lib/nodes';
+import { cloneNode, createNode, createPattern, decodeDragData, encodeDragData, findNode, isContainerNode, moveNode, updateNode } from '../lib/nodes';
 import type { CanvasNode } from '../types/document';
 
 describe('semantic node tree operations', () => {
@@ -99,6 +99,23 @@ describe('semantic node tree operations', () => {
     expect(row.kind).toBe('hstack');
     expect(row.children?.[1]?.kind).toBe('vstack');
     expect(emptyState.kind).toBe('content-unavailable');
+  });
+
+  it('rebuilds imported card layout when its image position changes', () => {
+    const image = createNode('image');
+    const content = createNode('vstack');
+    if (image.kind !== 'image' || content.kind !== 'vstack') throw new Error('Card fixtures missing');
+    const card = {
+      id: 'card',
+      kind: 'groupbox' as const,
+      title: 'カード',
+      cardImagePosition: 'top' as const,
+      children: [image, content],
+    };
+
+    const next = updateNode([card], 'card', { cardImagePosition: 'trailing' });
+
+    expect(next[0]).toMatchObject({ cardImagePosition: 'trailing', children: [{ kind: 'hstack', children: [{ kind: 'vstack' }, { kind: 'image' }] }] });
   });
 
   it('creates an Alert with usable default actions', () => {

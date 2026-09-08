@@ -6,6 +6,8 @@ import type {
   CanvasScreen,
   ContainerNode,
   BackgroundStyle,
+  CardContentAlignment,
+  CardImagePosition,
   ImageSource,
   SwipeDirection,
   TextStyle,
@@ -85,6 +87,10 @@ function numberValue(record: JsonObject, key: string): number | undefined {
 
 function booleanValue(record: JsonObject, key: string): boolean | undefined {
   return typeof record[key] === 'boolean' ? record[key] : undefined;
+}
+
+function isOneOf<T extends string>(value: unknown, values: readonly T[]): value is T {
+  return typeof value === 'string' && values.includes(value as T);
 }
 
 function recordValue(record: JsonObject, key: string): JsonObject | undefined {
@@ -240,8 +246,8 @@ function setButtonAction(node: Extract<CanvasNode, { kind: 'button' }>, item: Js
   if (action.back) node.notes = [node.notes, 'タップで前の画面へ戻る'].filter(Boolean).join('\n');
 }
 
-function linkM3eNode(node: CanvasNode, item: JsonObject, context: ConversionContext, fallbackLabel: string): CanvasNode {
-  const annotated = appendNotes(node, item);
+function linkM3eNode(node: CanvasNode, item: JsonObject, context: ConversionContext, fallbackLabel: string, extra: string[] = []): CanvasNode {
+  const annotated = appendNotes(node, item, extra);
   const action = actionTarget(item, context);
   if (action.back) {
     annotated.notes = [annotated.notes, 'タップで前の画面へ戻る'].filter(Boolean).join('\n');
@@ -301,7 +307,11 @@ function tabViewNode(item: JsonObject, context: ConversionContext): CanvasNode {
           notes: target === 'back' ? 'M3Eのタブ操作は前の画面へ戻る動作です。' : undefined,
         };
   });
-  return appendNotes({ id, kind: 'tabview', children }, item);
+  const selected = numberValue(item, 'selected');
+  const selectedIndex = selected !== undefined && Number.isInteger(selected) && children.length > 0
+    ? Math.max(0, Math.min(children.length - 1, selected))
+    : undefined;
+  return appendNotes({ id, kind: 'tabview', children, ...(selectedIndex === undefined ? {} : { selectedIndex }) }, item);
 }
 
 function listItemNode(item: JsonObject, context: ConversionContext): CanvasNode {
@@ -455,23 +465,88 @@ function mapItem(item: JsonObject, context: ConversionContext): CanvasNode | nul
     case 'divider':
       return appendNotes({ id, kind: 'divider' }, item);
     case 'loadingIndicator':
-      return appendNotes({ id, kind: 'progress', label: label || '読み込み中', value: 0.5, indeterminate: true }, item, ['M3Eの不確定ローディング表示です。']);
+      return appendNotes({ id, kind: 'progress', label: label || '読み込み中', value: 0.5, style: 'circular', indeterminate: true }, item, ['M3Eの不確定ローディング表示です。標準SwiftUIでは円形ProgressViewへ変換しました。']);
     case 'linearProgress':
     case 'circularProgress': {
       const value = numberValue(item, 'value');
-      return appendNotes({ id, kind: 'progress', label: label || '進捗', value: value === undefined ? 0.5 : Math.max(0, Math.min(1, value > 1 ? value / 100 : value)), ...(value === undefined ? { indeterminate: true } : {}) }, item, value === undefined ? ['M3Eの不確定プログレス表示です。'] : []);
+      const style = item.kind === 'circularProgress' ? 'circular' : 'linear';
+      const trackThickness = numberValue(item, 'trackThickness');
+      const extras = [
+        ...(value === undefined ? ['M3Eの不確定プログレス表示です。'] : []),
+        ...(booleanValue(item, 'wavy') ? ['M3Eの波形プログレス指定を保持しています。標準SwiftUIのProgressViewでは波形を直接指定できないため、実装時にカスタム表示へ置き換えてください。'] : []),
+        ...(trackThickness !== undefined && Number.isInteger(trackThickness) && trackThickness >= 2 && trackThickness <= 16
+          ? [`M3Eのトラック太さ ${trackThickness}pt を保持しています。標準SwiftUIのProgressViewでは太さを直接指定できません。`]
+          : []),
+      ];
+      return appendNotes({
+        id,
+        kind: 'progress',
+        label: label || '進捗',
+        style,
+        value: value === undefined ? 0.5 : Math.max(0, Math.min(1, value > 1 ? value / 100 : value)),
+        ...(value === undefined ? { indeterminate: true } : {}),
+        ...(booleanValue(item, 'wavy') ? { wavy: true } : {}),
+        ...(trackThickness !== undefined && Number.isInteger(trackThickness) && trackThickness >= 2 && trackThickness <= 16 ? { trackThickness } : {}),
+      }, item, extras);
     }
     case 'badge':
       return appendNotes({ id, kind: 'text', text: label || 'バッジ', fontSize: 13, weight: 'semibold', textStyle: 'caption' }, item);
     case 'box':
-      return appendNotes({ id, kind: 'groupbox', title: label || 'ボックス', children: [], ...(backgroundStyle(item) ? { background: backgroundStyle(item) } : {}) }, item);
+      return appendNotes({
+        id,
+        kind: 'groupbox',
+        title: label || 'ボックス',
+        children: [],
+        ...(backgroundStyle(item) ? { background: backgroundStyle(item) } : {}),
+        ...(booleanValue(item, 'checked') ? { isBottomSheet: true } : {}),
+      }, item, booleanValue(item, 'checked') ? ['M3Eのボックスをボトムシートとして読み込みました。SwiftUIでは標準Shapeのハンドルを付けた構造として出力します。'] : []);
     case 'card': {
-      const children: CanvasNode[] = [];
-      if (icon) children.push(imageNode(stableId('m3e-card-icon', sourceId, context.usedIds), icon, 'symbol', label || 'カード'));
-      if (label) children.push({ id: stableId('m3e-card-title', sourceId, context.usedIds), kind: 'text', text: label, fontSize: 20, weight: 'semibold', textStyle: 'headline' });
+      const imagePosition: CardImagePosition = isOneOf(stringValue(item, 'imagePos'), ['top', 'leading', 'trailing', 'background']) ? stringValue(item, 'imagePos') as CardImagePosition : 'top';
+      const contentAlignment: CardContentAlignment = isOneOf(stringValue(item, 'contentAlign'), ['start', 'center', 'end']) ? stringValue(item, 'contentAlign') as CardContentAlignment : 'start';
+      const noImage = booleanValue(item, 'noImage') === true;
+      const imageSize = numberValue(item, 'imageSize');
+      const cardImageSource = stringValue(item, 'src');
+      const hasRemoteImage = !!cardImageSource && /^https?:\/\//i.test(cardImageSource);
+      const cardImage = noImage ? undefined : imageNode(
+        stableId('m3e-card-icon', sourceId, context.usedIds),
+        hasRemoteImage ? cardImageSource : icon ?? 'photo',
+        hasRemoteImage ? 'remote' : 'symbol',
+        label || 'カード画像',
+      );
+      const textChildren: CanvasNode[] = [];
+      if (label) textChildren.push({ id: stableId('m3e-card-title', sourceId, context.usedIds), kind: 'text', text: label, fontSize: 20, weight: 'semibold', textStyle: 'headline' });
       const supporting = stringValue(item, 'supporting')?.trim();
-      if (supporting) children.push({ id: stableId('m3e-card-body', sourceId, context.usedIds), kind: 'text', text: supporting, fontSize: 17, weight: 'regular', textStyle: 'body' });
-      return linkM3eNode({ id, kind: 'groupbox', title: label || 'カード', children, ...(backgroundStyle(item) ? { background: backgroundStyle(item) } : {}) }, item, context, 'カード');
+      if (supporting) textChildren.push({ id: stableId('m3e-card-body', sourceId, context.usedIds), kind: 'text', text: supporting, fontSize: 17, weight: 'regular', textStyle: 'body' });
+      const text = { id: stableId('m3e-card-content', sourceId, context.usedIds), kind: 'vstack' as const, spacing: 4, alignment: 'leading' as const, frameWidth: 'max' as const, children: textChildren };
+      const children: CanvasNode[] = !cardImage
+        ? [text]
+        : imagePosition === 'background'
+          ? [{ id: stableId('m3e-card-background', sourceId, context.usedIds), kind: 'zstack' as const, children: [cardImage, text] }]
+          : imagePosition === 'leading' || imagePosition === 'trailing'
+            ? [{
+                id: stableId('m3e-card-row', sourceId, context.usedIds),
+                kind: 'hstack' as const,
+                spacing: 12,
+                alignment: 'center' as const,
+                children: imagePosition === 'leading' ? [cardImage, text] : [text, cardImage],
+              }]
+            : [cardImage, text];
+      const notes = [
+        ...(imageSize !== undefined && imageSize > 0 ? [`M3Eカードの画像サイズ ${imageSize}dp を読み込みました。`] : []),
+        ...(cardImageSource && !hasRemoteImage ? ['M3Eカードのローカル画像データはSwiftUIのAssetへ移してから差し替えてください。'] : []),
+        ...(contentAlignment !== 'start' ? [`M3Eカードの本文位置「${contentAlignment}」を保持しています。`] : []),
+      ];
+      return linkM3eNode({
+        id,
+        kind: 'groupbox',
+        title: label || 'カード',
+        children,
+        ...(backgroundStyle(item) ? { background: backgroundStyle(item) } : {}),
+        cardImagePosition: imagePosition,
+        ...(imageSize === undefined || imageSize <= 0 ? {} : { cardImageSize: imageSize }),
+        ...(contentAlignment === 'start' ? {} : { cardContentAlignment: contentAlignment }),
+        ...(noImage ? { cardNoImage: true } : {}),
+      }, item, context, 'カード', notes);
     }
     case 'listItem':
       return listItemNode(item, context);

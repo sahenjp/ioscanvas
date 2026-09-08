@@ -462,21 +462,27 @@ function renderNodeContent(
           <span>{node.label || 'Actions'}</span><span className="ios-picker-value" aria-hidden="true">⌄</span>
         </div>
       );
-    case 'progress':
-      if (node.indeterminate) {
+    case 'progress': {
+      const percent = Math.max(0, Math.min(100, node.value * 100));
+      const thickness = node.trackThickness ?? 4;
+      const progressClass = ['ios-progress', node.style === 'circular' ? 'is-circular' : '', node.wavy ? 'is-wavy' : ''].filter(Boolean).join(' ');
+      if (node.style === 'circular') {
         return (
-          <div className="ios-progress" aria-label={node.label || 'Progress'} aria-busy="true">
-            <div className="ios-progress-label"><span>{node.label || 'Progress'}</span><span>読み込み中</span></div>
-            <div className="ios-progress-track is-indeterminate"><span /></div>
+          <div className={progressClass} aria-label={node.label || 'Progress'} aria-busy={node.indeterminate || undefined}>
+            <div className="ios-progress-label"><span>{node.label || 'Progress'}</span><span>{node.indeterminate ? '読み込み中' : `${Math.round(percent)}%`}</span></div>
+            <div className="ios-progress-ring" style={{ '--progress': `${percent}%`, '--track-thickness': `${thickness}px` } as CSSProperties}>
+              <span aria-hidden="true">{node.indeterminate ? '…' : `${Math.round(percent)}%`}</span>
+            </div>
           </div>
         );
       }
       return (
-        <div className="ios-progress" aria-label={node.label || 'Progress'}>
-          <div className="ios-progress-label"><span>{node.label || 'Progress'}</span><span>{Math.round(node.value * 100)}%</span></div>
-          <div className="ios-progress-track"><span style={{ width: `${node.value * 100}%` }} /></div>
+        <div className={progressClass} aria-label={node.label || 'Progress'} aria-busy={node.indeterminate || undefined}>
+          <div className="ios-progress-label"><span>{node.label || 'Progress'}</span><span>{node.indeterminate ? '読み込み中' : `${Math.round(percent)}%`}</span></div>
+          <div className={`ios-progress-track ${node.indeterminate ? 'is-indeterminate' : ''}`} style={{ height: thickness }}><span style={{ width: `${percent}%` }} /></div>
         </div>
       );
+    }
     case 'gauge': {
       const percent = ((node.value - node.minimum) / (node.maximum - node.minimum)) * 100;
       return (
@@ -723,6 +729,7 @@ function renderNodeContent(
       };
       return (
         <div className={`canvas-container ${horizontal ? 'horizontal' : ''} ${overlay ? 'overlay' : ''} canvas-${node.kind}`}>
+          {node.kind === 'groupbox' && node.isBottomSheet && <div className="canvas-bottom-sheet-handle" aria-hidden="true" />}
           {(node.kind === 'section' || node.kind === 'disclosure-group' || node.kind === 'groupbox') && <div className="section-title">{node.title || 'Section'}</div>}
           <div className={childrenClass} style={childrenStyle}>
             {node.children.length === 0
@@ -1320,7 +1327,7 @@ function initialPreviewValue(node: CanvasNode): PreviewValue {
   switch (node.kind) {
     case 'button': return node.toggle?.isOn ?? false;
     case 'toggle': return node.isOn ?? false;
-    case 'tabview': return 0;
+    case 'tabview': return node.selectedIndex ?? 0;
     case 'disclosure-group': return true;
     case 'picker': return node.initialOption ?? node.options[0] ?? '';
     case 'menu': return node.options[0] ?? '';

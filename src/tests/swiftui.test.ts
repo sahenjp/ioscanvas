@@ -306,6 +306,41 @@ describe('SwiftUI generator', () => {
     expect(output).toContain('ProgressView(value: 0.75)');
   });
 
+  it('preserves circular progress and documents unsupported expressive styling', () => {
+    const document = structuredClone(defaultDocument);
+    document.screens[0]?.root.children.push({
+      id: 'circular-progress-test',
+      kind: 'progress',
+      label: '同期中',
+      value: 0.4,
+      style: 'circular',
+      wavy: true,
+      trackThickness: 8,
+    });
+
+    const output = generateSwiftUI(document);
+
+    expect(output).toContain('ProgressView(value: 0.4)');
+    expect(output).toContain('.progressViewStyle(.circular)');
+    expect(output).toContain('M3Eのトラック太さ: 8pt');
+  });
+
+  it('exports a bottom-sheet handle for imported box semantics', () => {
+    const document = structuredClone(defaultDocument);
+    document.screens[0]?.root.children.push({
+      id: 'sheet-box',
+      kind: 'groupbox',
+      title: 'メニュー',
+      isBottomSheet: true,
+      children: [],
+    });
+
+    const output = generateSwiftUI(document);
+
+    expect(output).toContain('Capsule()');
+    expect(output).toContain('presentationDetents');
+  });
+
   it('exports ColorPicker with a typed Color binding', () => {
     const document = structuredClone(defaultDocument);
     document.screens[0]?.root.children.push({

@@ -1,5 +1,5 @@
 import { isContainerNode } from './nodes';
-import type { AccentColor, AppearanceAccentColor, BackgroundStyle, ButtonStyle, ButtonToggle, CanvasDocument, CanvasNode, CanvasScreen, ColorScheme, FontDesign, FrameWidth, GlassShape, GlassStyle, ImageSource, NavigationTitleDisplayMode, NodeKind, ShadowStyle, StackAlignment, SwipeDirection, TextAlignment, TextStyle, ToolbarItem, ToolbarPlacement } from '../types/document';
+import type { AccentColor, AppearanceAccentColor, BackgroundStyle, ButtonStyle, ButtonToggle, CanvasDocument, CanvasNode, CanvasScreen, CardContentAlignment, CardImagePosition, ColorScheme, FontDesign, FrameWidth, GlassShape, GlassStyle, ImageSource, NavigationTitleDisplayMode, NodeKind, ProgressStyle, ShadowStyle, StackAlignment, SwipeDirection, TextAlignment, TextStyle, ToolbarItem, ToolbarPlacement } from '../types/document';
 
 type RecordValue = Record<string, unknown>;
 
@@ -270,8 +270,11 @@ function readNode(value: unknown, ids: Set<string>): CanvasNode | null {
         : null;
     case 'progress':
       return isString(value.label) && isNumber(value.value) && value.value >= 0 && value.value <= 1
+        && (value.style === undefined || isOneOf(value.style, ['linear', 'circular']))
         && (value.indeterminate === undefined || typeof value.indeterminate === 'boolean')
-        ? { id: value.id, kind: 'progress', label: value.label, value: value.value, ...(value.indeterminate === undefined ? {} : { indeterminate: value.indeterminate }), ...nodeProperties }
+        && (value.wavy === undefined || typeof value.wavy === 'boolean')
+        && (value.trackThickness === undefined || (isNumber(value.trackThickness) && Number.isInteger(value.trackThickness) && value.trackThickness >= 2 && value.trackThickness <= 16))
+        ? { id: value.id, kind: 'progress', label: value.label, value: value.value, ...(value.style === undefined ? {} : { style: value.style as ProgressStyle }), ...(value.indeterminate === undefined ? {} : { indeterminate: value.indeterminate }), ...(value.wavy === undefined ? {} : { wavy: value.wavy }), ...(value.trackThickness === undefined ? {} : { trackThickness: value.trackThickness }), ...nodeProperties }
         : null;
     case 'gauge':
       return isString(value.label)
@@ -351,6 +354,12 @@ function readNode(value: unknown, ids: Set<string>): CanvasNode | null {
       if (value.kind === 'lazyvgrid' && value.columns === undefined) return null;
       if (value.rows !== undefined && (!isNumber(value.rows) || !Number.isInteger(value.rows) || value.rows < 1 || value.rows > 8)) return null;
       if (value.kind === 'lazyhgrid' && value.rows === undefined) return null;
+      if (value.selectedIndex !== undefined && (!isNumber(value.selectedIndex) || !Number.isInteger(value.selectedIndex) || value.selectedIndex < 0 || value.selectedIndex >= value.children.length)) return null;
+      if (value.isBottomSheet !== undefined && typeof value.isBottomSheet !== 'boolean') return null;
+      if (value.cardImagePosition !== undefined && !isOneOf(value.cardImagePosition, ['top', 'leading', 'trailing', 'background'])) return null;
+      if (value.cardImageSize !== undefined && (!isNumber(value.cardImageSize) || value.cardImageSize < 1 || value.cardImageSize > 1024)) return null;
+      if (value.cardContentAlignment !== undefined && !isOneOf(value.cardContentAlignment, ['start', 'center', 'end'])) return null;
+      if (value.cardNoImage !== undefined && typeof value.cardNoImage !== 'boolean') return null;
       if (value.alignment !== undefined && !isString(value.alignment)) return null;
       const validAlignment = value.kind === 'vstack' || value.kind === 'lazyvstack'
         ? value.alignment === undefined || isOneOf(value.alignment, ['leading', 'center', 'trailing'])
@@ -370,6 +379,12 @@ function readNode(value: unknown, ids: Set<string>): CanvasNode | null {
         ...(value.title === undefined ? {} : { title: value.title }),
         ...(value.columns === undefined ? {} : { columns: value.columns }),
         ...(value.rows === undefined ? {} : { rows: value.rows }),
+        ...(value.selectedIndex === undefined ? {} : { selectedIndex: value.selectedIndex }),
+        ...(value.isBottomSheet === undefined ? {} : { isBottomSheet: value.isBottomSheet }),
+        ...(value.cardImagePosition === undefined ? {} : { cardImagePosition: value.cardImagePosition as CardImagePosition }),
+        ...(value.cardImageSize === undefined ? {} : { cardImageSize: value.cardImageSize }),
+        ...(value.cardContentAlignment === undefined ? {} : { cardContentAlignment: value.cardContentAlignment as CardContentAlignment }),
+        ...(value.cardNoImage === undefined ? {} : { cardNoImage: value.cardNoImage }),
         children: children as CanvasNode[],
       } as CanvasNode;
     }

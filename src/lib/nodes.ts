@@ -72,7 +72,7 @@ export function createNode(kind: NodeKind): CanvasNode {
     case 'menu':
       return { id, kind, label: 'Actions', options: ['Edit', 'Delete'], minHeight: 44 };
     case 'progress':
-      return { id, kind, label: 'Progress', value: 0.6 };
+      return { id, kind, label: 'Progress', value: 0.6, style: 'linear' };
     case 'gauge':
       return { id, kind, label: 'Progress', value: 0.6, minimum: 0, maximum: 1, minHeight: 44 };
     case 'content-unavailable':
@@ -300,13 +300,50 @@ export function decodeDragData(value: string): DragData | null {
 export function updateNode(nodes: CanvasNode[], id: string, patch: Partial<CanvasNode>): CanvasNode[] {
   return nodes.map((node) => {
     if (node.id === id) {
-      return { ...node, ...patch } as CanvasNode;
+      return updateCardLayout({ ...node, ...patch } as CanvasNode, patch);
     }
     if (node.children) {
       return { ...node, children: updateNode(node.children, id, patch) } as CanvasNode;
     }
     return node;
   });
+}
+
+function updateCardLayout(node: CanvasNode, patch: Partial<CanvasNode>): CanvasNode {
+  if (node.kind !== 'groupbox' || (!('cardImagePosition' in patch) && !('cardNoImage' in patch))) return node;
+
+  const wrappers = node.children.filter((child) => child.kind === 'hstack' || child.kind === 'zstack');
+  const wrapper = wrappers[0];
+  const candidates = wrapper && isContainerNode(wrapper) ? wrapper.children : node.children;
+  const image = candidates.find((child): child is Extract<CanvasNode, { kind: 'image' }> => child.kind === 'image');
+  const content = candidates.find((child): child is Extract<CanvasNode, { kind: 'vstack' }> => child.kind === 'vstack')
+    ?? { id: createId('card-content'), kind: 'vstack' as const, spacing: 4, alignment: 'leading' as const, frameWidth: 'max' as const, children: candidates.filter((child) => child.kind !== 'image') };
+  const nextImage = node.cardNoImage ? undefined : image ?? createNode('image');
+  if (nextImage?.kind === 'image' && !nextImage.accessibilityLabel) nextImage.accessibilityLabel = 'カード画像';
+  if (!nextImage) return { ...node, children: [content] };
+
+  switch (node.cardImagePosition ?? 'top') {
+    case 'background':
+      return {
+        ...node,
+        children: [{ id: wrapper?.id ?? createId('card-background'), kind: 'zstack', children: [nextImage, content] }],
+      };
+    case 'leading':
+    case 'trailing':
+      return {
+        ...node,
+        children: [{
+          id: wrapper?.id ?? createId('card-row'),
+          kind: 'hstack',
+          spacing: 12,
+          alignment: 'center',
+          children: node.cardImagePosition === 'leading' ? [nextImage, content] : [content, nextImage],
+        }],
+      };
+    case 'top':
+    default:
+      return { ...node, children: [nextImage, content] };
+  }
 }
 
 export function removeNode(nodes: CanvasNode[], id: string): CanvasNode[] {

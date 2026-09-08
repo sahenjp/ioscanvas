@@ -388,6 +388,13 @@ button.ios-navigation-link:hover { background: #f5f5f7; }
 .ios-progress-track { height: 4px; overflow: hidden; border-radius: 3px; background: #d1d1d6; }
 .ios-progress-track span { display: block; height: 100%; border-radius: inherit; background: var(--preview-accent); }
 .ios-progress-track.is-indeterminate span { width: 36%; }
+.ios-progress.is-wavy .ios-progress-track { background-image: repeating-linear-gradient(-45deg, transparent 0 5px, rgba(255, 255, 255, .28) 5px 8px); }
+.ios-progress.is-circular { align-items: center; }
+.ios-progress.is-circular .ios-progress-label { width: 100%; }
+.ios-progress-ring { position: relative; width: 58px; height: 58px; border-radius: 50%; background: conic-gradient(var(--preview-accent) var(--progress), #d1d1d6 0); }
+.ios-progress-ring::after { position: absolute; inset: var(--track-thickness); border-radius: inherit; background: #fff; content: ''; }
+.ios-progress-ring span { position: relative; z-index: 1; display: grid; height: 100%; place-items: center; color: #3a3a3c; font-size: 11px; font-variant-numeric: tabular-nums; }
+.ios-progress.is-circular.is-wavy .ios-progress-ring { filter: saturate(1.08); }
 .ios-gauge { display: flex; align-items: center; gap: 12px; width: 100%; padding: 8px 4px; color: #3a3a3c; }
 .ios-gauge-dial { position: relative; width: 58px; height: 58px; flex: 0 0 58px; display: grid; place-items: center; border-radius: 50%; background: conic-gradient(var(--preview-accent) var(--gauge-progress), #d1d1d6 0); }
 .ios-gauge-dial::after { position: absolute; inset: 6px; border-radius: inherit; background: #fff; content: ''; }
@@ -401,6 +408,7 @@ button.ios-navigation-link:hover { background: #f5f5f7; }
 .ios-divider { width: 100%; height: 1px; min-height: 1px; background: #c6c6c8; cursor: default; }
 .ios-spacer { width: 100%; height: 30px; border: 1px dashed #c8c8cc; color: #8e8e93; font-size: 10px; line-height: 28px; text-align: center; }
 .canvas-container { padding: 9px; border: 1px dashed #b9b9bd; border-radius: 9px; background: rgba(255, 255, 255, .3); }
+.canvas-bottom-sheet-handle { width: 36px; height: 5px; margin: 0 auto 7px; border-radius: 3px; background: #8e8e93; }
 .canvas-navigation-split { display: grid; grid-template-columns: minmax(0, .82fr) minmax(0, 1.48fr); min-width: 0; gap: 1px; padding: 1px; border: 1px solid rgba(120, 120, 128, .26); border-radius: 9px; background: rgba(120, 120, 128, .18); }
 .navigation-split-pane { min-width: 0; min-height: 100px; padding: 7px; background: rgba(255, 255, 255, .62); }
 .navigation-split-sidebar { border-radius: 7px 0 0 7px; }
@@ -461,6 +469,9 @@ button.ios-navigation-link:hover { background: #f5f5f7; }
 .phone-screen.scheme-dark .ios-stepper-control button { background: #3a3a3c; color: #f5f5f7; }
 .phone-screen.scheme-dark .ios-progress-label { color: #f5f5f7; }
 .phone-screen.scheme-dark .ios-progress-track { background: #48484a; }
+.phone-screen.scheme-dark .ios-progress-ring { background: conic-gradient(var(--preview-accent) var(--progress), #48484a 0); }
+.phone-screen.scheme-dark .ios-progress-ring::after { background: #1c1c1e; }
+.phone-screen.scheme-dark .ios-progress-ring span { color: #f5f5f7; }
 .phone-screen.scheme-dark .ios-gauge { color: #f5f5f7; }
 .phone-screen.scheme-dark .ios-gauge-dial { background: conic-gradient(var(--preview-accent) var(--gauge-progress), #48484a 0); }
 .phone-screen.scheme-dark .ios-gauge-dial::after { background: #1c1c1e; }
@@ -469,6 +480,7 @@ button.ios-navigation-link:hover { background: #f5f5f7; }
 .phone-screen.scheme-dark .ios-content-unavailable strong { color: #f5f5f7; }
 .phone-screen.scheme-dark .ios-content-unavailable > span:last-child { color: #aeaeb2; }
 .phone-screen.scheme-dark .canvas-container { border-color: #545458; background: rgba(44, 44, 46, .55); }
+.phone-screen.scheme-dark .canvas-bottom-sheet-handle { background: #8e8e93; }
 .phone-screen.scheme-dark .canvas-navigation-split { border-color: #545458; background: rgba(44, 44, 46, .72); }
 .phone-screen.scheme-dark .navigation-split-pane { background: rgba(28, 28, 30, .86); }
 .phone-screen.scheme-dark .tabview-preview-bar { border-color: rgba(255, 255, 255, .16); }

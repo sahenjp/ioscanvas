@@ -654,8 +654,23 @@ export function Inspector() {
             )}
             {node.kind === 'progress' && (
               <>
+                <Field label="表示形式">
+                  <select value={node.style ?? 'linear'} onChange={(event) => updateSelectedNode({ style: event.target.value as typeof node.style } as Partial<CanvasNode>)}>
+                    <option value="linear">横方向</option>
+                    <option value="circular">円形</option>
+                  </select>
+                </Field>
                 <Field label="不確定">
                   <input className="toggle-input" type="checkbox" checked={node.indeterminate ?? false} onChange={(event) => updateSelectedNode({ indeterminate: event.target.checked } as Partial<CanvasNode>)} />
+                </Field>
+                <Field label="波形">
+                  <input className="toggle-input" type="checkbox" checked={node.wavy ?? false} onChange={(event) => updateSelectedNode({ wavy: event.target.checked || undefined } as Partial<CanvasNode>)} />
+                </Field>
+                <Field label="トラック太さ">
+                  <div className="input-with-unit">
+                    <DraftInput key={`${node.id}-track-thickness-${node.trackThickness ?? 4}`} type="number" min="2" max="16" step="1" value={node.trackThickness ?? 4} onCommit={(value) => updateSelectedNode({ trackThickness: numericValue(value, node.trackThickness ?? 4, 2, 16) } as Partial<CanvasNode>)} />
+                    <span>pt</span>
+                  </div>
                 </Field>
                 <Field label="進捗">
                   <div className="input-with-unit">
@@ -866,8 +881,50 @@ export function Inspector() {
               </Field>
             )}
             {(node.kind === 'section' || node.kind === 'disclosure-group' || node.kind === 'sheet' || node.kind === 'groupbox') && (
-              <Field label="Sectionタイトル">
-                <DraftInput key={`${node.id}-title-${node.title ?? ''}`} value={node.title ?? ''} onCommit={(value) => updateSelectedNode({ title: value } as Partial<CanvasNode>)} />
+              <>
+                <Field label="Sectionタイトル">
+                  <DraftInput key={`${node.id}-title-${node.title ?? ''}`} value={node.title ?? ''} onCommit={(value) => updateSelectedNode({ title: value } as Partial<CanvasNode>)} />
+                </Field>
+                {node.kind === 'groupbox' && node.isBottomSheet !== undefined && (
+                  <Field label="ボトムシートのハンドル">
+                    <input className="toggle-input" type="checkbox" checked={node.isBottomSheet} onChange={(event) => updateSelectedNode({ isBottomSheet: event.target.checked } as Partial<CanvasNode>)} />
+                  </Field>
+                )}
+              </>
+            )}
+            {node.kind === 'groupbox' && node.cardImagePosition !== undefined && (
+              <>
+                <Field label="カード画像の位置">
+                  <select value={node.cardImagePosition} onChange={(event) => updateSelectedNode({ cardImagePosition: event.target.value as typeof node.cardImagePosition } as Partial<CanvasNode>)}>
+                    <option value="top">上</option>
+                    <option value="leading">左</option>
+                    <option value="trailing">右</option>
+                    <option value="background">背景</option>
+                  </select>
+                </Field>
+                <Field label="画像なし">
+                  <input className="toggle-input" type="checkbox" checked={node.cardNoImage ?? false} onChange={(event) => updateSelectedNode({ cardNoImage: event.target.checked } as Partial<CanvasNode>)} />
+                </Field>
+                <Field label="本文位置">
+                  <select value={node.cardContentAlignment ?? 'start'} onChange={(event) => updateSelectedNode({ cardContentAlignment: event.target.value as typeof node.cardContentAlignment } as Partial<CanvasNode>)}>
+                    <option value="start">上</option>
+                    <option value="center">中央</option>
+                    <option value="end">下</option>
+                  </select>
+                </Field>
+                {node.cardImageSize !== undefined && <Field label="画像サイズ">
+                  <div className="input-with-unit">
+                    <DraftInput key={`${node.id}-card-image-size-${node.cardImageSize}`} type="number" min="1" max="1024" value={node.cardImageSize} onCommit={(value) => updateSelectedNode({ cardImageSize: numericValue(value, node.cardImageSize ?? 1, 1, 1024) } as Partial<CanvasNode>)} />
+                    <span>dp</span>
+                  </div>
+                </Field>}
+              </>
+            )}
+            {node.kind === 'tabview' && node.children.length > 0 && (
+              <Field label="初期タブ">
+                <select value={String(node.selectedIndex ?? 0)} onChange={(event) => updateSelectedNode({ selectedIndex: Number(event.target.value) } as Partial<CanvasNode>)}>
+                  {node.children.map((child, index) => <option key={child.id} value={index}>{index + 1} · {defaultTabTitle(child)}</option>)}
+                </select>
               </Field>
             )}
             {(node.kind === 'vstack' || node.kind === 'hstack' || node.kind === 'lazyvstack' || node.kind === 'lazyhstack' || node.kind === 'glass-container' || node.kind === 'lazyvgrid' || node.kind === 'lazyhgrid') && (
