@@ -618,6 +618,11 @@ function imageNode(id: string, icon: string | undefined, source: ImageSource, la
   };
 }
 
+function imageSourceFor(src: string | undefined): ImageSource {
+  if (!src) return 'symbol';
+  return /^https?:\/\//i.test(src) ? 'remote' : 'asset';
+}
+
 function tabViewNode(item: JsonObject, context: ConversionContext): CanvasNode {
   const id = stableId('m3e-tabview', stringValue(item, 'id') ?? 'tabs', context.usedIds);
   const children = tabEntries(item).map((tab, index) => {
@@ -754,7 +759,7 @@ function mapItem(item: JsonObject, context: ConversionContext): CanvasNode | nul
   const label = stringValue(item, 'label')?.trim() ?? '';
   const icon = iconOf(item);
   const style = buttonStyle(item.variant);
-  const imageSource: ImageSource = typeof stringValue(item, 'src') === 'string' && /^https?:\/\//i.test(stringValue(item, 'src') ?? '') ? 'remote' : 'symbol';
+  const imageSource = imageSourceFor(stringValue(item, 'src'));
   const presentationKind = isOneOf(item.kind, ['fab', 'extendedFab', 'chip', 'splitButton'] as const)
     ? item.kind
     : undefined;
@@ -811,8 +816,12 @@ function mapItem(item: JsonObject, context: ConversionContext): CanvasNode | nul
       return appendNotes({ id, kind: 'toggle', label: label || '設定', binding: `is_${sourceId}`, ...(checked === undefined ? {} : { isOn: checked }), minHeight: 44, ...(controlKind ? { m3eKind: controlKind } : {}) }, item);
     }
     case 'slider': {
-      const value = Math.max(0, Math.min(100, numberValue(item, 'value') ?? 50));
-      return appendNotes({ id, kind: 'slider', label: label || '値', binding: `value_${sourceId}`, value, minimum: 0, maximum: 100, step: 1, minHeight: 44 }, item);
+      const minimum = numberValue(item, 'minimum') ?? 0;
+      const maximum = Math.max(minimum + 0.01, numberValue(item, 'maximum') ?? 100);
+      const step = Math.min(maximum - minimum, Math.max(0.01, numberValue(item, 'step') ?? 1));
+      const normalizedValue = Math.max(0, Math.min(1, (numberValue(item, 'value') ?? 50) / 100));
+      const value = minimum + (maximum - minimum) * normalizedValue;
+      return appendNotes({ id, kind: 'slider', label: label || '値', binding: `value_${sourceId}`, value, minimum, maximum, step, minHeight: 44 }, item);
     }
     case 'text': {
       const fontSize = Math.max(11, numberValue(item, 'size') ?? 17);
@@ -820,7 +829,7 @@ function mapItem(item: JsonObject, context: ConversionContext): CanvasNode | nul
     }
     case 'image': {
       const src = stringValue(item, 'src');
-      const node = imageNode(id, imageSource === 'remote' ? src : icon, imageSource, label || '画像');
+      const node = imageNode(id, imageSource === 'symbol' ? icon : src, imageSource, label || '画像');
       return linkM3eNode(node, item, context, '画像');
     }
     case 'camera':
@@ -871,11 +880,12 @@ function mapItem(item: JsonObject, context: ConversionContext): CanvasNode | nul
       const noImage = booleanValue(item, 'noImage') === true;
       const imageSize = numberValue(item, 'imageSize');
       const cardImageSource = stringValue(item, 'src');
-      const hasRemoteImage = !!cardImageSource && /^https?:\/\//i.test(cardImageSource);
+      const cardImageSourceKind = imageSourceFor(cardImageSource);
+      const hasExternalImage = cardImageSourceKind !== 'symbol';
       const cardImage = noImage ? undefined : imageNode(
         stableId('m3e-card-icon', sourceId, context.usedIds),
-        hasRemoteImage ? cardImageSource : icon ?? 'photo',
-        hasRemoteImage ? 'remote' : 'symbol',
+        hasExternalImage ? cardImageSource : icon ?? 'photo',
+        cardImageSourceKind,
         label || 'カード画像',
       );
       const textChildren: CanvasNode[] = [];
@@ -898,7 +908,7 @@ function mapItem(item: JsonObject, context: ConversionContext): CanvasNode | nul
             : [cardImage, text];
       const notes = [
         ...(imageSize !== undefined && imageSize > 0 ? [`M3Eカードの画像サイズ ${imageSize}dp を読み込みました。`] : []),
-        ...(cardImageSource && !hasRemoteImage ? ['M3Eカードのローカル画像データはSwiftUIのAssetへ移してから差し替えてください。'] : []),
+        ...(cardImageSource && cardImageSourceKind === 'asset' ? ['M3Eカードのローカル画像データはSwiftUIのAssetへ移してから差し替えてください。'] : []),
         ...(contentAlignment !== 'start' ? [`M3Eカードの本文位置「${contentAlignment}」を保持しています。`] : []),
       ];
       return linkM3eNode({
@@ -1441,6 +1451,7 @@ function exportListItemPresentation(node: Extract<CanvasNode, { kind: 'navigatio
 }
 
 function exportItem(node: CanvasNode, frameIds: Map<string, string>, inheritedNote = ''): M3eExportItem | null {
+  const nodeFill = exportNodeFill(node);
   const base = (kind: string, label: string, icon: string | null = null, extra: Partial<M3eExportItem> = {}): M3eExportItem => ({
     id: node.id,
     kind,
@@ -1448,6 +1459,7 @@ function exportItem(node: CanvasNode, frameIds: Map<string, string>, inheritedNo
     icon,
     variant: exportVariant(node),
     ...exportM3eMetadata(node.m3eMetadata),
+    ...(nodeFill ? { fill: nodeFill } : {}),
     ...extra,
     ...(exportNote(node, inheritedNote) ? { note: exportNote(node, inheritedNote) } : {}),
   });
@@ -1503,6 +1515,9 @@ function exportItem(node: CanvasNode, frameIds: Map<string, string>, inheritedNo
     case 'slider':
       return base('slider', node.label, null, {
         value: node.maximum > node.minimum ? ((node.value - node.minimum) / (node.maximum - node.minimum)) * 100 : 0,
+        minimum: node.minimum,
+        maximum: node.maximum,
+        step: node.step,
         note: exportNote(node, `値の範囲: ${node.minimum}〜${node.maximum} / 刻み: ${node.step}`),
       });
     case 'stepper':
@@ -1531,8 +1546,8 @@ function exportItem(node: CanvasNode, frameIds: Map<string, string>, inheritedNo
     case 'datepicker':
       return base('textField', node.label, 'calendar_month', { note: exportNote(node, 'SwiftUIではDatePickerとして再構成します。') });
     case 'image': {
-      const remote = node.source === 'remote' && /^https?:\/\//i.test(node.systemName);
-      return base('image', node.accessibilityLabel || '画像', node.source === 'symbol' || node.source === undefined ? node.systemName || null : null, remote ? { src: node.systemName } : {});
+      const external = node.source !== 'symbol' && node.source !== undefined && node.systemName.trim() !== '';
+      return base('image', node.accessibilityLabel || '画像', external ? null : node.systemName || null, external ? { src: node.systemName } : {});
     }
     case 'camera':
       return base('camera', node.label, null);
@@ -1611,10 +1626,10 @@ function exportCardPresentation(node: ContainerNode): Pick<M3eExportItem, 'icon'
   const image = descendants.find((child): child is Extract<CanvasNode, { kind: 'image' }> => child.kind === 'image');
   const texts = descendants.filter((child): child is Extract<CanvasNode, { kind: 'text' }> => child.kind === 'text');
   const supporting = texts.find((child) => child.text.trim() && child.text !== node.title)?.text.trim();
-  const remote = image?.source === 'remote' && /^https?:\/\//i.test(image.systemName);
+  const external = image?.source !== 'symbol' && image?.source !== undefined && Boolean(image.systemName.trim());
   return {
-    icon: remote ? null : image?.systemName ?? null,
-    ...(remote ? { src: image.systemName } : {}),
+    icon: external ? null : image?.systemName ?? null,
+    ...(external && image ? { src: image.systemName } : {}),
     ...(supporting ? { supporting } : {}),
   };
 }

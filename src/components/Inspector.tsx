@@ -1,7 +1,7 @@
 import { createId, findNode, findNodeLocation, isContainerNode } from '../lib/nodes';
 import { lintDocument } from '../lib/hig';
 import { useEditorStore } from '../store/editor';
-import type { AccentColor, BackgroundStyle, CanvasNode, CanvasScreen, ContentPlacement, FontDesign, FrameWidth, GlassShape, GlassStyle, ImageSource, NavigationTitleDisplayMode, NavigationTransition, ScreenBackground, ScreenDevice, ScreenOrientation, ShadowStyle, StackAlignment, SwipeDirection, TextAlignment, TextStyle, ToolbarItem, ToolbarPlacement } from '../types/document';
+import type { AccentColor, BackgroundStyle, CanvasNode, CanvasScreen, ContentPlacement, FontDesign, FrameWidth, GlassShape, GlassStyle, ImageSource, M3eItemMetadata, M3eTextColor, M3eVariant, NavigationTitleDisplayMode, NavigationTransition, ScreenBackground, ScreenDevice, ScreenOrientation, ShadowStyle, StackAlignment, SwipeDirection, TextAlignment, TextStyle, ToolbarItem, ToolbarPlacement } from '../types/document';
 
 const swipeDirections: { key: SwipeDirection; label: string }[] = [
   { key: 'left', label: '左へスワイプ' },
@@ -85,6 +85,14 @@ export function Inspector() {
     ? allIssues.filter((issue) => issue.nodeId === screen.root.id || Boolean(findNode(screen.root.children, issue.nodeId)))
     : [];
   const screenWarnings = screenIssues.filter((issue) => issue.severity === 'warning');
+  const updateM3eMetadata = (patch: Partial<M3eItemMetadata>) => {
+    if (!node) return;
+    const hasFillPatch = Object.prototype.hasOwnProperty.call(patch, 'fill');
+    updateSelectedNode({
+      m3eMetadata: { ...node.m3eMetadata, ...patch },
+      ...(hasFillPatch ? { background: m3eBackgroundStyle(patch.fill) } : {}),
+    } as Partial<CanvasNode>);
+  };
 
   return (
     <aside className="inspector panel-border-left">
@@ -400,6 +408,27 @@ export function Inspector() {
               ))}
             </section>
           )}
+          {screen && (screen.m3eTopAppBar || screen.toolbarItems?.some((item) => item.placement === 'topBarLeading' || item.placement === 'topBarTrailing') || screen.m3eBottomNav || screen.tabBarItems?.length) ? (
+            <section className="inspector-section">
+              <div className="section-label">M3E表示属性</div>
+              {(screen.m3eTopAppBar || screen.toolbarItems?.some((item) => item.placement === 'topBarLeading' || item.placement === 'topBarTrailing')) && (
+                <M3eMetadataFields
+                  label="Top App Bar"
+                  metadata={screen.m3eTopAppBar}
+                  showContained
+                  onChange={(patch) => updateActiveScreen({ m3eTopAppBar: { ...screen.m3eTopAppBar, ...patch } })}
+                />
+              )}
+              {(screen.m3eBottomNav || screen.tabBarItems?.length) && (
+                <M3eMetadataFields
+                  label="Bottom Navigation"
+                  metadata={screen.m3eBottomNav}
+                  showContained
+                  onChange={(patch) => updateActiveScreen({ m3eBottomNav: { ...screen.m3eBottomNav, ...patch } })}
+                />
+              )}
+            </section>
+          ) : null}
           {screenIssues.length > 0 && (
             <section className={`inspector-section ${screenWarnings.length > 0 ? 'warnings-section' : 'notes-section'}`}>
               <div className="section-label">HIGチェック{screenWarnings.length > 0 ? ` · ${screenWarnings.length}件` : ''}</div>
@@ -494,6 +523,33 @@ export function Inspector() {
               <Field label="ラベル">
                 <DraftInput key={`${node.id}-label-${node.label}`} value={node.label} onCommit={(value) => updateSelectedNode({ label: value } as Partial<CanvasNode>)} />
               </Field>
+            )}
+            {(node.m3eKind || node.m3eMetadata) && (
+              <section className="inspector-subsection">
+                <div className="section-label">M3E表示属性{node.m3eKind ? ` · ${node.m3eKind}` : ''}</div>
+                {node.m3eKind && (
+                  <Field label="バリアント">
+                    <select value={node.m3eVariant ?? 'filled'} onChange={(event) => updateSelectedNode({ m3eVariant: event.target.value as M3eVariant } as Partial<CanvasNode>)}>
+                      <option value="filled">Filled</option>
+                      <option value="tonal">Tonal</option>
+                      <option value="elevated">Elevated</option>
+                      <option value="outlined">Outlined</option>
+                      <option value="text">Text</option>
+                    </select>
+                  </Field>
+                )}
+                <M3eMetadataFields
+                  metadata={node.m3eMetadata}
+                  showCard={node.m3eKind === 'card' || node.kind === 'groupbox'}
+                  showChoice={node.m3eKind === 'checkbox' || node.m3eKind === 'radio' || node.m3eKind === 'switch' || node.kind === 'toggle'}
+                  showContained={node.m3eKind === 'bottomNav' || node.m3eKind === 'navRail' || node.m3eKind === 'box'}
+                  showProgress={node.kind === 'progress'}
+                  showRail={node.m3eKind === 'navRail' || node.kind === 'navigation-split-view'}
+                  showSource={node.kind === 'image' || node.m3eKind === 'card'}
+                  showSupporting={node.m3eKind === 'card' || node.m3eKind === 'listItem' || node.m3eKind === 'snackbar'}
+                  onChange={updateM3eMetadata}
+                />
+              </section>
             )}
             {node.m3eKind === 'fabMenu' && (
               <Field label="FABアイコン">
@@ -1175,6 +1231,169 @@ export function Inspector() {
   );
 }
 
+function M3eMetadataFields({
+  label,
+  metadata,
+  showCard = false,
+  showChoice = false,
+  showContained = false,
+  showProgress = false,
+  showRail = false,
+  showSource = false,
+  showSupporting = false,
+  onChange,
+}: {
+  label?: string;
+  metadata?: M3eItemMetadata;
+  showCard?: boolean;
+  showChoice?: boolean;
+  showContained?: boolean;
+  showProgress?: boolean;
+  showRail?: boolean;
+  showSource?: boolean;
+  showSupporting?: boolean;
+  onChange: (patch: Partial<M3eItemMetadata>) => void;
+}) {
+  const corners = metadata?.corners ?? { tl: metadata?.radiusTop ?? 0, tr: metadata?.radiusTop ?? 0, bl: metadata?.radiusBottom ?? 0, br: metadata?.radiusBottom ?? 0 };
+  const setCorner = (key: keyof typeof corners, raw: string) => onChange({ corners: { ...corners, [key]: numericValue(raw, corners[key], 0, 256) } });
+
+  return (
+    <div className="m3e-metadata-editor">
+      {label && <div className="m3e-editor-label">{label}</div>}
+      <Field label="塗り">
+        <select value={metadata?.fill ?? ''} onChange={(event) => onChange({ fill: event.target.value ? event.target.value as ScreenBackground : undefined })}>
+          <option value="">未指定</option>
+          {m3eFillOptions.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}
+        </select>
+      </Field>
+      <Field label="文字色">
+        <select value={metadata?.textColor ?? ''} onChange={(event) => onChange({ textColor: event.target.value ? event.target.value as M3eTextColor : undefined })}>
+          <option value="">標準</option>
+          {m3eTextColorOptions.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}
+        </select>
+      </Field>
+      <Field label="アイコン背景">
+        <select value={metadata?.iconFill ?? ''} onChange={(event) => onChange({ iconFill: event.target.value ? event.target.value as M3eItemMetadata['iconFill'] : undefined })}>
+          <option value="">標準</option>
+          <option value="none">なし</option>
+          {m3eFillOptions.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}
+        </select>
+      </Field>
+      <Field label="サイズ">
+        <div className="input-with-unit">
+          <DraftInput key={`m3e-size-${metadata?.size ?? ''}`} type="number" min="0" max="2048" value={metadata?.size ?? ''} placeholder="未指定" onCommit={(value) => onChange({ size: optionalNumericValue(value, 0, 2048) })} />
+          <span>dp</span>
+        </div>
+      </Field>
+      <Field label="サイズ2">
+        <div className="input-with-unit">
+          <DraftInput key={`m3e-size2-${metadata?.size2 ?? ''}`} type="number" min="0" max="2048" value={metadata?.size2 ?? ''} placeholder="未指定" onCommit={(value) => onChange({ size2: optionalNumericValue(value, 0, 2048) })} />
+          <span>dp</span>
+        </div>
+      </Field>
+      <Field label="上側の角丸">
+        <div className="input-with-unit">
+          <DraftInput key={`m3e-radius-top-${metadata?.radiusTop ?? ''}`} type="number" min="0" max="256" value={metadata?.radiusTop ?? ''} placeholder="未指定" onCommit={(value) => onChange({ radiusTop: optionalNumericValue(value, 0, 256) })} />
+          <span>dp</span>
+        </div>
+      </Field>
+      <Field label="下側の角丸">
+        <div className="input-with-unit">
+          <DraftInput key={`m3e-radius-bottom-${metadata?.radiusBottom ?? ''}`} type="number" min="0" max="256" value={metadata?.radiusBottom ?? ''} placeholder="未指定" onCommit={(value) => onChange({ radiusBottom: optionalNumericValue(value, 0, 256) })} />
+          <span>dp</span>
+        </div>
+      </Field>
+      <Field label="個別の角丸">
+        <div className="corner-grid">
+          {(['tl', 'tr', 'bl', 'br'] as const).map((key) => (
+            <DraftInput key={`m3e-corner-${key}-${corners[key]}`} type="number" min="0" max="256" value={corners[key]} aria-label={`角丸 ${key.toUpperCase()}`} onCommit={(value) => setCorner(key, value)} />
+          ))}
+        </div>
+      </Field>
+      {showSupporting && (
+        <Field label="補足">
+          <DraftTextarea key={`m3e-supporting-${metadata?.supporting ?? ''}`} value={metadata?.supporting ?? ''} onCommit={(value) => onChange({ supporting: value.trim() || undefined })} />
+        </Field>
+      )}
+      {showCard && (
+        <>
+          <Field label="画像位置">
+            <select value={metadata?.imagePos ?? ''} onChange={(event) => onChange({ imagePos: event.target.value ? event.target.value as M3eItemMetadata['imagePos'] : undefined })}>
+              <option value="">未指定</option>
+              <option value="top">上</option>
+              <option value="leading">左</option>
+              <option value="trailing">右</option>
+              <option value="background">背景</option>
+            </select>
+          </Field>
+          <Field label="画像サイズ">
+            <div className="input-with-unit">
+              <DraftInput key={`m3e-image-size-${metadata?.imageSize ?? ''}`} type="number" min="0" max="2048" value={metadata?.imageSize ?? ''} placeholder="未指定" onCommit={(value) => onChange({ imageSize: optionalNumericValue(value, 0, 2048) })} />
+              <span>dp</span>
+            </div>
+          </Field>
+          <Field label="本文位置">
+            <select value={metadata?.contentAlign ?? ''} onChange={(event) => onChange({ contentAlign: event.target.value ? event.target.value as M3eItemMetadata['contentAlign'] : undefined })}>
+              <option value="">未指定</option>
+              <option value="start">上</option>
+              <option value="center">中央</option>
+              <option value="end">下</option>
+            </select>
+          </Field>
+          <Field label="画像なし">
+            <input className="toggle-input" type="checkbox" checked={metadata?.noImage ?? false} onChange={(event) => onChange({ noImage: event.target.checked })} />
+          </Field>
+        </>
+      )}
+      {showChoice && (
+        <Field label="チェック表示なし">
+          <input className="toggle-input" type="checkbox" checked={metadata?.noCheck ?? false} onChange={(event) => onChange({ noCheck: event.target.checked })} />
+        </Field>
+      )}
+      {showContained && (
+        <Field label="Contained">
+          <input className="toggle-input" type="checkbox" checked={metadata?.contained ?? false} onChange={(event) => onChange({ contained: event.target.checked })} />
+        </Field>
+      )}
+      {showProgress && (
+        <>
+          <Field label="波形">
+            <input className="toggle-input" type="checkbox" checked={metadata?.wavy ?? false} onChange={(event) => onChange({ wavy: event.target.checked })} />
+          </Field>
+          <Field label="トラック太さ">
+            <div className="input-with-unit">
+              <DraftInput key={`m3e-track-${metadata?.trackThickness ?? ''}`} type="number" min="2" max="16" value={metadata?.trackThickness ?? ''} placeholder="未指定" onCommit={(value) => onChange({ trackThickness: optionalNumericValue(value, 2, 16) })} />
+              <span>pt</span>
+            </div>
+          </Field>
+        </>
+      )}
+      {showRail && (
+        <>
+          <Field label="Railを展開">
+            <input className="toggle-input" type="checkbox" checked={metadata?.railExpanded ?? false} onChange={(event) => onChange({ railExpanded: event.target.checked })} />
+          </Field>
+          <Field label="モーダルRail">
+            <input className="toggle-input" type="checkbox" checked={metadata?.railModal ?? false} onChange={(event) => onChange({ railModal: event.target.checked })} />
+          </Field>
+          <Field label="展開方向">
+            <select value={metadata?.railExpansionSide ?? ''} onChange={(event) => onChange({ railExpansionSide: event.target.value ? event.target.value as M3eItemMetadata['railExpansionSide'] : undefined })}>
+              <option value="">未指定</option>
+              <option value="left">左</option>
+              <option value="right">右</option>
+            </select>
+          </Field>
+        </>
+      )}
+      {showSource && (
+        <Field label="M3E画像ソース">
+          <DraftInput key={`m3e-src-${metadata?.src ?? ''}`} value={metadata?.src ?? ''} placeholder="未指定" onCommit={(value) => onChange({ src: value.trim() || undefined })} />
+        </Field>
+      )}
+    </div>
+  );
+}
+
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return <label className="field"><span>{label}</span>{children}</label>;
 }
@@ -1308,6 +1527,50 @@ function DraftTextarea({
 function numericValue(raw: string, fallback: number, min: number, max: number): number {
   const value = Number(raw);
   return Number.isFinite(value) ? Math.min(max, Math.max(min, value)) : fallback;
+}
+
+function optionalNumericValue(raw: string, min: number, max: number): number | undefined {
+  return raw.trim() ? numericValue(raw, min, min, max) : undefined;
+}
+
+const m3eFillOptions: { value: ScreenBackground; label: string }[] = [
+  { value: 'surface', label: 'Surface' },
+  { value: 'surfaceContainerLow', label: 'Container Low' },
+  { value: 'surfaceContainer', label: 'Container' },
+  { value: 'surfaceContainerHigh', label: 'Container High' },
+  { value: 'surfaceContainerHighest', label: 'Container Highest' },
+  { value: 'primaryContainer', label: 'Primary Container' },
+  { value: 'secondaryContainer', label: 'Secondary Container' },
+  { value: 'tertiaryContainer', label: 'Tertiary Container' },
+  { value: 'primary', label: 'Primary' },
+  { value: 'inverseSurface', label: 'Inverse Surface' },
+];
+
+const m3eTextColorOptions: { value: M3eTextColor; label: string }[] = [
+  { value: 'primary', label: 'Primary' },
+  { value: 'secondary', label: 'Secondary' },
+  { value: 'onSurface', label: 'On Surface' },
+  { value: 'onSurfaceVariant', label: 'On Surface Variant' },
+  { value: 'onPrimaryContainer', label: 'On Primary Container' },
+  { value: 'onSecondaryContainer', label: 'On Secondary Container' },
+  { value: 'onTertiaryContainer', label: 'On Tertiary Container' },
+  { value: 'inverseOnSurface', label: 'Inverse On Surface' },
+];
+
+function m3eBackgroundStyle(fill: ScreenBackground | undefined): BackgroundStyle | undefined {
+  switch (fill) {
+    case 'surface': return 'none';
+    case 'surfaceContainerLow': return 'secondary';
+    case 'surfaceContainer':
+    case 'surfaceContainerHigh':
+    case 'surfaceContainerHighest': return 'material';
+    case 'primaryContainer':
+    case 'secondaryContainer':
+    case 'primary': return 'accent';
+    case 'tertiaryContainer': return 'tertiary';
+    case 'inverseSurface': return 'material';
+    default: return undefined;
+  }
 }
 
 function parseOptions(raw: string, fallback: string[]): string[] {

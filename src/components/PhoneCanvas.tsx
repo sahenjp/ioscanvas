@@ -10,7 +10,7 @@ import {
   NODE_DRAG_MIME,
 } from '../lib/nodes';
 import { useEditorStore } from '../store/editor';
-import type { AlertNode, CanvasDocument, CanvasNode, CanvasScreen, ConfirmationDialogNode, ContainerNode, FontDesign, NavigationTransition, ScreenBackground, ScreenDevice, ScreenOrientation, SwipeDirection, TextStyle, ToolbarItem } from '../types/document';
+import type { AlertNode, CanvasDocument, CanvasNode, CanvasScreen, ConfirmationDialogNode, ContainerNode, FontDesign, M3eItemMetadata, M3eTextColor, NavigationTransition, ScreenBackground, ScreenDevice, ScreenOrientation, SwipeDirection, TextStyle, ToolbarItem } from '../types/document';
 
 function readDragData(event: React.DragEvent): ReturnType<typeof decodeDragData> {
   const value = event.dataTransfer.getData(NODE_DRAG_MIME) || event.dataTransfer.getData('text/plain');
@@ -101,6 +101,13 @@ function NodeView({
     node.glassShape && node.glassShape !== 'automatic' ? `glass-shape-${node.glassShape}` : '',
   ].filter(Boolean).join(' ');
   const nodeStyle = previewNodeStyle(node);
+  const m3eClass = [
+    node.m3eMetadata ? 'has-m3e-metadata' : '',
+    node.m3eMetadata?.fill ? 'has-m3e-fill' : '',
+    node.m3eMetadata?.textColor ? 'has-m3e-text-color' : '',
+    node.m3eMetadata?.iconFill ? 'has-m3e-icon-fill' : '',
+    m3eCornerRadius(node.m3eMetadata) ? 'has-m3e-radius' : '',
+  ].filter(Boolean).join(' ');
 
   const select = (event: React.MouseEvent) => {
     if (previewMode) return;
@@ -217,7 +224,7 @@ function NodeView({
 
   return (
     <div
-      className={`canvas-node canvas-node-layout-${node.kind} ${glassClass} ${selected ? 'is-selected' : ''} ${dropTarget ? `is-drop-target is-drop-${dropTarget.position}` : ''}`}
+      className={`canvas-node canvas-node-layout-${node.kind} ${glassClass} ${m3eClass} ${selected ? 'is-selected' : ''} ${dropTarget ? `is-drop-target is-drop-${dropTarget.position}` : ''}`}
       draggable={!previewMode}
       onClick={previewMode ? undefined : select}
       onDragEnd={previewMode ? undefined : () => setDropTarget(null)}
@@ -247,7 +254,7 @@ function renderNodeContent(
     case 'text':
       if (node.m3eKind === 'badge') {
         return (
-          <div className={`m3e-badge ${node.text.trim() ? 'has-text' : 'is-dot'}`} aria-label={node.text.trim() ? `バッジ ${node.text}` : '通知バッジ'}>
+          <div className={`m3e-badge ${node.text.trim() ? 'has-text' : 'is-dot'}`} style={m3eContentStyle(node)} aria-label={node.text.trim() ? `バッジ ${node.text}` : '通知バッジ'}>
             {node.text.trim() || <span aria-hidden="true" />}
           </div>
         );
@@ -260,6 +267,7 @@ function renderNodeContent(
             fontWeight: { regular: 400, medium: 500, semibold: 600, bold: 700 }[node.weight],
             fontFamily: fontDesignFamily(node.fontDesign),
             textAlign: node.textAlignment === 'center' ? 'center' : node.textAlignment === 'trailing' ? 'right' : 'left',
+            ...(m3eTextColor(node.m3eMetadata?.textColor) ? { color: m3eTextColor(node.m3eMetadata?.textColor) } : {}),
             ...(node.lineLimit === undefined ? {} : {
               display: '-webkit-box',
               overflow: 'hidden',
@@ -273,13 +281,13 @@ function renderNodeContent(
       );
     case 'image':
       return (
-        <div className="ios-image" role="img" aria-label={node.accessibilityLabel || undefined} title={node.systemName || undefined}>
+        <div className="ios-image" style={m3eContentStyle(node)} role="img" aria-label={node.accessibilityLabel || undefined} title={node.systemName || undefined}>
           {node.source && node.source !== 'symbol' && node.systemName.trim() ? (
             <>
               <img className="ios-image-media" src={node.systemName} alt="" onError={(event) => { event.currentTarget.style.display = 'none'; }} />
-              <span className="ios-image-symbol" aria-hidden="true">{symbolGlyph('photo')}</span>
+              <span className="ios-image-symbol" style={m3eIconStyle(node)} aria-hidden="true">{symbolGlyph('photo')}</span>
             </>
-          ) : <span className="ios-image-symbol" aria-hidden="true">{symbolGlyph(node.systemName)}</span>}
+          ) : <span className="ios-image-symbol" style={m3eIconStyle(node)} aria-hidden="true">{symbolGlyph(node.systemName)}</span>}
         </div>
       );
     case 'camera':
@@ -287,19 +295,19 @@ function renderNodeContent(
         <button
           className="ios-row ios-camera"
           type="button"
-          style={{ minHeight: node.minHeight }}
+          style={{ minHeight: node.minHeight, ...m3eContentStyle(node) }}
           aria-label={node.label || 'カメラ'}
           onClick={controls ? (event) => event.stopPropagation() : undefined}
         >
-          <span className="ios-camera-symbol" aria-hidden="true">{symbolGlyph('camera.fill')}</span>
+          <span className="ios-camera-symbol" style={m3eIconStyle(node)} aria-hidden="true">{symbolGlyph('camera.fill')}</span>
           <span>{node.label || 'カメラ'}</span>
           <span className="ios-link-indicator" aria-hidden="true">›</span>
         </button>
       );
     case 'map':
       return (
-        <div className="ios-map" role="img" aria-label={node.label || '地図'}>
-          <span className="ios-map-symbol" aria-hidden="true">{symbolGlyph('map.fill')}</span>
+        <div className="ios-map" style={m3eContentStyle(node)} role="img" aria-label={node.label || '地図'}>
+          <span className="ios-map-symbol" style={m3eIconStyle(node)} aria-hidden="true">{symbolGlyph('map.fill')}</span>
           <strong>MapKit Map</strong>
           <span>{node.label || '地図'}</span>
         </div>
@@ -316,12 +324,13 @@ function renderNodeContent(
               <button
                 type="button"
                 className="ios-button ios-split-button-primary"
+                style={m3eContentStyle(node)}
                 onClick={onNavigate ? (event) => { event.stopPropagation(); onNavigate(); } : undefined}
               >
-                {systemName && <span className="ios-button-symbol" aria-hidden="true">{symbolGlyph(systemName)}</span>}
+                {systemName && <span className="ios-button-symbol" style={m3eIconStyle(node)} aria-hidden="true">{symbolGlyph(systemName)}</span>}
                 <span>{label || 'Button'}</span>
               </button>
-              <button type="button" className="ios-button ios-split-button-menu" aria-label={`${label || 'ボタン'}のメニュー`} onClick={(event) => event.stopPropagation()}>
+              <button type="button" className="ios-button ios-split-button-menu" style={m3eContentStyle(node)} aria-label={`${label || 'ボタン'}のメニュー`} onClick={(event) => event.stopPropagation()}>
                 <span aria-hidden="true">⌄</span>
               </button>
             </div>
@@ -331,7 +340,7 @@ function renderNodeContent(
           <button
             type="button"
             className={`ios-button ${node.role === 'destructive' ? 'destructive' : ''} ${!node.glass && buttonStyle && buttonStyle !== 'automatic' ? `button-style-${buttonStyle}` : ''} ${node.glass ? `ios-button-${node.glass}` : ''} ${node.glassInteractive ? 'glass-interactive' : ''} ${node.glassTint ? `glass-tint-${node.glassTint}` : ''} ${node.toggle ? `ios-button-toggle ${toggleOn ? 'is-on' : ''}` : ''} ${node.m3eKind ? `m3e-${node.m3eKind}` : ''}`}
-            style={{ minHeight: node.minHeight }}
+            style={{ minHeight: node.minHeight, ...m3eContentStyle(node) }}
             aria-label={node.accessibilityLabel || undefined}
             aria-pressed={node.toggle ? toggleOn : undefined}
             onClick={onNavigate || (node.toggle && controls) ? (event) => {
@@ -340,7 +349,7 @@ function renderNodeContent(
               onNavigate?.();
             } : undefined}
           >
-            {systemName && <span className="ios-button-symbol" aria-hidden="true">{symbolGlyph(systemName)}</span>}
+            {systemName && <span className="ios-button-symbol" style={m3eIconStyle(node)} aria-hidden="true">{symbolGlyph(systemName)}</span>}
             <span>{label || 'Button'}</span>
           </button>
         );
@@ -348,17 +357,18 @@ function renderNodeContent(
     case 'toggle':
       if (node.m3eKind === 'checkbox' || node.m3eKind === 'radio') {
         const checked = controls ? controls.value === true : node.isOn ?? false;
+        const showIndicator = node.m3eMetadata?.noCheck !== true;
         return (
-          <label className={`ios-choice-row m3e-${node.m3eKind}`} style={{ minHeight: 44 }}>
+          <label className={`ios-choice-row m3e-${node.m3eKind}`} style={{ minHeight: 44, ...m3eContentStyle(node) }}>
             {controls && <input className="ios-choice-input" type={node.m3eKind === 'radio' ? 'radio' : 'checkbox'} checked={checked} aria-label={node.label || '選択'} onChange={() => controls.onChange(!checked)} />}
-            <span className="ios-choice-indicator" aria-hidden="true">{checked && (node.m3eKind === 'checkbox' ? '✓' : <span />)}</span>
+            {showIndicator && <span className="ios-choice-indicator" aria-hidden="true">{checked && (node.m3eKind === 'checkbox' ? '✓' : <span />)}</span>}
             <span>{node.label || '選択'}</span>
           </label>
         );
       }
       if (controls) {
         return (
-          <label className="ios-row ios-toggle-row" style={{ minHeight: node.minHeight }}>
+          <label className="ios-row ios-toggle-row" style={{ minHeight: node.minHeight, ...m3eContentStyle(node) }}>
             <span>{node.label || 'Toggle'}</span>
             <input className="ios-switch-input" type="checkbox" checked={controls.value === true} onChange={(event) => controls.onChange(event.target.checked)} />
             <span className="ios-switch" aria-hidden="true"><span /></span>
@@ -366,7 +376,7 @@ function renderNodeContent(
         );
       }
       return (
-        <div className="ios-row" style={{ minHeight: node.minHeight }}>
+        <div className="ios-row" style={{ minHeight: node.minHeight, ...m3eContentStyle(node) }}>
           <span>{node.label || 'Toggle'}</span>
           <span className="ios-switch" aria-hidden="true"><span /></span>
         </div>
@@ -1030,7 +1040,7 @@ function ScreenPreview({
         >
           <div className="statusbar"><span>9:41</span><span className="status-icons" aria-hidden="true">5G  ▮▮</span></div>
           <div className="dynamic-island" aria-hidden="true" />
-          <div className={`navigation-header title-${titleDisplayMode}`}>
+          <div className={`navigation-header title-${titleDisplayMode} ${screen.m3eTopAppBar?.contained ? 'm3e-screen-contained' : ''}`} style={m3eScreenPartStyle(screen.m3eTopAppBar)}>
             {(canGoBack || leadingItems.length > 0) && (
               <div className="navigation-toolbar-slot leading">
                 {canGoBack && (
@@ -1070,7 +1080,7 @@ function ScreenPreview({
             <ConfirmationDialogPreview node={confirmationDialog} onClose={() => setOpenSheetId(null)} />
           )}
           {tabBarItems.length > 0 ? (
-            <nav className="ios-tab-bar" aria-label="タブバー">
+            <nav className={`ios-tab-bar ${screen.m3eBottomNav?.contained ? 'm3e-screen-contained' : ''}`} style={m3eScreenPartStyle(screen.m3eBottomNav)} aria-label="タブバー">
               {tabBarItems.map((item) => {
                 const destination = item.destinationScreenId;
                 const selected = previewMode
@@ -1098,7 +1108,7 @@ function ScreenPreview({
               })}
             </nav>
           ) : bottomItems.length > 0 && (
-            <div className="ios-bottom-toolbar" role="toolbar" aria-label="下部ツールバー">
+            <div className={`ios-bottom-toolbar ${screen.m3eBottomNav?.contained ? 'm3e-screen-contained' : ''}`} style={m3eScreenPartStyle(screen.m3eBottomNav)} role="toolbar" aria-label="下部ツールバー">
               {bottomItems.map((item) => <PreviewToolbarButton item={item} onNavigate={previewMode ? item.navigationAction === 'back' ? () => backPreview(item.navigationTransition) : item.destinationScreenId ? () => navigatePreview(item.destinationScreenId as string, item.navigationTransition) : undefined : undefined} key={item.id} />)}
             </div>
           )}
@@ -1584,14 +1594,20 @@ function previewNodeStyle(node: CanvasNode): CSSProperties | undefined {
   if (node.padding !== undefined) style.padding = node.padding;
   if (node.frameWidth === 'max') style.width = '100%';
   if (node.background && node.background !== 'none') {
-    style.background = {
-      secondary: 'rgba(120, 120, 128, .12)',
-      tertiary: 'rgba(120, 120, 128, .07)',
-      accent: 'rgba(10, 132, 255, .14)',
-      material: 'rgba(255, 255, 255, .34)',
-    }[node.background];
+    style.background = nodeBackgroundColor(node.background);
+  } else if (node.m3eMetadata?.fill) {
+    style.background = m3eFillColor(node.m3eMetadata.fill);
   }
   if (node.cornerRadius !== undefined) style.borderRadius = node.cornerRadius;
+  if (node.cornerRadius === undefined) {
+    const radius = m3eCornerRadius(node.m3eMetadata);
+    if (radius) style.borderRadius = radius;
+  }
+  if (node.m3eMetadata?.textColor) style.color = m3eTextColor(node.m3eMetadata.textColor);
+  if (node.m3eMetadata && (node.kind === 'button' || node.kind === 'image' || node.kind === 'groupbox')) {
+    if (node.m3eMetadata.size !== undefined) style.width = node.m3eMetadata.size;
+    if (node.m3eMetadata.size2 !== undefined) style.minHeight = node.m3eMetadata.size2;
+  }
   if (node.overlay || (node.shadow && node.shadow !== 'none')) {
     const shadow = node.shadow === 'medium'
       ? '0 8px 18px rgba(0, 0, 0, .16)'
@@ -1603,7 +1619,104 @@ function previewNodeStyle(node: CanvasNode): CSSProperties | undefined {
       shadow,
     ].filter(Boolean).join(', ') || undefined;
   }
-  return Object.keys(style).length > 0 ? style : undefined;
+  const customProperties: Record<string, string> = {};
+  const metadataStyle = m3eMetadataStyle(node.m3eMetadata);
+  if (metadataStyle.background) customProperties['--m3e-fill'] = String(metadataStyle.background);
+  if (metadataStyle.color) customProperties['--m3e-text-color'] = String(metadataStyle.color);
+  if (node.m3eMetadata?.iconFill) customProperties['--m3e-icon-fill'] = node.m3eMetadata.iconFill === 'none' ? 'transparent' : String(m3eFillColor(node.m3eMetadata.iconFill));
+  const radius = m3eCornerRadius(node.m3eMetadata);
+  if (radius) customProperties['--m3e-radius'] = radius;
+  return Object.keys(style).length > 0 || Object.keys(customProperties).length > 0
+    ? { ...style, ...customProperties } as CSSProperties
+    : undefined;
+}
+
+function nodeBackgroundColor(background: CanvasNode['background']): string | undefined {
+  switch (background) {
+    case 'secondary': return 'rgba(120, 120, 128, .12)';
+    case 'tertiary': return 'rgba(120, 120, 128, .07)';
+    case 'accent': return 'rgba(10, 132, 255, .14)';
+    case 'material': return 'rgba(255, 255, 255, .34)';
+    default: return undefined;
+  }
+}
+
+function m3eFillColor(fill: ScreenBackground | undefined): string | undefined {
+  switch (fill) {
+    case 'surface': return 'var(--screen-background)';
+    case 'surfaceContainerLow': return 'color-mix(in srgb, var(--screen-foreground) 6%, var(--screen-background))';
+    case 'surfaceContainer': return 'color-mix(in srgb, var(--screen-foreground) 12%, var(--screen-background))';
+    case 'surfaceContainerHigh': return 'color-mix(in srgb, var(--screen-foreground) 18%, var(--screen-background))';
+    case 'surfaceContainerHighest': return 'color-mix(in srgb, var(--screen-foreground) 24%, var(--screen-background))';
+    case 'primaryContainer': return 'color-mix(in srgb, var(--preview-accent) 18%, var(--screen-background))';
+    case 'secondaryContainer': return 'color-mix(in srgb, var(--preview-accent) 10%, var(--screen-background))';
+    case 'tertiaryContainer': return 'color-mix(in srgb, #ff9500 12%, var(--screen-background))';
+    case 'primary': return 'var(--preview-accent)';
+    case 'inverseSurface': return 'var(--screen-foreground)';
+    default: return undefined;
+  }
+}
+
+function m3eTextColor(color: M3eTextColor | undefined): string | undefined {
+  switch (color) {
+    case 'primary': return 'var(--preview-accent)';
+    case 'secondary': return 'color-mix(in srgb, var(--screen-foreground) 64%, var(--screen-background))';
+    case 'onSurface': return 'var(--screen-foreground)';
+    case 'onSurfaceVariant': return 'color-mix(in srgb, var(--screen-foreground) 72%, var(--screen-background))';
+    case 'onPrimaryContainer':
+    case 'onSecondaryContainer':
+    case 'onTertiaryContainer': return 'var(--screen-foreground)';
+    case 'inverseOnSurface': return 'var(--screen-background)';
+    default: return undefined;
+  }
+}
+
+function m3eCornerRadius(metadata: M3eItemMetadata | undefined): string | undefined {
+  if (metadata?.corners) {
+    const { tl, tr, br, bl } = metadata.corners;
+    return `${tl}px ${tr}px ${br}px ${bl}px`;
+  }
+  if (metadata?.radiusTop !== undefined || metadata?.radiusBottom !== undefined) {
+    const top = metadata.radiusTop ?? 0;
+    const bottom = metadata.radiusBottom ?? 0;
+    return `${top}px ${top}px ${bottom}px ${bottom}px`;
+  }
+  return undefined;
+}
+
+function m3eMetadataStyle(metadata: M3eItemMetadata | undefined): CSSProperties {
+  return {
+    ...(metadata?.fill ? { background: m3eFillColor(metadata.fill) } : {}),
+    ...(metadata?.textColor ? { color: m3eTextColor(metadata.textColor) } : {}),
+    ...(m3eCornerRadius(metadata) ? { borderRadius: m3eCornerRadius(metadata) } : {}),
+  };
+}
+
+function m3eContentStyle(node: CanvasNode): CSSProperties {
+  const style: CSSProperties = {
+    ...m3eMetadataStyle(node.m3eMetadata),
+    ...(node.background && node.background !== 'none' ? { background: nodeBackgroundColor(node.background) } : {}),
+  };
+  if (node.m3eMetadata?.size !== undefined && (node.kind === 'button' || node.kind === 'image')) style.width = node.m3eMetadata.size;
+  if (node.m3eMetadata?.size2 !== undefined && (node.kind === 'button' || node.kind === 'image')) style.minHeight = node.m3eMetadata.size2;
+  return style;
+}
+
+function m3eIconStyle(node: CanvasNode): CSSProperties | undefined {
+  const metadata = node.m3eMetadata;
+  if (!metadata?.iconFill && !metadata?.textColor) return undefined;
+  return {
+    ...(metadata.iconFill ? { background: metadata.iconFill === 'none' ? 'transparent' : m3eFillColor(metadata.iconFill), padding: metadata.iconFill === 'none' ? 0 : 4, borderRadius: 8 } : {}),
+    ...(metadata.textColor ? { color: m3eTextColor(metadata.textColor) } : {}),
+  };
+}
+
+function m3eScreenPartStyle(metadata: M3eItemMetadata | undefined): CSSProperties | undefined {
+  if (!metadata) return undefined;
+  return {
+    ...m3eMetadataStyle(metadata),
+    ...(metadata.size !== undefined ? { minHeight: metadata.size } : {}),
+  };
 }
 
 function containerAlignmentStyle(node: CanvasNode): CSSProperties {

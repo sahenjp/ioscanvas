@@ -256,6 +256,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .ios-tab-bar-item { min-width: 44px; min-height: 44px; flex: 1; display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; border: 0; border-radius: 7px; background: transparent; color: #6d6d72; font: inherit; font-size: 10px; cursor: pointer; }
 .ios-tab-bar-item.is-selected { color: var(--preview-accent); font-weight: 650; }
 .ios-tab-bar-item:hover { background: rgba(120, 120, 128, .1); }
+.m3e-screen-contained { margin-inline: 8px; border: 1px solid rgba(120, 120, 128, .22); border-radius: 14px; }
 .ios-tab-bar-symbol { min-height: 20px; color: currentColor; font-size: 18px; line-height: 1; }
 .home-indicator { position: absolute; bottom: 8px; left: 50%; width: 139px; height: 5px; transform: translateX(-50%); border-radius: 4px; background: #111; }
 .phone-screen.scheme-dark .home-indicator { background: #f5f5f7; }
@@ -269,6 +270,10 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .canvas-node:hover { outline-color: rgba(10, 132, 255, .35); }
 .canvas-node.is-selected { outline: 2px solid var(--blue); }
 .canvas-node.is-drop-target { outline: 2px dashed var(--blue); background: rgba(10, 132, 255, .08); }
+.canvas-node.has-m3e-fill > .ios-button, .canvas-node.has-m3e-fill > .ios-row, .canvas-node.has-m3e-fill > .ios-field, .canvas-node.has-m3e-fill > .ios-text-editor, .canvas-node.has-m3e-fill > .ios-map, .canvas-node.has-m3e-fill > .ios-label { background: var(--m3e-fill); }
+.canvas-node.has-m3e-text-color > .canvas-text, .canvas-node.has-m3e-text-color > .ios-button, .canvas-node.has-m3e-text-color > .ios-row, .canvas-node.has-m3e-text-color > .ios-field, .canvas-node.has-m3e-text-color > .ios-text-editor, .canvas-node.has-m3e-text-color > .ios-map, .canvas-node.has-m3e-text-color > .ios-label { color: var(--m3e-text-color); }
+.canvas-node.has-m3e-icon-fill .ios-button-symbol, .canvas-node.has-m3e-icon-fill .ios-image-symbol, .canvas-node.has-m3e-icon-fill .ios-camera-symbol, .canvas-node.has-m3e-icon-fill .ios-map-symbol { box-sizing: border-box; border-radius: 8px; background: var(--m3e-icon-fill); padding: 4px; }
+.canvas-node.has-m3e-radius > .ios-button, .canvas-node.has-m3e-radius > .ios-row, .canvas-node.has-m3e-radius > .ios-field, .canvas-node.has-m3e-radius > .ios-text-editor, .canvas-node.has-m3e-radius > .ios-map, .canvas-node.has-m3e-radius > .ios-label { border-radius: var(--m3e-radius); }
 .canvas-node.is-drop-before::before, .canvas-node.is-drop-after::after { position: absolute; z-index: 4; border-radius: 2px; background: var(--blue); content: ''; pointer-events: none; }
 .canvas-node.is-drop-before::before { top: -4px; right: 0; left: 0; height: 3px; }
 .canvas-node.is-drop-after::after { right: 0; bottom: -4px; left: 0; height: 3px; }
@@ -604,6 +609,11 @@ button.ios-navigation-link:hover { background: #f5f5f7; }
 .inspector-help { margin: 0 0 12px; color: var(--muted); font-size: 11px; line-height: 1.5; }
 .multi-selection-controls { margin: 15px 0 12px; padding-top: 12px; border-top: 1px solid var(--line); }
 .inspector-kind { display: inline-flex; align-items: center; min-height: 28px; margin-bottom: 10px; padding: 0 9px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--panel-raised); color: var(--text-soft); font: 11px ui-monospace, SFMono-Regular, Menlo, monospace; }
+.inspector-subsection { margin: 12px -14px 0; padding: 12px 14px 2px; border-top: 1px solid var(--line); }
+.m3e-metadata-editor { margin-top: 8px; }
+.m3e-editor-label { margin: 0 0 2px; color: var(--text-soft); font-size: 11px; font-weight: 650; }
+.corner-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
+.corner-grid input { min-width: 0; padding-inline: 4px; text-align: center; }
 .field { display: grid; grid-template-columns: 106px minmax(0, 1fr); align-items: center; gap: 8px; min-height: 42px; color: var(--muted); font-size: 12px; }
 .field input, .field select, .field textarea { width: 100%; min-width: 0; height: 34px; padding: 0 9px; border: 1px solid var(--line-strong); border-radius: 6px; outline: none; background: var(--input); color: var(--text-soft); font-size: 13px; }
 .field textarea { min-height: 68px; padding-block: 8px; resize: vertical; line-height: 1.4; }

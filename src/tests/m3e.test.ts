@@ -800,4 +800,30 @@ describe('M3E compatibility importer', () => {
     expect(exportReport.lostFields).toEqual([]);
     expect(exportReport.preservedFields).toEqual(expect.arrayContaining(['corners', 'fill', 'noCheck', 'size', 'toggle']));
   });
+
+  it('maps slider value and range into SwiftUI semantics before exporting', () => {
+    const document = convertM3eDocument({
+      frames: [{ id: 'home', name: 'ホーム', x: 0, y: 0 }],
+      groups: [{
+        id: 'controls',
+        x: 0,
+        y: 0,
+        axis: 'y',
+        items: [{ id: 'range', kind: 'slider', label: '温度', value: 25, minimum: 10, maximum: 30, step: 5, variant: 'filled' }],
+      }],
+    });
+
+    expect(document).not.toBeNull();
+    if (!document) throw new Error('Slider document was not converted');
+    expect(findNode(document.screens[0]?.root.children ?? [], 'm3e-range')).toMatchObject({
+      kind: 'slider',
+      value: 15,
+      minimum: 10,
+      maximum: 30,
+      step: 5,
+    });
+
+    const slider = exportM3eDocument(document).groups.flatMap((group) => group.items).find((item) => item.id === 'm3e-range');
+    expect(slider).toMatchObject({ value: 25, minimum: 10, maximum: 30, step: 5 });
+  });
 });
