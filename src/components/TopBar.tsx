@@ -72,6 +72,7 @@ export function TopBar() {
           report.invalidFrameCount > 0 ? `無効な画面${report.invalidFrameCount}件` : '',
           report.invalidGroupCount > 0 ? `無効なグループ${report.invalidGroupCount}件` : '',
           report.orphanedGroupCount > 0 ? `画面外グループ${report.orphanedGroupCount}件` : '',
+          report.flattenedLayoutCount > 0 ? `自由配置・ロック情報を${report.flattenedLayoutCount}件平坦化` : '',
           report.discardedItemCount > 0 ? `破棄した項目${report.discardedItemCount}件` : '',
           report.unresolvedDestinationCount > 0 ? `未解決の遷移${report.unresolvedDestinationCount}件` : '',
           report.unresolvedActionCount > 0 ? `未解決の操作${report.unresolvedActionCount}件` : '',

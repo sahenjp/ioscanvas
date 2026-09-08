@@ -4,7 +4,7 @@ import { convertM3eDocument, exportM3eDocument, generateM3eJson, inspectM3eCompa
 import { defaultDocument } from '../lib/defaultDocument';
 import { parseCanvasDocument } from '../lib/document';
 import { generateSwiftUI } from '../lib/swiftui';
-import type { CanvasDocument } from '../types/document';
+import type { CanvasDocument, CanvasNode } from '../types/document';
 
 const m3eDocument = {
   title: 'レシピ',
@@ -321,7 +321,7 @@ describe('M3E compatibility importer', () => {
     expect(document).not.toBeNull();
     if (!document) throw new Error('Icon button fixture was not converted');
     expect(exportM3eDocument(document).groups.flatMap((group) => group.items)).toEqual(expect.arrayContaining([
-      expect.objectContaining({ kind: 'iconButton', label: '', icon: 'heart.fill' }),
+      expect.objectContaining({ kind: 'iconButton', label: '', icon: 'favorite' }),
     ]));
   });
 
@@ -365,13 +365,13 @@ describe('M3E compatibility importer', () => {
 
     const exported = exportM3eDocument(document).groups.flatMap((group) => group.items);
     expect(exported).toEqual(expect.arrayContaining([
-      expect.objectContaining({ kind: 'extendedFab', label: '作成', icon: 'plus' }),
+      expect.objectContaining({ kind: 'extendedFab', label: '作成', icon: 'add' }),
       expect.objectContaining({ kind: 'chip', label: 'お気に入り', checked: true }),
-      expect.objectContaining({ kind: 'splitButton', label: '送信', icon: 'paperplane.fill' }),
+      expect.objectContaining({ kind: 'splitButton', label: '送信', icon: 'send' }),
       expect.objectContaining({ kind: 'checkbox', label: '同意する', checked: true }),
       expect.objectContaining({ kind: 'radio', label: '選択肢', checked: false }),
       expect.objectContaining({ kind: 'badge', label: '' }),
-      expect.objectContaining({ kind: 'fabMenu', icon: 'plus', tabs: [{ label: '写真', icon: 'photo' }, { label: '書類', icon: 'doc.fill' }] }),
+      expect.objectContaining({ kind: 'fabMenu', icon: 'add', tabs: [{ label: '写真', icon: 'photo' }, { label: '書類', icon: 'doc.fill' }] }),
     ]));
 
     const swiftui = generateSwiftUI(document);
@@ -410,7 +410,7 @@ describe('M3E compatibility importer', () => {
     const exported = exportM3eDocument(document).groups.flatMap((group) => group.items);
     expect(exported).toEqual(expect.arrayContaining([
       expect.objectContaining({ kind: 'searchBar', label: '検索' }),
-      expect.objectContaining({ kind: 'listItem', label: '設定', supporting: '詳細', icon: 'gearshape.fill', icon2: 'chevron.right' }),
+      expect.objectContaining({ kind: 'listItem', label: '設定', supporting: '詳細', icon: 'settings', icon2: 'chevron_right' }),
       expect.objectContaining({ kind: 'box', label: 'ボックス' }),
       expect.objectContaining({ kind: 'card', label: 'カード', supporting: '補足' }),
       expect.objectContaining({ kind: 'snackbar', label: '保存しました', supporting: '元に戻す' }),
@@ -454,9 +454,10 @@ describe('M3E compatibility importer', () => {
       unresolvedActionCount: 2,
       unsupportedKinds: ['unknownPart'],
       approximatedKinds: ['fab'],
-      preservedFields: ['action'],
+      preservedFields: ['action', 'icon'],
       approximatedFields: [],
       lostFields: [],
+      flattenedLayoutCount: 0,
     });
   });
 
@@ -468,6 +469,30 @@ describe('M3E compatibility importer', () => {
 
     expect(inspectM3eCompatibility(value)).toMatchObject({ orphanedGroupCount: 1 });
     expect(convertM3eDocument(value)?.screens[0]?.root.children).toEqual([]);
+  });
+
+  it('reports and explains M3E free-placement metadata without adding coordinates to the tree', () => {
+    const source = {
+      frames: [{ id: 'home', name: 'ホーム', x: 0, y: 0 }],
+      groups: [{
+        id: 'free-group',
+        x: 0,
+        y: 0,
+        axis: 'y',
+        free: true,
+        locked: true,
+        pos: { x: 12, y: 24 },
+        items: [{ id: 'free-text', kind: 'text', label: '自由配置', pos: { x: 4, y: 8 }, locked: true }],
+      }],
+    };
+
+    expect(inspectM3eCompatibility(source)).toMatchObject({ flattenedLayoutCount: 5 });
+    const document = convertM3eDocument(source);
+    expect(document?.screens[0]?.root.children[0]).toMatchObject({
+      kind: 'text',
+      notes: expect.stringContaining('自由配置・座標指定・ロック'),
+    });
+    expect(JSON.stringify(document)).not.toContain('"pos"');
   });
 
   it('keeps a toggle button valid when its M3E action also names a destination', () => {
@@ -594,7 +619,7 @@ describe('M3E compatibility importer', () => {
     const exportedItems = exportM3eDocument(document).groups.flatMap((group) => group.items);
     expect(exportedItems).toEqual(expect.arrayContaining([
       expect.objectContaining({ kind: 'box', label: 'メニュー', checked: true }),
-      expect.objectContaining({ kind: 'card', label: 'おすすめ', icon: 'star.fill', supporting: '説明', imagePos: 'leading', imageSize: 96, contentAlign: 'center' }),
+      expect.objectContaining({ kind: 'card', label: 'おすすめ', icon: 'star', supporting: '説明', imagePos: 'leading', imageSize: 96, contentAlign: 'center' }),
     ]));
   });
 
@@ -825,5 +850,53 @@ describe('M3E compatibility importer', () => {
 
     const slider = exportM3eDocument(document).groups.flatMap((group) => group.items).find((item) => item.id === 'm3e-range');
     expect(slider).toMatchObject({ value: 25, minimum: 10, maximum: 30, step: 5 });
+  });
+
+  it('retains original M3E icon names and source fields after semantic editing', () => {
+    const source = {
+      title: '原典保持',
+      frames: [{ id: 'home', name: 'ホーム', x: 0, y: 0 }],
+      groups: [{
+        id: 'content',
+        x: 0,
+        y: 0,
+        axis: 'y',
+        items: [
+          { id: 'action', kind: 'button', label: 'ホーム', icon: 'home', icon2: 'settings', variant: 'filled', note: '元の操作', bold: false },
+          { id: 'range', kind: 'slider', label: '温度', icon: null, value: 25, minimum: 10, maximum: 30, step: 5, variant: 'filled' },
+        ],
+      }],
+    };
+
+    const document = convertM3eDocument(source);
+    expect(document).not.toBeNull();
+    if (!document) throw new Error('Raw M3E fixture was not converted');
+
+    const action = findNode(document.screens[0]?.root.children ?? [], 'm3e-action');
+    const slider = findNode(document.screens[0]?.root.children ?? [], 'm3e-range');
+    expect(action?.m3eMetadata).toMatchObject({ icon: 'home', icon2: 'settings', note: '元の操作', bold: false });
+    expect(slider?.m3eMetadata).toMatchObject({ icon: null, value: 25 });
+
+    const items = exportM3eDocument(document).groups.flatMap((group) => group.items);
+    expect(items).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'm3e-action', icon: 'home', icon2: 'settings', note: '元の操作', bold: false }),
+      expect.objectContaining({ id: 'm3e-range', icon: null, value: 25 }),
+    ]));
+
+    if (!action || action.kind !== 'button') throw new Error('Raw button fixture is missing');
+    const editNode = (node: CanvasNode): CanvasNode => node.id === action.id
+      ? { ...action, systemName: 'star.fill' }
+      : Array.isArray(node.children) ? { ...node, children: node.children.map(editNode) } : node;
+    const edited: CanvasDocument = {
+      ...document,
+      screens: document.screens.map((screen) => screen.id !== document.activeScreenId
+        ? screen
+        : { ...screen, root: { ...screen.root, children: screen.root.children.map(editNode) } }),
+    };
+    expect(exportM3eDocument(edited).groups.flatMap((group) => group.items)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'm3e-action', icon: 'star.fill' }),
+    ]));
+    expect(inspectM3eCompatibility(source)?.lostFields).toEqual([]);
+    expect(inspectM3eExportCompatibility(document).lostFields).toEqual([]);
   });
 });

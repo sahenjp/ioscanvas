@@ -76,19 +76,22 @@ function readM3eMetadata(value: unknown): M3eItemMetadata | null | undefined {
   if (!isRecord(value)) return null;
 
   const metadata: M3eItemMetadata = {};
-  const copyNumber = (key: 'size' | 'size2' | 'minimum' | 'maximum' | 'step' | 'radiusTop' | 'radiusBottom' | 'imageSize'): boolean => {
+  const copyNumber = (key: 'size' | 'size2' | 'minimum' | 'maximum' | 'step' | 'value' | 'radiusTop' | 'radiusBottom' | 'imageSize'): boolean => {
     if (value[key] === undefined) return true;
     if (!isNonNegativeNumber(value[key])) return false;
     metadata[key] = value[key];
     return true;
   };
-  for (const key of ['size', 'size2', 'minimum', 'maximum', 'step', 'radiusTop', 'radiusBottom', 'imageSize'] as const) {
+  for (const key of ['size', 'size2', 'minimum', 'maximum', 'step', 'value', 'radiusTop', 'radiusBottom', 'imageSize'] as const) {
     if (!copyNumber(key)) return null;
   }
 
   if (value.supporting !== undefined && !isString(value.supporting)) return null;
+  if (value.icon !== undefined && value.icon !== null && !isString(value.icon)) return null;
   if (value.icon2 !== undefined && value.icon2 !== null && !isString(value.icon2)) return null;
   if (value.src !== undefined && !isString(value.src)) return null;
+  if (value.bold !== undefined && typeof value.bold !== 'boolean') return null;
+  if (value.note !== undefined && !isString(value.note)) return null;
   if (value.noteHistory !== undefined && (!Array.isArray(value.noteHistory) || value.noteHistory.some((entry) => !isString(entry)))) return null;
   if (value.selected !== undefined && (!isNumber(value.selected) || !Number.isInteger(value.selected) || value.selected < 0)) return null;
   if (value.checked !== undefined && typeof value.checked !== 'boolean') return null;
@@ -157,7 +160,10 @@ function readM3eMetadata(value: unknown): M3eItemMetadata | null | undefined {
 
   Object.assign(metadata, {
     ...(value.supporting === undefined ? {} : { supporting: value.supporting }),
+    ...(value.icon === undefined ? {} : { icon: value.icon as string | null }),
     ...(value.icon2 === undefined ? {} : { icon2: value.icon2 }),
+    ...(value.bold === undefined ? {} : { bold: value.bold }),
+    ...(value.note === undefined ? {} : { note: value.note }),
     ...(value.selected === undefined ? {} : { selected: value.selected }),
     ...(value.checked === undefined ? {} : { checked: value.checked }),
     ...(value.switch === undefined ? {} : { switch: value.switch }),
@@ -258,6 +264,7 @@ function readToolbarItems(value: unknown, ids: Set<string>): ToolbarItem[] | nul
     if (!isRecord(item) || !isString(item.id) || !isString(item.title) || !isOneOf(item.placement, ['topBarLeading', 'topBarTrailing', 'bottomBar'])) return null;
     if (ids.has(item.id)) return null;
     if (item.systemName !== undefined && !isString(item.systemName)) return null;
+    if (item.m3eIcon !== undefined && item.m3eIcon !== null && !isString(item.m3eIcon)) return null;
     if (item.role !== undefined && !isOneOf(item.role, ['normal', 'destructive', 'cancel'])) return null;
     if (item.selected !== undefined && typeof item.selected !== 'boolean') return null;
     if (item.destinationScreenId !== undefined && !isString(item.destinationScreenId)) return null;
@@ -270,6 +277,7 @@ function readToolbarItems(value: unknown, ids: Set<string>): ToolbarItem[] | nul
       title: item.title,
       placement: item.placement as ToolbarPlacement,
       ...(item.systemName === undefined ? {} : { systemName: item.systemName }),
+      ...(item.m3eIcon === undefined ? {} : { m3eIcon: item.m3eIcon as string | null }),
       ...(item.role === undefined ? {} : { role: item.role }),
       ...(item.selected === undefined ? {} : { selected: item.selected }),
       ...(item.destinationScreenId === undefined ? {} : { destinationScreenId: item.destinationScreenId }),

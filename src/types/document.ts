@@ -136,12 +136,16 @@ export interface M3eCorners {
 /** M3E fields that do not all have a direct SwiftUI equivalent. */
 export interface M3eItemMetadata {
   supporting?: string;
+  icon?: string | null;
   icon2?: string | null;
   size?: number;
   size2?: number;
   minimum?: number;
   maximum?: number;
   step?: number;
+  value?: number;
+  bold?: boolean;
+  note?: string;
   radiusTop?: number;
   radiusBottom?: number;
   corners?: M3eCorners;
@@ -414,6 +418,7 @@ export interface ToolbarItem {
   id: string;
   title: string;
   systemName?: string;
+  m3eIcon?: string | null;
   placement: ToolbarPlacement;
   role?: ButtonRole;
   selected?: boolean;
