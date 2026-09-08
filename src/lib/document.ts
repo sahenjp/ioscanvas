@@ -1,5 +1,5 @@
 import { isContainerNode } from './nodes';
-import type { AccentColor, AppearanceAccentColor, BackgroundStyle, ButtonStyle, ButtonToggle, CanvasDocument, CanvasNode, CanvasScreen, CardContentAlignment, CardImagePosition, ColorScheme, ContentPlacement, FontDesign, FrameWidth, GlassShape, GlassStyle, ImageSource, NavigationTitleDisplayMode, NavigationTransition, NodeKind, ProgressStyle, ScreenBackground, ScreenDevice, ScreenOrientation, ShadowStyle, StackAlignment, SwipeDirection, TextAlignment, TextStyle, ToolbarItem, ToolbarPlacement } from '../types/document';
+import type { AccentColor, AppearanceAccentColor, BackgroundStyle, ButtonStyle, ButtonToggle, CanvasDocument, CanvasNode, CanvasScreen, CardContentAlignment, CardImagePosition, ColorScheme, ContentPlacement, FontDesign, FrameWidth, GlassShape, GlassStyle, ImageSource, M3ePresentationKind, M3eVariant, NavigationTitleDisplayMode, NavigationTransition, NodeKind, ProgressStyle, ScreenBackground, ScreenDevice, ScreenOrientation, ShadowStyle, StackAlignment, SwipeDirection, TextAlignment, TextStyle, ToolbarItem, ToolbarPlacement } from '../types/document';
 
 type RecordValue = Record<string, unknown>;
 
@@ -50,6 +50,16 @@ function readNavigationTransition(value: unknown): NavigationTransition | null |
   return isOneOf(value, ['slide', 'slideLeft', 'slideUp', 'slideDown', 'fade', 'expand', 'none']) ? value : null;
 }
 
+function readM3eKind(value: unknown): M3ePresentationKind | null | undefined {
+  if (value === undefined) return undefined;
+  return isOneOf(value, ['fab', 'extendedFab', 'chip', 'splitButton', 'checkbox', 'radio', 'badge', 'fabMenu', 'toolbar']) ? value : null;
+}
+
+function readM3eVariant(value: unknown): M3eVariant | null | undefined {
+  if (value === undefined) return undefined;
+  return isOneOf(value, ['filled', 'tonal', 'elevated', 'outlined', 'text']) ? value : null;
+}
+
 function readNodeProperties(value: RecordValue): {
   tabTitle?: string;
   tabSystemName?: string;
@@ -66,6 +76,9 @@ function readNodeProperties(value: RecordValue): {
   shadow?: ShadowStyle;
   navigationAction?: 'back';
   navigationTransition?: NavigationTransition;
+  m3eKind?: M3ePresentationKind;
+  m3eVariant?: M3eVariant;
+  m3eIcon?: string;
 } | null {
   const glass = readGlass(value.glass);
   if (glass === null) return null;
@@ -84,6 +97,11 @@ function readNodeProperties(value: RecordValue): {
   if (value.navigationAction !== undefined && value.navigationAction !== 'back') return null;
   const navigationTransition = readNavigationTransition(value.navigationTransition);
   if (navigationTransition === null) return null;
+  const m3eKind = readM3eKind(value.m3eKind);
+  if (m3eKind === null) return null;
+  const m3eVariant = readM3eVariant(value.m3eVariant);
+  if (m3eVariant === null) return null;
+  if (value.m3eIcon !== undefined && !isString(value.m3eIcon)) return null;
 
   return {
     ...(value.tabTitle === undefined ? {} : { tabTitle: value.tabTitle }),
@@ -101,6 +119,9 @@ function readNodeProperties(value: RecordValue): {
     ...(value.shadow === undefined ? {} : { shadow: value.shadow as ShadowStyle }),
     ...(value.navigationAction === undefined ? {} : { navigationAction: 'back' as const }),
     ...(navigationTransition === undefined ? {} : { navigationTransition }),
+    ...(m3eKind === undefined ? {} : { m3eKind }),
+    ...(m3eVariant === undefined ? {} : { m3eVariant }),
+    ...(value.m3eIcon === undefined ? {} : { m3eIcon: value.m3eIcon }),
   };
 }
 

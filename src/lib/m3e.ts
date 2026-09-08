@@ -19,6 +19,7 @@ import type {
   TextStyle,
   ToolbarItem,
   NodeKind,
+  M3eVariant,
 } from '../types/document';
 
 type JsonObject = Record<string, unknown>;
@@ -45,8 +46,6 @@ interface M3eGroup {
   axis: 'x' | 'y';
   items: JsonObject[];
 }
-
-type M3eVariant = 'filled' | 'tonal' | 'elevated' | 'outlined' | 'text';
 
 interface M3eExportTab {
   label: string;
@@ -593,6 +592,9 @@ function mapItem(item: JsonObject, context: ConversionContext): CanvasNode | nul
   const icon = iconOf(item);
   const style = buttonStyle(item.variant);
   const imageSource: ImageSource = typeof stringValue(item, 'src') === 'string' && /^https?:\/\//i.test(stringValue(item, 'src') ?? '') ? 'remote' : 'symbol';
+  const presentationKind = isOneOf(item.kind, ['fab', 'extendedFab', 'chip', 'splitButton'] as const)
+    ? item.kind
+    : undefined;
 
   switch (item.kind) {
     case 'button':
@@ -612,6 +614,7 @@ function mapItem(item: JsonObject, context: ConversionContext): CanvasNode | nul
           : {}),
         ...(icon ? { systemName: icon } : {}),
         ...(style ? { buttonStyle: style } : {}),
+        ...(presentationKind ? { m3eKind: presentationKind, m3eVariant: item.variant as M3eVariant } : {}),
       };
       const toggle = recordValue(item, 'toggle');
       if (toggle || booleanValue(item, 'checked') !== undefined) {
@@ -641,7 +644,8 @@ function mapItem(item: JsonObject, context: ConversionContext): CanvasNode | nul
     case 'checkbox':
     case 'radio': {
       const checked = booleanValue(item, 'checked');
-      return appendNotes({ id, kind: 'toggle', label: label || '設定', binding: `is_${sourceId}`, ...(checked === undefined ? {} : { isOn: checked }), minHeight: 44 }, item);
+      const controlKind = item.kind === 'checkbox' || item.kind === 'radio' ? item.kind : undefined;
+      return appendNotes({ id, kind: 'toggle', label: label || '設定', binding: `is_${sourceId}`, ...(checked === undefined ? {} : { isOn: checked }), minHeight: 44, ...(controlKind ? { m3eKind: controlKind } : {}) }, item);
     }
     case 'slider': {
       const value = Math.max(0, Math.min(100, numberValue(item, 'value') ?? 50));
@@ -688,7 +692,7 @@ function mapItem(item: JsonObject, context: ConversionContext): CanvasNode | nul
       }, item, extras);
     }
     case 'badge':
-      return appendNotes({ id, kind: 'text', text: label || 'バッジ', fontSize: 13, weight: 'semibold', textStyle: 'caption' }, item);
+      return appendNotes({ id, kind: 'text', text: label, fontSize: 13, weight: 'semibold', textStyle: 'caption', m3eKind: 'badge' }, item);
     case 'box':
       return appendNotes({
         id,
@@ -799,7 +803,17 @@ function mapItem(item: JsonObject, context: ConversionContext): CanvasNode | nul
           ...(action ? { action } : {}),
         }, context);
       }).filter((node): node is CanvasNode => node !== null);
-      return appendNotes({ id, kind: 'hstack', spacing: 8, alignment: 'center', children }, item);
+      return appendNotes({
+        id,
+        kind: item.kind === 'fabMenu' ? 'vstack' : 'hstack',
+        label,
+        spacing: 8,
+        alignment: item.kind === 'fabMenu' ? 'trailing' : 'center',
+        children,
+        m3eKind: item.kind,
+        m3eVariant: item.variant as M3eVariant,
+        ...(item.kind === 'fabMenu' ? { m3eIcon: icon ?? 'plus' } : {}),
+      }, item);
     }
     case 'navRail': {
       const links = tabEntries(item).map((tab, index) => {
@@ -1120,6 +1134,7 @@ export function convertM3eDocument(value: unknown): CanvasDocument | null {
 }
 
 function exportVariant(node: CanvasNode): M3eVariant {
+  if (node.m3eVariant) return node.m3eVariant;
   if (node.kind !== 'button') return node.glass === 'prominent' ? 'filled' : node.glass ? 'elevated' : 'filled';
   switch (node.buttonStyle) {
     case 'plain': return 'text';
@@ -1199,12 +1214,16 @@ function exportItem(node: CanvasNode, frameIds: Map<string, string>, inheritedNo
 
   switch (node.kind) {
     case 'text':
-      return base('text', node.text, null, { size: node.fontSize, ...(node.weight === 'bold' || node.weight === 'semibold' ? { bold: true } : {}) });
-    case 'button':
-      return base(node.label.trim() ? 'button' : node.systemName ? 'iconButton' : 'button', node.label, node.systemName ?? null, {
+      return base(node.m3eKind === 'badge' ? 'badge' : 'text', node.text, null, { size: node.fontSize, ...(node.weight === 'bold' || node.weight === 'semibold' ? { bold: true } : {}) });
+    case 'button': {
+      const buttonKind = node.m3eKind === 'fab' || node.m3eKind === 'extendedFab' || node.m3eKind === 'chip' || node.m3eKind === 'splitButton'
+        ? node.m3eKind
+        : node.label.trim() ? 'button' : node.systemName ? 'iconButton' : 'button';
+      return base(buttonKind, node.label, node.systemName ?? null, {
         ...(node.toggle ? { checked: node.toggle.isOn } : {}),
         action: exportAction(node, frameIds),
       });
+    }
     case 'navigation-link': {
       const presentation = exportListItemPresentation(node);
       return base('listItem', node.label, presentation.icon, {
@@ -1214,7 +1233,7 @@ function exportItem(node: CanvasNode, frameIds: Map<string, string>, inheritedNo
       });
     }
     case 'toggle':
-      return base('switch', node.label, null, { checked: node.isOn ?? false });
+      return base(node.m3eKind === 'checkbox' || node.m3eKind === 'radio' ? node.m3eKind : 'switch', node.label, null, { checked: node.isOn ?? false });
     case 'textfield':
       return base('textField', node.label, null);
     case 'searchfield':
@@ -1349,6 +1368,24 @@ function exportCardPresentation(node: ContainerNode): Pick<M3eExportItem, 'icon'
   };
 }
 
+function exportFabMenuNode(node: ContainerNode, frameIds: Map<string, string>, inheritedNote: string): M3eExportItem {
+  const buttons = node.children.filter((child): child is Extract<CanvasNode, { kind: 'button' }> => child.kind === 'button');
+  const actions = Object.fromEntries(buttons.flatMap((button, index) => {
+    const action = exportAction(button, frameIds);
+    return action ? [[`tab:${index}`, action]] : [];
+  }));
+  return {
+    id: node.id,
+    kind: 'fabMenu',
+    label: node.label ?? 'FABメニュー',
+    icon: node.m3eIcon ?? null,
+    variant: exportVariant(node),
+    tabs: buttons.map((button) => exportTabItem(button)),
+    ...(Object.keys(actions).length > 0 ? { actions } : {}),
+    ...(exportNote(node, inheritedNote) ? { note: exportNote(node, inheritedNote) } : {}),
+  };
+}
+
 function exportToolbarNode(node: ContainerNode, frameIds: Map<string, string>, inheritedNote: string): M3eExportItem | null {
   if (node.kind !== 'hstack' || node.children.length === 0 || node.children.some((child) => child.kind !== 'button')) return null;
   const buttons = node.children.filter((child): child is Extract<CanvasNode, { kind: 'button' }> => child.kind === 'button');
@@ -1390,6 +1427,7 @@ function isExportContainer(node: CanvasNode): node is ContainerNode {
 }
 
 function exportContainerItems(node: ContainerNode, frameIds: Map<string, string>, inheritedNote = ''): M3eExportItem[] {
+  if (node.m3eKind === 'fabMenu') return [exportFabMenuNode(node, frameIds, inheritedNote)];
   if (node.kind === 'tabview') return [exportTabsNode(node, frameIds, inheritedNote)];
   if (node.kind === 'navigation-split-view') {
     const detail = node.children[1];
@@ -1575,6 +1613,7 @@ function collectExportCompatibilityKinds(
 ): void {
   if (flattenedOnlyNodeKinds.has(node.kind)) unsupportedNodeKinds.add(node.kind);
   if (approximatedNodeKinds.has(node.kind)) approximatedKinds.add(node.kind);
+  if (node.m3eKind && approximatedM3eKinds.has(node.m3eKind)) approximatedKinds.add(node.m3eKind);
   if (Array.isArray(node.children)) {
     for (const child of node.children) collectExportCompatibilityKinds(child, unsupportedNodeKinds, approximatedKinds);
   }

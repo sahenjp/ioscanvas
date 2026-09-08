@@ -320,6 +320,61 @@ describe('M3E compatibility importer', () => {
     ]));
   });
 
+  it('keeps expressive action kinds across the semantic iOS round trip', () => {
+    const document = convertM3eDocument({
+      frames: [{ id: 'home', name: 'ホーム', x: 0, y: 0 }],
+      groups: [{
+        id: 'expressive',
+        x: 16,
+        y: 80,
+        axis: 'y',
+        items: [
+          { id: 'extended', kind: 'extendedFab', label: '作成', icon: 'add', variant: 'tonal' },
+          { id: 'chip', kind: 'chip', label: 'お気に入り', icon: 'star', variant: 'outlined', checked: true },
+          { id: 'split', kind: 'splitButton', label: '送信', icon: 'send', variant: 'filled' },
+          { id: 'agree', kind: 'checkbox', label: '同意する', checked: true },
+          { id: 'choice', kind: 'radio', label: '選択肢', checked: false },
+          { id: 'dot', kind: 'badge', label: '', variant: 'filled' },
+          {
+            id: 'menu',
+            kind: 'fabMenu',
+            label: '',
+            icon: 'add',
+            variant: 'filled',
+            tabs: [{ label: '写真', icon: 'photo' }, { label: '書類', icon: 'doc.fill' }],
+          },
+        ],
+      }],
+    });
+
+    expect(document).not.toBeNull();
+    if (!document) throw new Error('Expressive fixture was not converted');
+    const nodes = document.screens[0]?.root.children ?? [];
+    expect(findNode(nodes, 'm3e-extended')).toMatchObject({ kind: 'button', m3eKind: 'extendedFab' });
+    expect(findNode(nodes, 'm3e-chip')).toMatchObject({ kind: 'button', m3eKind: 'chip', toggle: { isOn: true } });
+    expect(findNode(nodes, 'm3e-split')).toMatchObject({ kind: 'button', m3eKind: 'splitButton' });
+    expect(findNode(nodes, 'm3e-agree')).toMatchObject({ kind: 'toggle', m3eKind: 'checkbox', isOn: true });
+    expect(findNode(nodes, 'm3e-choice')).toMatchObject({ kind: 'toggle', m3eKind: 'radio' });
+    expect(findNode(nodes, 'm3e-dot')).toMatchObject({ kind: 'text', m3eKind: 'badge', text: '' });
+    expect(findNode(nodes, 'm3e-menu')).toMatchObject({ kind: 'vstack', m3eKind: 'fabMenu', m3eIcon: 'plus' });
+
+    const exported = exportM3eDocument(document).groups.flatMap((group) => group.items);
+    expect(exported).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: 'extendedFab', label: '作成', icon: 'plus' }),
+      expect.objectContaining({ kind: 'chip', label: 'お気に入り', checked: true }),
+      expect.objectContaining({ kind: 'splitButton', label: '送信', icon: 'paperplane.fill' }),
+      expect.objectContaining({ kind: 'checkbox', label: '同意する', checked: true }),
+      expect.objectContaining({ kind: 'radio', label: '選択肢', checked: false }),
+      expect.objectContaining({ kind: 'badge', label: '' }),
+      expect.objectContaining({ kind: 'fabMenu', icon: 'plus', tabs: [{ label: '写真', icon: 'photo' }, { label: '書類', icon: 'doc.fill' }] }),
+    ]));
+
+    const swiftui = generateSwiftUI(document);
+    expect(swiftui).toContain('M3E SplitButtonのメニュー項目');
+    expect(swiftui).toContain('Menu {');
+    expect(swiftui).toContain('Circle()');
+  });
+
   it('rejects values that are not M3E project documents', () => {
     expect(isM3eDocument({ screens: [] })).toBe(false);
     expect(convertM3eDocument({ frames: [], groups: [] })).toBeNull();

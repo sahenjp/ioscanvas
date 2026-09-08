@@ -71,6 +71,8 @@ export type ToolbarPlacement = 'topBarLeading' | 'topBarTrailing' | 'bottomBar';
 export type SwipeDirection = 'left' | 'right' | 'up' | 'down';
 export type PatternId = 'glass-card' | 'settings-section' | 'list-row' | 'empty-state';
 export type ImageSource = 'symbol' | 'asset' | 'remote';
+export type M3ePresentationKind = 'fab' | 'extendedFab' | 'chip' | 'splitButton' | 'checkbox' | 'radio' | 'badge' | 'fabMenu' | 'toolbar';
+export type M3eVariant = 'filled' | 'tonal' | 'elevated' | 'outlined' | 'text';
 
 export interface DocumentAppearance {
   colorScheme: ColorScheme;
@@ -99,6 +101,9 @@ export interface BaseNode {
   shadow?: ShadowStyle;
   navigationAction?: 'back';
   navigationTransition?: NavigationTransition;
+  m3eKind?: M3ePresentationKind;
+  m3eVariant?: M3eVariant;
+  m3eIcon?: string;
 }
 
 export interface TextNode extends BaseNode {

@@ -231,6 +231,13 @@ function renderNodeContent(
 ): React.ReactNode {
   switch (node.kind) {
     case 'text':
+      if (node.m3eKind === 'badge') {
+        return (
+          <div className={`m3e-badge ${node.text.trim() ? 'has-text' : 'is-dot'}`} aria-label={node.text.trim() ? `バッジ ${node.text}` : '通知バッジ'}>
+            {node.text.trim() || <span aria-hidden="true" />}
+          </div>
+        );
+      }
       return (
         <div
           className="canvas-text"
@@ -289,10 +296,27 @@ function renderNodeContent(
         const label = node.toggle && toggleOn ? node.toggle.onLabel : node.label;
         const systemName = node.toggle && toggleOn ? node.toggle.onSystemName ?? node.systemName : node.systemName;
         const buttonStyle = node.toggle && toggleOn ? node.toggle.onButtonStyle ?? node.buttonStyle : node.buttonStyle;
+        if (node.m3eKind === 'splitButton') {
+          return (
+            <div className="ios-split-button" role="group" aria-label={node.label || 'スプリットボタン'} style={{ minHeight: node.minHeight }}>
+              <button
+                type="button"
+                className="ios-button ios-split-button-primary"
+                onClick={onNavigate ? (event) => { event.stopPropagation(); onNavigate(); } : undefined}
+              >
+                {systemName && <span className="ios-button-symbol" aria-hidden="true">{symbolGlyph(systemName)}</span>}
+                <span>{label || 'Button'}</span>
+              </button>
+              <button type="button" className="ios-button ios-split-button-menu" aria-label={`${label || 'ボタン'}のメニュー`} onClick={(event) => event.stopPropagation()}>
+                <span aria-hidden="true">⌄</span>
+              </button>
+            </div>
+          );
+        }
         return (
           <button
             type="button"
-            className={`ios-button ${node.role === 'destructive' ? 'destructive' : ''} ${!node.glass && buttonStyle && buttonStyle !== 'automatic' ? `button-style-${buttonStyle}` : ''} ${node.glass ? `ios-button-${node.glass}` : ''} ${node.glassInteractive ? 'glass-interactive' : ''} ${node.glassTint ? `glass-tint-${node.glassTint}` : ''} ${node.toggle ? `ios-button-toggle ${toggleOn ? 'is-on' : ''}` : ''}`}
+            className={`ios-button ${node.role === 'destructive' ? 'destructive' : ''} ${!node.glass && buttonStyle && buttonStyle !== 'automatic' ? `button-style-${buttonStyle}` : ''} ${node.glass ? `ios-button-${node.glass}` : ''} ${node.glassInteractive ? 'glass-interactive' : ''} ${node.glassTint ? `glass-tint-${node.glassTint}` : ''} ${node.toggle ? `ios-button-toggle ${toggleOn ? 'is-on' : ''}` : ''} ${node.m3eKind ? `m3e-${node.m3eKind}` : ''}`}
             style={{ minHeight: node.minHeight }}
             aria-label={node.accessibilityLabel || undefined}
             aria-pressed={node.toggle ? toggleOn : undefined}
@@ -308,6 +332,16 @@ function renderNodeContent(
         );
       }
     case 'toggle':
+      if (node.m3eKind === 'checkbox' || node.m3eKind === 'radio') {
+        const checked = controls ? controls.value === true : node.isOn ?? false;
+        return (
+          <label className={`ios-choice-row m3e-${node.m3eKind}`} style={{ minHeight: 44 }}>
+            {controls && <input className="ios-choice-input" type={node.m3eKind === 'radio' ? 'radio' : 'checkbox'} checked={checked} aria-label={node.label || '選択'} onChange={() => controls.onChange(!checked)} />}
+            <span className="ios-choice-indicator" aria-hidden="true">{checked && (node.m3eKind === 'checkbox' ? '✓' : <span />)}</span>
+            <span>{node.label || '選択'}</span>
+          </label>
+        );
+      }
       if (controls) {
         return (
           <label className="ios-row ios-toggle-row" style={{ minHeight: node.minHeight }}>
@@ -708,6 +742,14 @@ function renderNodeContent(
     case 'list':
     case 'form':
     case 'section': {
+      if (node.m3eKind === 'fabMenu') {
+        return (
+          <div className="canvas-fab-menu-preview" aria-label={node.label || 'FABメニュー'}>
+            {node.children.map((child) => <NodeView key={child.id} node={child} allNodes={allNodes} screenId={screenId} onOpenSheet={onOpenSheet} onNavigateScreen={onNavigateScreen} onNavigateBack={onNavigateBack} />)}
+            <div className="m3e-fab-menu-trigger" aria-hidden="true">{symbolGlyph(node.m3eIcon || 'plus')}</div>
+          </div>
+        );
+      }
       if (node.kind === 'tabview' && controls) {
         const activeIndex = node.children.length > 0
           ? Math.max(0, Math.min(node.children.length - 1, Math.round(numberPreviewValue(controls.value, 0))))

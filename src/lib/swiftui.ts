@@ -363,6 +363,37 @@ function buttonStyleModifier(style: string | undefined, depth: number): string {
   return style && style !== 'automatic' ? `\n${indent(depth)}.buttonStyle(.${style})` : '';
 }
 
+function renderM3eSplitButton(
+  node: Extract<CanvasNode, { kind: 'button' }>,
+  depth: number,
+  context: RenderContext,
+): string {
+  const pad = indent(depth);
+  const innerPad = indent(depth + 1);
+  const contentPad = indent(depth + 2);
+  const destination = node.destinationScreenId ? context.viewNames.get(node.destinationScreenId) : undefined;
+  const label = node.systemName?.trim()
+    ? `Label(${quoted(node.label)}, systemImage: ${quoted(node.systemName)})`
+    : `Text(${quoted(node.label)})`;
+  const primary = node.navigationAction === 'back'
+    ? `${innerPad}Button {\n${contentPad}dismiss()\n${innerPad}} label: {\n${contentPad}${label}\n${innerPad}}`
+    : destination
+      ? `${innerPad}NavigationLink {\n${contentPad}${destination}()\n${innerPad}} label: {\n${contentPad}${label}\n${innerPad}}`
+      : `${innerPad}Button {\n${contentPad}// Action\n${innerPad}} label: {\n${contentPad}${label}\n${innerPad}}`;
+  return `${pad}HStack(spacing: 2) {\n${primary}\n${innerPad}Menu {\n${contentPad}Button("メニュー") {\n${contentPad}    // M3E SplitButtonのメニュー項目\n${contentPad}}\n${innerPad}} label: {\n${contentPad}Image(systemName: "chevron.down")\n${innerPad}}\n${pad}}\n${pad}.frame(minHeight: ${node.minHeight})`;
+}
+
+function renderM3eFabMenu(node: ContainerNode, depth: number, context: RenderContext): string {
+  const pad = indent(depth);
+  const children = node.children.length > 0
+    ? node.children.map((child) => renderNode(child, depth + 1, context)).join('\n')
+    : `${indent(depth + 1)}Text("メニュー項目を追加")`;
+  const label = node.m3eIcon?.trim()
+    ? `Label(${quoted(node.label ?? 'FABメニュー')}, systemImage: ${quoted(node.m3eIcon)})`
+    : `Text(${quoted(node.label ?? 'FABメニュー')})`;
+  return `${pad}Menu {\n${children}\n${pad}} label: {\n${indent(depth + 1)}${label}\n${pad}}`;
+}
+
 function renderToggleButtonBody(
   node: Extract<CanvasNode, { kind: 'button' }>,
   depth: number,
@@ -408,6 +439,11 @@ function renderNodeContent(node: CanvasNode, depth: number, context: RenderConte
 
   switch (node.kind) {
     case 'text': {
+      if (node.m3eKind === 'badge') {
+        return node.text.trim()
+          ? `${pad}Text(${quoted(node.text)})\n${pad}    .font(.caption2)\n${pad}    .fontWeight(.semibold)\n${pad}    .padding(.horizontal, 4)\n${pad}    .padding(.vertical, 2)\n${pad}    .background(.red, in: Capsule())`
+          : `${pad}Circle()\n${pad}    .fill(.red)\n${pad}    .frame(width: 6, height: 6)\n${pad}    .accessibilityHidden(true)`;
+      }
       if (node.textStyle && node.textStyle !== 'custom') {
         const weight = node.weight === 'regular' ? '' : `\n${pad}    .fontWeight(.${node.weight})`;
         return `${pad}Text(${quoted(node.text)})\n${pad}    .font(.${node.textStyle})${weight}${fontDesignModifier(node, depth)}${textLayoutModifiers(node, depth)}`;
@@ -417,6 +453,7 @@ function renderNodeContent(node: CanvasNode, depth: number, context: RenderConte
       return `${pad}Text(${quoted(node.text)})\n${pad}    .font(.system(size: ${node.fontSize}${weight}${design}))${textLayoutModifiers(node, depth)}`;
     }
     case 'button': {
+      if (node.m3eKind === 'splitButton') return renderM3eSplitButton(node, depth, context);
       const destination = node.destinationScreenId ? context.viewNames.get(node.destinationScreenId) : undefined;
       if (node.navigationAction === 'back') {
         const label = node.systemName?.trim()
@@ -467,8 +504,14 @@ function renderNodeContent(node: CanvasNode, depth: number, context: RenderConte
       ].join('\n');
       return `${pad}Button(${quoted(node.label)}) {\n${pad}    ${binding} = true\n${pad}}\n${pad}.frame(minHeight: ${node.minHeight})\n${pad}.confirmationDialog(${quoted(node.title)}, isPresented: $${binding}, titleVisibility: .visible) {\n${actions}\n${pad}} message: {\n${pad}    Text(${quoted(node.message)})\n${pad}}`;
     }
-    case 'toggle':
-      return `${pad}Toggle(${quoted(node.label)}, isOn: $${context.bindings.get(bindingKey(node))?.name ?? swiftIdentifier(node.binding, 'isEnabled')})\n${pad}    .frame(minHeight: ${node.minHeight})`;
+    case 'toggle': {
+      const note = node.m3eKind === 'checkbox'
+        ? `${pad}// M3E checkboxをSwiftUI Toggleへ変換しています。必要ならToggleStyleを実装してください。\n`
+        : node.m3eKind === 'radio'
+          ? `${pad}// M3E radioをSwiftUI Toggleへ変換しています。グループ選択は実装側で束ねてください。\n`
+          : '';
+      return `${note}${pad}Toggle(${quoted(node.label)}, isOn: $${context.bindings.get(bindingKey(node))?.name ?? swiftIdentifier(node.binding, 'isEnabled')})\n${pad}    .frame(minHeight: ${node.minHeight})`;
+    }
     case 'textfield':
       return `${pad}TextField(${quoted(node.label)}, text: $${context.bindings.get(bindingKey(node))?.name ?? swiftIdentifier(node.binding, 'value')})\n${pad}    .textFieldStyle(.roundedBorder)\n${pad}    .frame(minHeight: ${node.minHeight})`;
     case 'searchfield': {
@@ -633,6 +676,7 @@ function renderNodeContent(node: CanvasNode, depth: number, context: RenderConte
       return `${pad}Button(${quoted(node.label ?? 'Open sheet')}) {\n${pad}    ${binding} = true\n${pad}}\n${pad}.sheet(isPresented: $${binding}) {\n${sheetChildren}\n${pad}}`;
     }
     case 'section': {
+      if (node.m3eKind === 'fabMenu') return renderM3eFabMenu(node, depth, context);
       const children = node.children.map((child) => renderNode(child, depth + 1, context)).join('\n');
       return `${pad}Section(${quoted(node.title ?? 'Section')}) {\n${children}\n${pad}}`;
     }

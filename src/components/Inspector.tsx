@@ -495,6 +495,11 @@ export function Inspector() {
                 <DraftInput key={`${node.id}-label-${node.label}`} value={node.label} onCommit={(value) => updateSelectedNode({ label: value } as Partial<CanvasNode>)} />
               </Field>
             )}
+            {node.m3eKind === 'fabMenu' && (
+              <Field label="FABアイコン">
+                <SymbolInput key={`${node.id}-m3e-icon-${node.m3eIcon ?? ''}`} value={node.m3eIcon ?? 'plus'} onCommit={(value) => updateSelectedNode({ m3eIcon: value.trim() || 'plus' } as Partial<CanvasNode>)} />
+              </Field>
+            )}
             {parent?.kind === 'tabview' && (
               <>
                 <Field label="タブ名">
