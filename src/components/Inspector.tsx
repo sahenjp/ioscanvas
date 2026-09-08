@@ -1,7 +1,7 @@
 import { createId, findNode, findNodeLocation, isContainerNode } from '../lib/nodes';
 import { lintDocument } from '../lib/hig';
 import { useEditorStore } from '../store/editor';
-import type { AccentColor, BackgroundStyle, CanvasNode, CanvasScreen, ContentPlacement, FontDesign, FrameWidth, GlassShape, GlassStyle, ImageSource, NavigationTitleDisplayMode, NavigationTransition, ScreenBackground, ShadowStyle, StackAlignment, SwipeDirection, TextAlignment, TextStyle, ToolbarItem, ToolbarPlacement } from '../types/document';
+import type { AccentColor, BackgroundStyle, CanvasNode, CanvasScreen, ContentPlacement, FontDesign, FrameWidth, GlassShape, GlassStyle, ImageSource, NavigationTitleDisplayMode, NavigationTransition, ScreenBackground, ScreenDevice, ScreenOrientation, ShadowStyle, StackAlignment, SwipeDirection, TextAlignment, TextStyle, ToolbarItem, ToolbarPlacement } from '../types/document';
 
 const swipeDirections: { key: SwipeDirection; label: string }[] = [
   { key: 'left', label: '左へスワイプ' },
@@ -253,6 +253,26 @@ export function Inspector() {
                     <option value="tertiaryContainer">ターシャリコンテナ</option>
                     <option value="primary">プライマリ</option>
                     <option value="inverseSurface">反転サーフェス</option>
+                  </select>
+                </Field>
+                <Field label="プレビュー端末">
+                  <select
+                    value={screen.previewDevice ?? 'iphone-16'}
+                    onChange={(event) => updateActiveScreen({ previewDevice: event.target.value as ScreenDevice })}
+                  >
+                    <option value="iphone-se">iPhone SE</option>
+                    <option value="iphone-16">iPhone 16</option>
+                    <option value="ipad-mini">iPad mini</option>
+                    <option value="ipad-pro-11">iPad Pro 11インチ</option>
+                  </select>
+                </Field>
+                <Field label="画面方向">
+                  <select
+                    value={screen.previewOrientation ?? 'portrait'}
+                    onChange={(event) => updateActiveScreen({ previewOrientation: event.target.value as ScreenOrientation })}
+                  >
+                    <option value="portrait">縦向き</option>
+                    <option value="landscape">横向き</option>
                   </select>
                 </Field>
               </>

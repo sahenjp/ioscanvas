@@ -1,5 +1,5 @@
 import { lintDocument } from './hig';
-import type { CanvasDocument, CanvasNode } from '../types/document';
+import type { CanvasDocument, CanvasNode, ScreenDevice } from '../types/document';
 
 function describe(node: CanvasNode, depth = 0): string[] {
   const pad = '  '.repeat(depth);
@@ -80,6 +80,13 @@ function describe(node: CanvasNode, depth = 0): string[] {
 
 export type PromptScope = 'active' | 'all';
 
+const screenDeviceNames: Record<ScreenDevice, string> = {
+  'iphone-se': 'iPhone SE',
+  'iphone-16': 'iPhone 16',
+  'ipad-mini': 'iPad mini',
+  'ipad-pro-11': 'iPad Pro 11インチ',
+};
+
 function screenDetails(screen: CanvasDocument['screens'][number], document: CanvasDocument): string[] {
   const actionDetails = (item: { navigationAction?: 'back'; navigationTransition?: string; destinationScreenId?: string }) => `${item.navigationAction === 'back' ? ' / action=back' : ''}${item.destinationScreenId ? ` / destination=${document.screens.find((candidate) => candidate.id === item.destinationScreenId)?.name ?? '未設定'}` : ''}${item.navigationTransition ? ` / transition=${item.navigationTransition}` : ''}`;
   const toolbar = (screen.toolbarItems ?? []).map((item) => `${item.placement}: ${item.title}${item.systemName ? ` / symbol=${item.systemName}` : ''}${item.selected ? ' / selected' : ''}${actionDetails(item)}`).join(', ') || 'なし';
@@ -96,6 +103,8 @@ function screenDetails(screen: CanvasDocument['screens'][number], document: Canv
     `タイトル表示: ${screen.navigationTitleDisplayMode ?? 'automatic'}`,
     `本文の配置: ${screen.contentPlacement ?? 'top'}`,
     `画面背景: ${screen.background ?? 'surface'}`,
+    `プレビュー端末: ${screenDeviceNames[screen.previewDevice ?? 'iphone-16']}`,
+    `画面方向: ${screen.previewOrientation === 'landscape' ? '横向き' : '縦向き'}`,
     `ツールバー: ${toolbar}`,
     `タブバー: ${tabBar}`,
     `NavigationLink遷移: ${navigation}`,

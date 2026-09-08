@@ -10,7 +10,7 @@ import {
   NODE_DRAG_MIME,
 } from '../lib/nodes';
 import { useEditorStore } from '../store/editor';
-import type { AlertNode, CanvasDocument, CanvasNode, CanvasScreen, ConfirmationDialogNode, ContainerNode, FontDesign, NavigationTransition, ScreenBackground, SwipeDirection, TextStyle, ToolbarItem } from '../types/document';
+import type { AlertNode, CanvasDocument, CanvasNode, CanvasScreen, ConfirmationDialogNode, ContainerNode, FontDesign, NavigationTransition, ScreenBackground, ScreenDevice, ScreenOrientation, SwipeDirection, TextStyle, ToolbarItem } from '../types/document';
 
 function readDragData(event: React.DragEvent): ReturnType<typeof decodeDragData> {
   const value = event.dataTransfer.getData(NODE_DRAG_MIME) || event.dataTransfer.getData('text/plain');
@@ -28,11 +28,10 @@ interface CanvasDropTarget {
   position: DropPosition;
 }
 
-type PreviewDeviceId = 'iphone-se' | 'iphone-16' | 'ipad-mini' | 'ipad-pro-11';
 type PreviewTextScale = 'default' | 'large' | 'accessibility';
 
 interface PreviewDevice {
-  id: PreviewDeviceId;
+  id: ScreenDevice;
   label: string;
   width: number;
   height: number;
@@ -45,6 +44,12 @@ const previewDevices: PreviewDevice[] = [
   { id: 'ipad-mini', label: 'iPad mini', width: 744, height: 1133, kind: 'tablet' },
   { id: 'ipad-pro-11', label: 'iPad Pro 11″', width: 834, height: 1194, kind: 'tablet' },
 ];
+
+function orientPreviewDevice(device: PreviewDevice, orientation: ScreenOrientation | undefined): PreviewDevice {
+  return orientation === 'landscape'
+    ? { ...device, width: device.height, height: device.width, label: `${device.label}（横向き）` }
+    : device;
+}
 
 const previewTextScales: { id: PreviewTextScale; label: string; factor: number }[] = [
   { id: 'default', label: '標準文字', factor: 1 },
@@ -822,6 +827,8 @@ function ScreenPreview({
   const screen = previewMode
     ? document.screens.find((candidate) => candidate.id === previewScreenId) ?? initialScreen
     : initialScreen;
+  const baseDevice = previewDevices.find((candidate) => candidate.id === screen.previewDevice) ?? device;
+  const screenDevice = orientPreviewDevice(baseDevice, screen.previewOrientation);
   const hasGlass = containsGlass(screen.root.children);
   const customAccent = document.appearance.accentColor === 'custom' ? document.appearance.accentHex : undefined;
   const isActive = previewMode || activeScreenId === screen.id;
@@ -898,12 +905,12 @@ function ScreenPreview({
 
   return (
     <article
-      className={`screen-preview ${isActive ? 'is-active' : ''} ${device.kind === 'tablet' ? 'tablet-preview' : ''}`}
+      className={`screen-preview ${isActive ? 'is-active' : ''} ${screenDevice.kind === 'tablet' ? 'tablet-preview' : ''}`}
       style={{
-        '--device-width': `${device.width}px`,
-        '--device-height': `${device.height}px`,
-        '--device-shell-width': `${device.width + 30}px`,
-        '--device-shell-height': `${device.height + 30}px`,
+        '--device-width': `${screenDevice.width}px`,
+        '--device-height': `${screenDevice.height}px`,
+        '--device-shell-width': `${screenDevice.width + 30}px`,
+        '--device-shell-height': `${screenDevice.height + 30}px`,
         '--preview-text-scale': previewTextScales.find((scale) => scale.id === textScale)?.factor ?? 1,
       } as CSSProperties}
     >
@@ -912,7 +919,7 @@ function ScreenPreview({
           <strong>{screen.name}</strong>
           <span>{isActive ? '編集中' : '表示のみ'}</span>
         </button>
-        <span className="screen-preview-size">{device.width} × {device.height} pt</span>
+        <span className="screen-preview-size">{screenDevice.width} × {screenDevice.height} pt</span>
       </header>
       {!previewMode && connections.length > 0 && (
         <div className="screen-flow-summary" aria-label={`${initialScreen.name}の画面遷移`}>
@@ -1185,13 +1192,13 @@ export function PhoneCanvas() {
   const document = useEditorStore((state) => state.document);
   const selectNode = useEditorStore((state) => state.selectNode);
   const tidyActiveScreen = useEditorStore((state) => state.tidyActiveScreen);
+  const updateActiveScreen = useEditorStore((state) => state.updateActiveScreen);
   const previewMode = useEditorStore((state) => state.previewMode);
   const systemDark = useSystemDarkMode();
   const activeScreen = document.screens.find((candidate) => candidate.id === document.activeScreenId) ?? document.screens[0];
   const [zoom, setZoom] = useState(100);
   const [showGuides, setShowGuides] = useState(true);
   const [codeShelfOpen, setCodeShelfOpen] = useState(true);
-  const [previewDeviceId, setPreviewDeviceId] = useState<PreviewDeviceId>('iphone-16');
   const [previewTextScale, setPreviewTextScale] = useState<PreviewTextScale>('default');
 
   useEffect(() => {
@@ -1224,8 +1231,10 @@ export function PhoneCanvas() {
   const previewScheme = document.appearance.colorScheme === 'system'
     ? systemDark ? 'dark' : 'light'
     : document.appearance.colorScheme;
-  const previewDevice = previewDevices.find((device) => device.id === previewDeviceId) ?? previewDevices[1];
-  if (!previewDevice) return null;
+  const previewDeviceId: ScreenDevice = activeScreen.previewDevice ?? 'iphone-16';
+  const basePreviewDevice = previewDevices.find((device) => device.id === previewDeviceId) ?? previewDevices[1];
+  if (!basePreviewDevice) return null;
+  const previewDevice = orientPreviewDevice(basePreviewDevice, activeScreen.previewOrientation);
   const textScaleLabel = previewTextScales.find((scale) => scale.id === previewTextScale)?.label ?? '標準文字';
 
   return (
@@ -1239,7 +1248,7 @@ export function PhoneCanvas() {
         {!previewMode && <div className="workspace-controls" onClick={(event) => event.stopPropagation()}>
           <label className="workspace-device-select">
             <span className="visually-hidden">プレビュー端末</span>
-            <select value={previewDevice.id} onChange={(event) => setPreviewDeviceId(event.target.value as PreviewDeviceId)} aria-label="プレビュー端末">
+            <select value={previewDevice.id} onChange={(event) => updateActiveScreen({ previewDevice: event.target.value as ScreenDevice })} aria-label="プレビュー端末">
               {previewDevices.map((device) => <option value={device.id} key={device.id}>{device.label}</option>)}
             </select>
           </label>
@@ -1275,9 +1284,10 @@ export function PhoneCanvas() {
             const navigationConnected = nextScreen && screenDestinations(screen).includes(nextScreen.id);
             const swipeConnected = Boolean(nextScreen && swipeDestinations.includes(nextScreen.id));
             const connected = Boolean(navigationConnected || swipeConnected);
+            const screenDevice = previewDevices.find((candidate) => candidate.id === (screen.previewDevice ?? 'iphone-16')) ?? basePreviewDevice;
             return (
               <div className="screen-board-item" key={screen.id}>
-                <ScreenPreview document={document} screen={screen} previewMode={previewMode} previewScheme={previewScheme} device={previewDevice} textScale={previewTextScale} key={`${screen.id}-${previewMode ? 'preview' : 'editor'}-${previewDevice.id}-${previewTextScale}`} />
+                <ScreenPreview document={document} screen={screen} previewMode={previewMode} previewScheme={previewScheme} device={screenDevice} textScale={previewTextScale} key={`${screen.id}-${previewMode ? 'preview' : 'editor'}-${screenDevice.id}-${screen.previewOrientation ?? 'portrait'}-${previewTextScale}`} />
                 {nextScreen && (
                   <div className={`screen-connector ${connected ? 'is-connected' : ''}`} aria-label={connected ? `${screen.name}から${nextScreen.name}へ接続` : undefined}>
                     {connected && <><span className="connector-line" /><span className="connector-arrow" aria-hidden="true">→</span><span className="connector-label">{swipeConnected && !navigationConnected ? 'スワイプ遷移' : 'NavigationLink'}</span></>}

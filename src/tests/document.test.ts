@@ -277,6 +277,8 @@ describe('project document parsing', () => {
     screen.navigationTitleDisplayMode = 'inline';
     screen.contentPlacement = 'spread';
     screen.background = 'surfaceContainerHigh';
+    screen.previewDevice = 'ipad-mini';
+    screen.previewOrientation = 'landscape';
     screen.toolbarItems = [{
       id: 'toolbar-help',
       title: 'ヘルプ',
@@ -302,6 +304,8 @@ describe('project document parsing', () => {
     expect(parseCanvasDocument({ ...document, screens: [{ ...screen, tabBarItems: [{ ...screen.tabBarItems[0], placement: 'topBarLeading' }] }] })).toBeNull();
     expect(parseCanvasDocument({ ...document, screens: [{ ...screen, contentPlacement: 'diagonal' }] })).toBeNull();
     expect(parseCanvasDocument({ ...document, screens: [{ ...screen, background: 'flat' }] })).toBeNull();
+    expect(parseCanvasDocument({ ...document, screens: [{ ...screen, previewDevice: 'macbook' }] })).toBeNull();
+    expect(parseCanvasDocument({ ...document, screens: [{ ...screen, previewOrientation: 'diagonal' }] })).toBeNull();
     expect(parseCanvasDocument({ ...document, screens: [{ ...screen, toolbarItems: [{ ...screen.toolbarItems[0], navigationTransition: 'warp' }] }] })).toBeNull();
     expect(parseCanvasDocument({ ...document, screens: [{ ...screen, swipe: { left: 'missing-screen' } }] })).toBeNull();
   });

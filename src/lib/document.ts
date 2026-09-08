@@ -1,5 +1,5 @@
 import { isContainerNode } from './nodes';
-import type { AccentColor, AppearanceAccentColor, BackgroundStyle, ButtonStyle, ButtonToggle, CanvasDocument, CanvasNode, CanvasScreen, CardContentAlignment, CardImagePosition, ColorScheme, ContentPlacement, FontDesign, FrameWidth, GlassShape, GlassStyle, ImageSource, NavigationTitleDisplayMode, NavigationTransition, NodeKind, ProgressStyle, ScreenBackground, ShadowStyle, StackAlignment, SwipeDirection, TextAlignment, TextStyle, ToolbarItem, ToolbarPlacement } from '../types/document';
+import type { AccentColor, AppearanceAccentColor, BackgroundStyle, ButtonStyle, ButtonToggle, CanvasDocument, CanvasNode, CanvasScreen, CardContentAlignment, CardImagePosition, ColorScheme, ContentPlacement, FontDesign, FrameWidth, GlassShape, GlassStyle, ImageSource, NavigationTitleDisplayMode, NavigationTransition, NodeKind, ProgressStyle, ScreenBackground, ScreenDevice, ScreenOrientation, ShadowStyle, StackAlignment, SwipeDirection, TextAlignment, TextStyle, ToolbarItem, ToolbarPlacement } from '../types/document';
 
 type RecordValue = Record<string, unknown>;
 
@@ -437,6 +437,8 @@ function readScreen(value: unknown, ids: Set<string>): CanvasScreen | null {
   if (value.navigationTitleDisplayMode !== undefined && !isOneOf(value.navigationTitleDisplayMode, ['automatic', 'inline', 'large'])) return null;
   if (value.contentPlacement !== undefined && !isOneOf(value.contentPlacement, ['top', 'center', 'bottom', 'spread'])) return null;
   if (value.background !== undefined && !isOneOf(value.background, ['surface', 'surfaceContainerLow', 'surfaceContainer', 'surfaceContainerHigh', 'surfaceContainerHighest', 'primaryContainer', 'secondaryContainer', 'tertiaryContainer', 'primary', 'inverseSurface'])) return null;
+  if (value.previewDevice !== undefined && !isOneOf(value.previewDevice, ['iphone-se', 'iphone-16', 'ipad-mini', 'ipad-pro-11'])) return null;
+  if (value.previewOrientation !== undefined && !isOneOf(value.previewOrientation, ['portrait', 'landscape'])) return null;
   const toolbarItems = readToolbarItems(value.toolbarItems, ids);
   if (toolbarItems === null) return null;
   const tabBarItems = readToolbarItems(value.tabBarItems, ids);
@@ -453,6 +455,8 @@ function readScreen(value: unknown, ids: Set<string>): CanvasScreen | null {
         ...(value.navigationTitleDisplayMode === undefined ? {} : { navigationTitleDisplayMode: value.navigationTitleDisplayMode as NavigationTitleDisplayMode }),
         ...(value.contentPlacement === undefined ? {} : { contentPlacement: value.contentPlacement as ContentPlacement }),
         ...(value.background === undefined ? {} : { background: value.background as ScreenBackground }),
+        ...(value.previewDevice === undefined ? {} : { previewDevice: value.previewDevice as ScreenDevice }),
+        ...(value.previewOrientation === undefined ? {} : { previewOrientation: value.previewOrientation as ScreenOrientation }),
         ...(toolbarItems === undefined ? {} : { toolbarItems }),
         ...(tabBarItems === undefined ? {} : { tabBarItems }),
         ...(swipe === undefined ? {} : { swipe }),

@@ -65,7 +65,7 @@ describe('M3E compatibility importer', () => {
     });
     const home = document?.screens[0];
     const detail = document?.screens[1];
-    expect(home).toMatchObject({ name: 'ホーム', navigationTitle: 'ホーム', notes: '一覧画面', contentPlacement: 'center', background: 'surfaceContainerLow' });
+    expect(home).toMatchObject({ name: 'ホーム', navigationTitle: 'ホーム', notes: '一覧画面', contentPlacement: 'center', background: 'surfaceContainerLow', previewDevice: 'iphone-16', previewOrientation: 'portrait' });
     expect(home?.toolbarItems).toEqual(expect.arrayContaining([
       expect.objectContaining({ placement: 'topBarLeading', systemName: 'line.3.horizontal' }),
       expect.objectContaining({ placement: 'topBarTrailing', systemName: 'gearshape.fill' }),
@@ -85,6 +85,20 @@ describe('M3E compatibility importer', () => {
     expect(generateSwiftUI(document)).toContain('NavigationLink {');
 
     expect(detail?.swipe).toEqual({ right: home?.id });
+  });
+
+  it('maps M3E frame sizes to semantic iPhone and iPad preview devices', () => {
+    const document = convertM3eDocument({
+      frames: [
+        { id: 'small', name: '小さい画面', x: 0, y: 0, w: 375, h: 667 },
+        { id: 'tablet', name: 'タブレット', x: 500, y: 0, w: 744, h: 1133 },
+        { id: 'desktop', name: '横長画面', x: 1300, y: 0, w: 1280, h: 800 },
+      ],
+      groups: [],
+    });
+
+    expect(document?.screens.map((screen) => screen.previewDevice)).toEqual(['iphone-se', 'ipad-mini', 'ipad-pro-11']);
+    expect(document?.screens.map((screen) => screen.previewOrientation)).toEqual(['portrait', 'portrait', 'landscape']);
   });
 
   it('keeps back actions as executable semantic controls', () => {

@@ -39,7 +39,7 @@ interface EditorState {
   updateSelectedNode: (patch: Partial<CanvasNode>) => void;
   updateSelectedNodes: (patch: Partial<CanvasNode>) => void;
   updateDocumentName: (name: string) => void;
-  updateActiveScreen: (patch: Partial<Pick<CanvasScreen, 'name' | 'navigationTitle' | 'notes' | 'navigationTitleDisplayMode' | 'contentPlacement' | 'background' | 'toolbarItems' | 'tabBarItems' | 'swipe'>>) => void;
+  updateActiveScreen: (patch: Partial<Pick<CanvasScreen, 'name' | 'navigationTitle' | 'notes' | 'navigationTitleDisplayMode' | 'contentPlacement' | 'background' | 'previewDevice' | 'previewOrientation' | 'toolbarItems' | 'tabBarItems' | 'swipe'>>) => void;
   updateAppearance: (patch: Partial<DocumentAppearance>) => void;
   deleteSelectedNode: () => void;
   loadDocument: (document: CanvasDocument) => void;

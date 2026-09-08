@@ -12,6 +12,8 @@ import type {
   ImageSource,
   NavigationTransition,
   ScreenBackground,
+  ScreenDevice,
+  ScreenOrientation,
   SwipeDirection,
   TextStyle,
   ToolbarItem,
@@ -28,6 +30,8 @@ interface M3eFrame {
   height: number;
   place?: ContentPlacement;
   background?: ScreenBackground;
+  previewDevice: ScreenDevice;
+  previewOrientation: ScreenOrientation;
   note?: string;
   swipe?: Partial<Record<SwipeDirection, string>>;
 }
@@ -43,6 +47,19 @@ interface M3eGroup {
 interface ConversionContext {
   usedIds: Set<string>;
   frameIds: Map<string, string>;
+}
+
+function deviceForFrame(width: number, height: number): ScreenDevice {
+  const shortEdge = Math.min(width, height);
+  const longEdge = Math.max(width, height);
+  if (shortEdge >= 800 || longEdge >= 1180) return 'ipad-pro-11';
+  if (shortEdge >= 700 || longEdge >= 1000) return 'ipad-mini';
+  if (shortEdge <= 380 && longEdge <= 700) return 'iphone-se';
+  return 'iphone-16';
+}
+
+function orientationForFrame(width: number, height: number): ScreenOrientation {
+  return width > height ? 'landscape' : 'portrait';
 }
 
 export interface M3eCompatibilityReport {
@@ -154,13 +171,17 @@ function readFrame(value: unknown): M3eFrame | null {
     if (destination) swipe[direction] = destination;
   }
 
+  const width = Math.max(1, numberValue(value, 'w') ?? 412);
+  const height = Math.max(1, numberValue(value, 'h') ?? 892);
   return {
     id,
     name,
     x,
     y,
-    width: Math.max(1, numberValue(value, 'w') ?? 412),
-    height: Math.max(1, numberValue(value, 'h') ?? 892),
+    width,
+    height,
+    previewDevice: deviceForFrame(width, height),
+    previewOrientation: orientationForFrame(width, height),
     ...(place === undefined ? {} : { place }),
     ...(background === undefined ? {} : { background: background as ScreenBackground }),
     ...(stringValue(value, 'note')?.trim() ? { note: stringValue(value, 'note') } : {}),
@@ -821,6 +842,8 @@ function convertScreen(frame: M3eFrame, groups: M3eGroup[], frames: M3eFrame[], 
     ...(frame.background === undefined ? {} : { background: frame.background }),
     ...(frame.note ? { notes: frame.note } : {}),
     ...(frame.place ? { contentPlacement: frame.place } : {}),
+    previewDevice: frame.previewDevice,
+    previewOrientation: frame.previewOrientation,
     ...(toolbarItems.length > 0 ? { toolbarItems } : {}),
     ...(tabBarItems.length > 0 ? { tabBarItems } : {}),
     ...(frame.swipe ? {

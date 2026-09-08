@@ -65,6 +65,8 @@ export type NavigationTitleDisplayMode = 'automatic' | 'inline' | 'large';
 export type ContentPlacement = 'top' | 'center' | 'bottom' | 'spread';
 export type NavigationTransition = 'slide' | 'slideLeft' | 'slideUp' | 'slideDown' | 'fade' | 'expand' | 'none';
 export type ScreenBackground = 'surface' | 'surfaceContainerLow' | 'surfaceContainer' | 'surfaceContainerHigh' | 'surfaceContainerHighest' | 'primaryContainer' | 'secondaryContainer' | 'tertiaryContainer' | 'primary' | 'inverseSurface';
+export type ScreenDevice = 'iphone-se' | 'iphone-16' | 'ipad-mini' | 'ipad-pro-11';
+export type ScreenOrientation = 'portrait' | 'landscape';
 export type ToolbarPlacement = 'topBarLeading' | 'topBarTrailing' | 'bottomBar';
 export type SwipeDirection = 'left' | 'right' | 'up' | 'down';
 export type PatternId = 'glass-card' | 'settings-section' | 'list-row' | 'empty-state';
@@ -381,6 +383,8 @@ export interface CanvasScreen {
   navigationTitleDisplayMode?: NavigationTitleDisplayMode;
   contentPlacement?: ContentPlacement;
   background?: ScreenBackground;
+  previewDevice?: ScreenDevice;
+  previewOrientation?: ScreenOrientation;
   toolbarItems?: ToolbarItem[];
   tabBarItems?: ToolbarItem[];
   swipe?: Partial<Record<SwipeDirection, string>>;
