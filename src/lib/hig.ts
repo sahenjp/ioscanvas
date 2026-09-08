@@ -336,13 +336,17 @@ export function lintDocument(document: CanvasDocument): LintIssue[] {
         message: 'NavigationStackのタイトルが空です。画面の階層と目的が伝わるタイトルを設定してください。',
       });
     }
-    for (const item of screen.toolbarItems ?? []) {
+    const actionItems = [
+      ...(screen.toolbarItems ?? []).map((item) => ({ item, label: 'ツールバー項目' })),
+      ...(screen.tabBarItems ?? []).map((item) => ({ item, label: 'タブバー項目' })),
+    ];
+    for (const { item, label } of actionItems) {
       if (item.title.trim().length === 0) {
         issues.push({
           nodeId: screen.root.id,
           severity: 'warning',
           code: 'ACCESSIBILITY',
-          message: 'ツールバー項目に表示名がありません。VoiceOverで理解できるラベルを指定してください。',
+          message: `${label}に表示名がありません。VoiceOverで理解できるラベルを指定してください。`,
         });
       }
       if (item.destinationScreenId !== undefined && !screenIds.has(item.destinationScreenId)) {
@@ -350,14 +354,14 @@ export function lintDocument(document: CanvasDocument): LintIssue[] {
           nodeId: screen.root.id,
           severity: 'warning',
           code: 'NAVIGATION_DESTINATION',
-          message: 'ツールバー項目の遷移先画面が未設定です。表示する画面を指定してください。',
+          message: `${label}の遷移先画面が未設定です。表示する画面を指定してください。`,
         });
       } else if (item.destinationScreenId === screen.id) {
         issues.push({
           nodeId: screen.root.id,
           severity: 'warning',
           code: 'NAVIGATION_STRUCTURE',
-          message: 'ツールバー項目が現在の画面自身を遷移先にしています。意図しないNavigationStackの積み重ねにならないか確認してください。',
+          message: `${label}が現在の画面自身を遷移先にしています。意図しないNavigationStackの積み重ねにならないか確認してください。`,
         });
       }
     }

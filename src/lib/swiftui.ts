@@ -720,6 +720,15 @@ function buildViewNames(screens: CanvasScreen[]): Map<string, string> {
   return viewNames;
 }
 
+function tabBarSelectionName(screenId: string): string {
+  return swiftIdentifier(`selected_tab_${screenId}`, 'selectedTab');
+}
+
+function tabBarSelectedIndex(items: ToolbarItem[]): number {
+  const selected = items.findIndex((item) => item.selected);
+  return selected < 0 ? 0 : selected;
+}
+
 function renderScreen(
   screen: CanvasScreen,
   context: RenderContext,
@@ -728,9 +737,12 @@ function renderScreen(
   appearance: CanvasDocument['appearance'],
 ): string {
   const swipeStates = buildSwipeStates(screen, context);
+  const tabBarItems = isRoot ? screen.tabBarItems ?? [] : [];
+  const tabSelectionName = tabBarItems.length > 0 ? tabBarSelectionName(screen.id) : undefined;
   const stateLines = [
     ...[...context.bindings.values()].map(({ name, type, initial }) => `    @State private var ${name}: ${type} = ${initial}`),
     ...swipeStates.map(({ stateName }) => `    @State private var ${stateName} = false`),
+    ...(tabSelectionName ? [`    @State private var ${tabSelectionName}: Int = ${tabBarSelectedIndex(tabBarItems)}`] : []),
   ].join('\n');
   const firstChild = screen.root.children[0];
   const directScrollContainer = screen.root.children.length === 1
@@ -757,8 +769,22 @@ function renderScreen(
     ? `\n        .fontDesign(.${appearance.fontDesign})`
     : '';
   const contentWithSwipe = renderSwipeSupport(content, swipeStates, 2);
+  const tabView = tabSelectionName
+    ? `${indent(2)}TabView(selection: $${tabSelectionName}) {\n${tabBarItems.map((item, index) => {
+        const destination = item.destinationScreenId ? context.viewNames.get(item.destinationScreenId) : viewName;
+        const body = destination && destination !== viewName
+          ? `${indent(4)}${destination}()`
+          : indentBlock(contentWithSwipe, 4);
+        const label = item.systemName?.trim()
+          ? `Label(${quoted(item.title)}, systemImage: ${quoted(item.systemName)})`
+          : `Text(${quoted(item.title)})`;
+        return `${indent(3)}NavigationStack {\n${body}\n${indent(3)}}\n${indent(3)}.tabItem {\n${indent(4)}${label}\n${indent(3)}}\n${indent(3)}.tag(${index})`;
+      }).join('\n')}\n${indent(2)}}`
+    : '';
   const rootBody = isRoot
-    ? directSplitContainer
+    ? tabView
+      ? `${tabView}\n        .tint(${accentColorLiteral(appearance)})${colorScheme}${fontDesign}`
+      : directSplitContainer
       ? `${contentWithSwipe}\n        .tint(${accentColorLiteral(appearance)})${colorScheme}${fontDesign}`
       : `        NavigationStack {\n${indentBlock(contentWithSwipe, 1)}\n        }\n        .tint(${accentColorLiteral(appearance)})${colorScheme}${fontDesign}`
     : contentWithSwipe;

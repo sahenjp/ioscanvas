@@ -278,6 +278,25 @@ describe('SwiftUI generator', () => {
     expect(output).toContain('Button(role: .destructive)');
   });
 
+  it('exports screen tab bar items as a native TabView', () => {
+    const document = structuredClone(defaultDocument);
+    const screen = document.screens[0];
+    if (!screen) throw new Error('Fixture screen missing');
+    screen.tabBarItems = [
+      { id: 'home-tab', title: 'ホーム', systemName: 'house', placement: 'bottomBar', selected: true },
+      { id: 'settings-tab', title: '設定', systemName: 'gearshape', placement: 'bottomBar', destinationScreenId: 'screen-settings' },
+    ];
+
+    const output = generateSwiftUI(document);
+
+    expect(output).toContain('TabView(selection: $selected_tab_screen_home)');
+    expect(output).toContain('Label("ホーム", systemImage: "house")');
+    expect(output).toContain('Label("設定", systemImage: "gearshape")');
+    expect(output).toContain('.tag(0)');
+    expect(output).toContain('.tag(1)');
+    expect(output).toContain('                Screen2View()');
+  });
+
   it('exports configured swipe destinations as native navigation gestures', () => {
     const document = structuredClone(defaultDocument);
     const screen = document.screens[0];

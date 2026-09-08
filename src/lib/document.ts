@@ -420,6 +420,8 @@ function readScreen(value: unknown, ids: Set<string>): CanvasScreen | null {
   if (value.navigationTitleDisplayMode !== undefined && !isOneOf(value.navigationTitleDisplayMode, ['automatic', 'inline', 'large'])) return null;
   const toolbarItems = readToolbarItems(value.toolbarItems, ids);
   if (toolbarItems === null) return null;
+  const tabBarItems = readToolbarItems(value.tabBarItems, ids);
+  if (tabBarItems === null || tabBarItems?.some((item) => item.placement !== 'bottomBar')) return null;
   const swipe = readSwipe(value.swipe);
   if (swipe === null) return null;
   const root = readNode(value.root, ids);
@@ -431,6 +433,7 @@ function readScreen(value: unknown, ids: Set<string>): CanvasScreen | null {
         ...(value.notes === undefined ? {} : { notes: value.notes }),
         ...(value.navigationTitleDisplayMode === undefined ? {} : { navigationTitleDisplayMode: value.navigationTitleDisplayMode as NavigationTitleDisplayMode }),
         ...(toolbarItems === undefined ? {} : { toolbarItems }),
+        ...(tabBarItems === undefined ? {} : { tabBarItems }),
         ...(swipe === undefined ? {} : { swipe }),
         root,
       }

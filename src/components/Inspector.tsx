@@ -299,6 +299,43 @@ export function Inspector() {
           )}
           {screen && (
             <section className="inspector-section">
+              <div className="section-label">TabViewのタブバー</div>
+              {(screen.tabBarItems ?? []).map((item) => (
+                <ToolbarItemEditor
+                  item={item}
+                  screenId={screen.id}
+                  screens={document.screens}
+                  fixedPlacement="bottomBar"
+                  key={item.id}
+                  onChange={(patch) => updateActiveScreen({
+                    tabBarItems: (screen.tabBarItems ?? []).map((candidate) => candidate.id === item.id ? { ...candidate, ...patch } : candidate),
+                  })}
+                  onRemove={() => updateActiveScreen({ tabBarItems: (screen.tabBarItems ?? []).filter((candidate) => candidate.id !== item.id) })}
+                />
+              ))}
+              <button
+                className="secondary-action-button toolbar-add-button"
+                type="button"
+                onClick={() => updateActiveScreen({
+                  tabBarItems: [
+                    ...(screen.tabBarItems ?? []),
+                    {
+                      id: createId('tab'),
+                      title: '新しいタブ',
+                      systemName: 'square',
+                      placement: 'bottomBar',
+                      selected: (screen.tabBarItems ?? []).length === 0,
+                      destinationScreenId: document.screens.find((candidate) => candidate.id !== screen.id)?.id,
+                    },
+                  ],
+                })}
+              >
+                ＋ タブを追加
+              </button>
+            </section>
+          )}
+          {screen && (
+            <section className="inspector-section">
               <div className="section-label">スワイプ遷移</div>
               {swipeDirections.map(({ key, label }) => (
                 <Field label={label} key={key}>
@@ -1061,12 +1098,14 @@ function ToolbarItemEditor({
   item,
   screenId,
   screens,
+  fixedPlacement,
   onChange,
   onRemove,
 }: {
   item: ToolbarItem;
   screenId: string;
   screens: CanvasScreen[];
+  fixedPlacement?: ToolbarPlacement;
   onChange: (patch: Partial<ToolbarItem>) => void;
   onRemove: () => void;
 }) {
@@ -1082,13 +1121,17 @@ function ToolbarItemEditor({
       <Field label="SF Symbol">
         <SymbolInput key={`${item.id}-symbol-${item.systemName ?? ''}`} value={item.systemName ?? ''} onCommit={(value) => onChange({ systemName: value.trim() || undefined })} />
       </Field>
-      <Field label="位置">
-        <select value={item.placement} onChange={(event) => onChange({ placement: event.target.value as ToolbarPlacement })}>
-          <option value="topBarLeading">左上</option>
-          <option value="topBarTrailing">右上</option>
-          <option value="bottomBar">下部バー</option>
-        </select>
-      </Field>
+      {fixedPlacement ? (
+        <Field label="位置"><span className="field-static-value">タブバー</span></Field>
+      ) : (
+        <Field label="位置">
+          <select value={item.placement} onChange={(event) => onChange({ placement: event.target.value as ToolbarPlacement })}>
+            <option value="topBarLeading">左上</option>
+            <option value="topBarTrailing">右上</option>
+            <option value="bottomBar">下部バー</option>
+          </select>
+        </Field>
+      )}
       <Field label="役割">
         <select value={item.role ?? 'normal'} onChange={(event) => onChange({ role: event.target.value as ToolbarItem['role'] })}>
           <option value="normal">標準</option>

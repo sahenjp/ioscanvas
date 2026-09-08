@@ -283,10 +283,19 @@ describe('project document parsing', () => {
       role: 'normal',
       destinationScreenId: 'screen-settings',
     }];
+    screen.tabBarItems = [{
+      id: 'tab-home',
+      title: 'ホーム',
+      systemName: 'house',
+      placement: 'bottomBar',
+      selected: true,
+      destinationScreenId: 'screen-home',
+    }];
     screen.swipe = { left: 'screen-settings' };
 
     expect(parseCanvasDocument(document)).toEqual(document);
     expect(parseCanvasDocument({ ...document, screens: [{ ...screen, toolbarItems: [{ ...screen.toolbarItems[0], placement: 'invalid' }] }] })).toBeNull();
+    expect(parseCanvasDocument({ ...document, screens: [{ ...screen, tabBarItems: [{ ...screen.tabBarItems[0], placement: 'topBarLeading' }] }] })).toBeNull();
     expect(parseCanvasDocument({ ...document, screens: [{ ...screen, swipe: { left: 'missing-screen' } }] })).toBeNull();
   });
 

@@ -25,12 +25,14 @@ describe('implementation prompt generator', () => {
     if (!screen) throw new Error('Fixture screen missing');
     screen.navigationTitleDisplayMode = 'inline';
     screen.toolbarItems = [{ id: 'help', title: 'ヘルプ', systemName: 'questionmark.circle', placement: 'topBarTrailing', destinationScreenId: 'screen-settings' }];
+    screen.tabBarItems = [{ id: 'settings-tab', title: '設定', systemName: 'gearshape', placement: 'bottomBar', destinationScreenId: 'screen-settings' }];
     screen.swipe = { left: 'screen-settings' };
 
     const output = generateImplementationPrompt(document);
 
     expect(output).toContain('タイトル表示: inline');
     expect(output).toContain('ツールバー: topBarTrailing: ヘルプ / symbol=questionmark.circle / destination=設定');
+    expect(output).toContain('タブバー: 設定 / symbol=gearshape / destination=設定');
     expect(output).toContain('スワイプ遷移: left=設定');
   });
 

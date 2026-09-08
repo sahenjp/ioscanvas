@@ -817,6 +817,7 @@ function ScreenPreview({
   const customAccent = document.appearance.accentColor === 'custom' ? document.appearance.accentHex : undefined;
   const isActive = previewMode || activeScreenId === screen.id;
   const toolbarItems = screen.toolbarItems ?? [];
+  const tabBarItems = (previewMode ? initialScreen.tabBarItems : screen.tabBarItems) ?? [];
   const leadingItems = toolbarItems.filter((item) => item.placement === 'topBarLeading');
   const trailingItems = toolbarItems.filter((item) => item.placement === 'topBarTrailing');
   const bottomItems = toolbarItems.filter((item) => item.placement === 'bottomBar');
@@ -971,7 +972,34 @@ function ScreenPreview({
           {previewMode && confirmationDialog && (
             <ConfirmationDialogPreview node={confirmationDialog} onClose={() => setOpenSheetId(null)} />
           )}
-          {bottomItems.length > 0 && (
+          {tabBarItems.length > 0 ? (
+            <nav className="ios-tab-bar" aria-label="タブバー">
+              {tabBarItems.map((item) => {
+                const destination = item.destinationScreenId;
+                const selected = previewMode
+                  ? (destination ? destination === screen.id : screen.id === initialScreen.id)
+                  : item.selected ?? false;
+                return (
+                  <button
+                    className={`ios-tab-bar-item ${selected ? 'is-selected' : ''}`}
+                    type="button"
+                    role="tab"
+                    aria-selected={selected}
+                    aria-label={item.title || 'タブ'}
+                    key={item.id}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      if (destination && previewMode) navigatePreview(destination);
+                      else if (destination && !previewMode) selectScreen(destination);
+                    }}
+                  >
+                    {item.systemName && <span className="ios-tab-bar-symbol" aria-hidden="true">{symbolGlyph(item.systemName)}</span>}
+                    <span>{item.title || 'タブ'}</span>
+                  </button>
+                );
+              })}
+            </nav>
+          ) : bottomItems.length > 0 && (
             <div className="ios-bottom-toolbar" role="toolbar" aria-label="下部ツールバー">
               {bottomItems.map((item) => <PreviewToolbarButton item={item} onNavigate={previewMode && item.destinationScreenId ? () => navigatePreview(item.destinationScreenId as string) : undefined} key={item.id} />)}
             </div>
@@ -1451,6 +1479,7 @@ function screenDestinations(screen: CanvasScreen): string[] {
   return [...new Set([
     ...navigationDestinations(screen.root.children),
     ...(screen.toolbarItems ?? []).flatMap((item) => item.destinationScreenId ? [item.destinationScreenId] : []),
+    ...(screen.tabBarItems ?? []).flatMap((item) => item.destinationScreenId ? [item.destinationScreenId] : []),
   ])];
 }
 
@@ -1471,12 +1500,17 @@ function screenConnections(screen: CanvasScreen): ScreenConnection[] {
       ? [{ destinationScreenId: item.destinationScreenId, nodeId: null, gesture: `ツールバー · ${item.title}` }]
       : [],
   );
+  const tabBar = (screen.tabBarItems ?? []).flatMap((item) =>
+    item.destinationScreenId
+      ? [{ destinationScreenId: item.destinationScreenId, nodeId: null, gesture: `タブバー · ${item.title}` }]
+      : [],
+  );
   const swipe = Object.entries(screen.swipe ?? {}).map(([direction, destinationScreenId]) => ({
     destinationScreenId,
     nodeId: null,
     gesture: direction === 'left' ? '左スワイプ' : direction === 'right' ? '右スワイプ' : direction === 'up' ? '上スワイプ' : '下スワイプ',
   }));
-  return [...navigation, ...toolbar, ...swipe];
+  return [...navigation, ...toolbar, ...tabBar, ...swipe];
 }
 
 function navigationLinks(nodes: CanvasNode[]): Extract<CanvasNode, { kind: 'navigation-link' | 'button' }>[] {

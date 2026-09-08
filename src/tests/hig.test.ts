@@ -315,6 +315,21 @@ describe('HIG linter', () => {
     ]));
   });
 
+  it('flags unlabeled and invalid tab bar items', () => {
+    const document = structuredClone(defaultDocument);
+    const screen = document.screens[0];
+    if (!screen) throw new Error('Fixture screen missing');
+    screen.tabBarItems = [
+      { id: 'empty-tab', title: ' ', placement: 'bottomBar' },
+      { id: 'broken-tab', title: '詳細', placement: 'bottomBar', destinationScreenId: 'missing-screen' },
+    ];
+
+    expect(lintDocument(document)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ nodeId: screen.root.id, code: 'ACCESSIBILITY' }),
+      expect.objectContaining({ nodeId: screen.root.id, code: 'NAVIGATION_DESTINATION' }),
+    ]));
+  });
+
   it('flags a swipe destination that points back to the same screen', () => {
     const document = structuredClone(defaultDocument);
     const screen = document.screens[0];

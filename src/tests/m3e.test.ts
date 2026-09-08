@@ -69,6 +69,8 @@ describe('M3E compatibility importer', () => {
     expect(home?.toolbarItems).toEqual(expect.arrayContaining([
       expect.objectContaining({ placement: 'topBarLeading', systemName: 'line.3.horizontal' }),
       expect.objectContaining({ placement: 'topBarTrailing', systemName: 'gearshape.fill' }),
+    ]));
+    expect(home?.tabBarItems).toEqual(expect.arrayContaining([
       expect.objectContaining({ placement: 'bottomBar', title: '詳細', destinationScreenId: detail?.id }),
     ]));
 
@@ -282,7 +284,7 @@ describe('M3E compatibility importer', () => {
       children: [expect.objectContaining({ kind: 'text' }), expect.objectContaining({ kind: 'button', label: '元に戻す' })],
     });
     expect(findNode(nodes, 'm3e-rail')).toMatchObject({ kind: 'navigation-split-view', selectedIndex: 1, railExpanded: true, railModal: true });
-    expect(document.screens[0]?.toolbarItems).toEqual(expect.arrayContaining([
+    expect(document.screens[0]?.tabBarItems).toEqual(expect.arrayContaining([
       expect.objectContaining({ title: '詳細', placement: 'bottomBar', selected: true }),
     ]));
     const output = generateSwiftUI(document);

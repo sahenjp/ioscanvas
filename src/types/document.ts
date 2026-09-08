@@ -373,6 +373,7 @@ export interface CanvasScreen {
   notes?: string;
   navigationTitleDisplayMode?: NavigationTitleDisplayMode;
   toolbarItems?: ToolbarItem[];
+  tabBarItems?: ToolbarItem[];
   swipe?: Partial<Record<SwipeDirection, string>>;
   root: ContainerNode;
 }

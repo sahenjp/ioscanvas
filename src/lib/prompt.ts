@@ -82,6 +82,7 @@ export type PromptScope = 'active' | 'all';
 
 function screenDetails(screen: CanvasDocument['screens'][number], document: CanvasDocument): string[] {
   const toolbar = (screen.toolbarItems ?? []).map((item) => `${item.placement}: ${item.title}${item.systemName ? ` / symbol=${item.systemName}` : ''}${item.selected ? ' / selected' : ''}${item.destinationScreenId ? ` / destination=${document.screens.find((candidate) => candidate.id === item.destinationScreenId)?.name ?? '未設定'}` : ''}`).join(', ') || 'なし';
+  const tabBar = (screen.tabBarItems ?? []).map((item) => `${item.title}${item.systemName ? ` / symbol=${item.systemName}` : ''}${item.selected ? ' / selected' : ''}${item.destinationScreenId ? ` / destination=${document.screens.find((candidate) => candidate.id === item.destinationScreenId)?.name ?? '未設定'}` : ''}`).join(', ') || 'なし';
   const navigation = navigationLinks(screen.root.children)
     .map((node) => `${node.label}=${document.screens.find((candidate) => candidate.id === node.destinationScreenId)?.name ?? '未設定'}`)
     .join(', ') || 'なし';
@@ -93,6 +94,7 @@ function screenDetails(screen: CanvasDocument['screens'][number], document: Canv
     ...(screen.notes?.trim() ? [`画面メモ: ${screen.notes.trim()}`] : []),
     `タイトル表示: ${screen.navigationTitleDisplayMode ?? 'automatic'}`,
     `ツールバー: ${toolbar}`,
+    `タブバー: ${tabBar}`,
     `NavigationLink遷移: ${navigation}`,
     `スワイプ遷移: ${swipe}`,
     '構造:',

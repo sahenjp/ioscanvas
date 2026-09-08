@@ -683,6 +683,7 @@ function groupsForScreen(groups: M3eGroup[], frame: M3eFrame, frames: M3eFrame[]
 
 function convertScreen(frame: M3eFrame, groups: M3eGroup[], frames: M3eFrame[], context: ConversionContext): CanvasScreen {
   const toolbarItems: ToolbarItem[] = [];
+  const tabBarItems: ToolbarItem[] = [];
   const bodyNodes: CanvasNode[] = [];
   let splitView: ContainerNode | undefined;
   let navigationTitle = frame.name;
@@ -699,7 +700,7 @@ function convertScreen(frame: M3eFrame, groups: M3eGroup[], frames: M3eFrame[], 
         continue;
       }
       if (item.kind === 'bottomNav') {
-        toolbarItems.push(...bottomNavigationItems(item, context));
+        tabBarItems.push(...bottomNavigationItems(item, context));
         continue;
       }
       if (item.kind === 'navRail') {
@@ -744,6 +745,7 @@ function convertScreen(frame: M3eFrame, groups: M3eGroup[], frames: M3eFrame[], 
     navigationTitle,
     ...(frame.note ? { notes: frame.note } : {}),
     ...(toolbarItems.length > 0 ? { toolbarItems } : {}),
+    ...(tabBarItems.length > 0 ? { tabBarItems } : {}),
     ...(frame.swipe ? {
       swipe: Object.fromEntries(
         Object.entries(frame.swipe).flatMap(([direction, target]) => context.frameIds.has(target) ? [[direction, context.frameIds.get(target) as string]] : []),
