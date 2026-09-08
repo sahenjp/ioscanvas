@@ -17,6 +17,7 @@ import type {
   SwipeDirection,
   TextStyle,
   ToolbarItem,
+  NodeKind,
 } from '../types/document';
 
 type JsonObject = Record<string, unknown>;
@@ -148,6 +149,25 @@ export interface M3eCompatibilityReport {
   unresolvedDestinationCount: number;
   unsupportedKinds: string[];
 }
+
+export interface M3eExportCompatibilityReport {
+  flattenedItemCount: number;
+  unsupportedNodeKinds: string[];
+  approximatedKinds: string[];
+  unresolvedDestinationCount: number;
+  normalizedScreenCount: number;
+}
+
+const flattenedOnlyNodeKinds: ReadonlySet<NodeKind> = new Set([
+  'vstack', 'hstack', 'lazyvstack', 'lazyhstack', 'zstack', 'glass-container', 'group',
+  'lazyvgrid', 'lazyhgrid', 'scrollview', 'list', 'form',
+]);
+
+const approximatedNodeKinds: ReadonlySet<NodeKind> = new Set([
+  'securefield', 'texteditor', 'colorpicker', 'stepper', 'menu', 'gauge', 'content-unavailable',
+  'label', 'link', 'datepicker', 'spacer', 'section', 'disclosure-group', 'sheet', 'groupbox',
+  'tabview', 'navigation-split-view', 'alert', 'confirmation-dialog',
+]);
 
 const supportedM3eKinds = new Set([
   'box', 'button', 'iconButton', 'fab', 'extendedFab', 'chip', 'topAppBar', 'bottomNav', 'navRail',
@@ -1398,6 +1418,60 @@ export function exportM3eDocument(document: CanvasDocument): M3eExportDocument {
     frame: document.activeScreenId,
     frames,
     groups,
+  };
+}
+
+function collectExportCompatibilityKinds(
+  node: CanvasNode,
+  unsupportedNodeKinds: Set<string>,
+  approximatedKinds: Set<string>,
+): void {
+  if (flattenedOnlyNodeKinds.has(node.kind)) unsupportedNodeKinds.add(node.kind);
+  if (approximatedNodeKinds.has(node.kind)) approximatedKinds.add(node.kind);
+  if (Array.isArray(node.children)) {
+    for (const child of node.children) collectExportCompatibilityKinds(child, unsupportedNodeKinds, approximatedKinds);
+  }
+}
+
+export function inspectM3eExportCompatibility(document: CanvasDocument): M3eExportCompatibilityReport {
+  const exported = exportM3eDocument(document);
+  const frameIds = new Set(document.screens.map((screen) => screen.id));
+  const unsupportedNodeKinds = new Set<string>();
+  const approximatedKinds = new Set<string>();
+  let unresolvedDestinationCount = 0;
+
+  for (const screen of document.screens) {
+    collectExportCompatibilityKinds(screen.root, unsupportedNodeKinds, approximatedKinds);
+    for (const node of screen.root.children) {
+      const visit = (current: CanvasNode): void => {
+        if ((current.kind === 'button' || current.kind === 'navigation-link')
+          && current.destinationScreenId
+          && !frameIds.has(current.destinationScreenId)) {
+          unresolvedDestinationCount += 1;
+        }
+        if (Array.isArray(current.children)) {
+          for (const child of current.children) visit(child);
+        }
+      };
+      visit(node);
+    }
+    for (const item of [...(screen.toolbarItems ?? []), ...(screen.tabBarItems ?? [])]) {
+      if (item.destinationScreenId && !frameIds.has(item.destinationScreenId)) unresolvedDestinationCount += 1;
+    }
+    for (const destination of Object.values(screen.swipe ?? {})) {
+      if (destination && !frameIds.has(destination)) unresolvedDestinationCount += 1;
+    }
+  }
+
+  return {
+    flattenedItemCount: exported.groups.reduce(
+      (count, group) => count + group.items.filter((item) => item.kind !== 'topAppBar' && item.kind !== 'bottomNav').length,
+      0,
+    ),
+    unsupportedNodeKinds: [...unsupportedNodeKinds].sort(),
+    approximatedKinds: [...approximatedKinds].sort(),
+    unresolvedDestinationCount,
+    normalizedScreenCount: exported.frames.length,
   };
 }
 

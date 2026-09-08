@@ -612,6 +612,7 @@ button.ios-navigation-link:hover { background: #f5f5f7; }
 
 .modal-backdrop { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; padding: 32px; background: rgba(0, 0, 0, .66); }
 .export-panel { width: min(920px, calc(100vw - 80px)); height: min(680px, calc(100vh - 80px)); display: grid; grid-template-rows: auto auto 1fr auto; overflow: hidden; border: 1px solid var(--line-strong); border-radius: 7px; background: var(--panel); box-shadow: 0 24px 70px rgba(0, 0, 0, .5); }
+.export-panel.has-compatibility { grid-template-rows: auto auto auto 1fr auto; }
 .export-header { min-height: 62px; display: flex; align-items: center; gap: 16px; padding: 0 14px 0 18px; border-bottom: 1px solid var(--line); }
 .export-header > div { display: flex; flex-direction: column; gap: 4px; }
 .export-header strong { font-size: 13px; }
@@ -623,6 +624,10 @@ button.ios-navigation-link:hover { background: #f5f5f7; }
 .export-scope { display: inline-flex; align-items: center; gap: 7px; margin-left: auto; color: var(--muted); font-size: 10px; }
 .export-scope select { height: 30px; padding: 0 8px; border: 1px solid var(--line-strong); border-radius: 5px; background: var(--input); color: var(--text-soft); font-size: 11px; }
 .export-code { margin: 0; overflow: auto; padding: 18px 20px; background: #111214; color: #d4d4d4; font: 11px/1.65 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre-wrap; }
+.m3e-compatibility { display: grid; gap: 3px; padding: 8px 18px; border-bottom: 1px solid var(--line); background: var(--panel-raised); color: var(--muted); font-size: 10px; line-height: 1.45; }
+.m3e-compatibility strong { color: var(--text-soft); font-size: 11px; }
+.m3e-compatibility.has-warning { background: #1c1812; color: #d2b37e; }
+.m3e-compatibility.has-warning strong { color: #f0d49b; }
 .export-footer { min-height: 52px; display: flex; align-items: center; gap: 12px; padding: 0 12px 0 18px; border-top: 1px solid var(--line); }
 .export-footer span { color: var(--muted); font-size: 10px; }
 .export-footer .primary-toolbar-button { margin-left: auto; }
@@ -677,6 +682,8 @@ button.ios-navigation-link:hover { background: #f5f5f7; }
   .notes-section .hig-issue-button:hover { color: #41454b; }
   .secondary-action-button { background: #fff; }
   .delete-button { border-color: #e5b4b0; background: #fff5f4; }
+  .m3e-compatibility.has-warning { background: #fff9ed; color: #8a661f; }
+  .m3e-compatibility.has-warning strong { color: #6f5015; }
   .phone-shell { border-color: #c5c8cd; background: #17191c; }
   .phone-screen.has-glass { background-color: #edf0f3; }
   .canvas-container { background: rgba(255, 255, 255, .28); }
@@ -763,6 +770,8 @@ button.ios-navigation-link:hover { background: #f5f5f7; }
 .app-shell[data-theme="light"] .secondary-action-button { background: #fff; }
 .app-shell[data-theme="light"] .secondary-action-button:hover { background: #eef0f2; }
 .app-shell[data-theme="light"] .delete-button { border-color: #e5b4b0; background: #fff5f4; }
+.app-shell[data-theme="light"] .m3e-compatibility.has-warning { background: #fff9ed; color: #8a661f; }
+.app-shell[data-theme="light"] .m3e-compatibility.has-warning strong { color: #6f5015; }
 .app-shell[data-theme="light"] .code-preview, .app-shell[data-theme="light"] .export-code { background: #f5f6f7; color: #26282b; }
 
 @media (prefers-reduced-motion: reduce) {

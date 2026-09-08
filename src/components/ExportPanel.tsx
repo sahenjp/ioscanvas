@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { generateImplementationPrompt, type PromptScope } from '../lib/prompt';
-import { generateM3eJson } from '../lib/m3e';
+import { generateM3eJson, inspectM3eExportCompatibility } from '../lib/m3e';
 import { copyText } from '../lib/share';
 import { generateSwiftUI } from '../lib/swiftui';
 import { useEditorStore } from '../store/editor';
@@ -18,7 +18,11 @@ export function ExportPanel() {
   const swiftui = useMemo(() => generateSwiftUI(document), [document]);
   const prompt = useMemo(() => generateImplementationPrompt(document, promptScope), [document, promptScope]);
   const m3e = useMemo(() => generateM3eJson(document), [document]);
+  const m3eReport = useMemo(() => inspectM3eExportCompatibility(document), [document]);
   const value = tab === 'swiftui' ? swiftui : tab === 'prompt' ? prompt : m3e;
+  const m3eHasWarnings = m3eReport.unsupportedNodeKinds.length > 0
+    || m3eReport.approximatedKinds.length > 0
+    || m3eReport.unresolvedDestinationCount > 0;
 
   useEffect(() => {
     if (!open) return;
@@ -54,7 +58,7 @@ export function ExportPanel() {
 
   return (
     <div className="modal-backdrop" role="presentation" onMouseDown={() => setOpen(false)}>
-      <section className="export-panel" role="dialog" aria-modal="true" aria-label="設計を書き出す" onMouseDown={(event) => event.stopPropagation()}>
+      <section className={`export-panel ${tab === 'm3e' ? 'has-compatibility' : ''}`} role="dialog" aria-modal="true" aria-label="設計を書き出す" onMouseDown={(event) => event.stopPropagation()}>
         <header className="export-header">
           <div>
             <strong>設計を書き出す</strong>
@@ -76,6 +80,15 @@ export function ExportPanel() {
             </label>
           )}
         </div>
+        {tab === 'm3e' && (
+          <div className={`m3e-compatibility ${m3eHasWarnings ? 'has-warning' : ''}`} role="status" aria-label="M3E互換診断">
+            <strong>M3E互換診断</strong>
+            <span>{m3eReport.flattenedItemCount}要素を平坦化 / {m3eReport.normalizedScreenCount}画面を端末プリセットへ正規化</span>
+            {m3eReport.unsupportedNodeKinds.length > 0 && <span>直接対応なし: {m3eReport.unsupportedNodeKinds.join(', ')}</span>}
+            {m3eReport.approximatedKinds.length > 0 && <span>近似変換: {m3eReport.approximatedKinds.join(', ')}</span>}
+            {m3eReport.unresolvedDestinationCount > 0 && <span>未解決の遷移: {m3eReport.unresolvedDestinationCount}件</span>}
+          </div>
+        )}
         <pre className="export-code"><code>{value}</code></pre>
         <footer className="export-footer">
           <span>{copyError ? 'コピーできません。テキストを手動で選択してください。' : tab === 'swiftui' ? 'ドキュメントの意味構造から生成' : tab === 'prompt' ? '実装条件と現在のHIGチェックを含みます。' : 'M3E Canvasで開ける座標射影データとして生成'}</span>

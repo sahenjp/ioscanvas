@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { findNode } from '../lib/nodes';
-import { convertM3eDocument, exportM3eDocument, generateM3eJson, inspectM3eCompatibility, isM3eDocument } from '../lib/m3e';
+import { convertM3eDocument, exportM3eDocument, generateM3eJson, inspectM3eCompatibility, inspectM3eExportCompatibility, isM3eDocument } from '../lib/m3e';
 import { defaultDocument } from '../lib/defaultDocument';
 import { generateSwiftUI } from '../lib/swiftui';
+import type { CanvasDocument } from '../types/document';
 
 const m3eDocument = {
   title: 'レシピ',
@@ -70,6 +71,42 @@ describe('M3E compatibility importer', () => {
     expect(roundTripped?.screens[0]?.root.children).toEqual(expect.arrayContaining([
       expect.objectContaining({ kind: 'navigation-link', label: '設定を開く' }),
     ]));
+  });
+
+  it('reports lossy decisions made during M3E export', () => {
+    const document: CanvasDocument = {
+      version: 1,
+      name: '互換診断',
+      platform: 'iOS',
+      minimumOS: '26.0',
+      appearance: { colorScheme: 'system', accentColor: 'blue' },
+      activeScreenId: 'home',
+      screens: [{
+        id: 'home',
+        name: 'ホーム',
+        navigationTitle: 'ホーム',
+        previewDevice: 'iphone-se',
+        root: {
+          id: 'root',
+          kind: 'vstack',
+          children: [
+            { id: 'title', kind: 'text', text: '見出し', fontSize: 28, weight: 'bold' },
+            { id: 'password', kind: 'securefield', label: 'パスワード', binding: 'password', minHeight: 44 },
+            { id: 'glass', kind: 'glass-container', children: [{ id: 'glass-text', kind: 'text', text: '補足', fontSize: 17, weight: 'regular' }] },
+            { id: 'broken-link', kind: 'button', label: '開く', role: 'normal', minHeight: 44, destinationScreenId: 'missing' },
+          ],
+        },
+        swipe: { right: 'missing' },
+      }],
+    };
+
+    expect(inspectM3eExportCompatibility(document)).toEqual({
+      flattenedItemCount: 4,
+      unsupportedNodeKinds: ['glass-container', 'vstack'],
+      approximatedKinds: ['securefield'],
+      unresolvedDestinationCount: 2,
+      normalizedScreenCount: 1,
+    });
   });
 
   it('recognizes and converts M3E screen groups into a semantic iOS document', () => {
