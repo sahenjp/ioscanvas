@@ -1,9 +1,41 @@
 import { lintDocument } from './hig';
 import type { CanvasDocument, CanvasNode, ScreenDevice } from '../types/document';
 
+function m3eMetadataDetails(metadata: CanvasNode['m3eMetadata']): string {
+  if (!metadata) return '';
+  const parts = [
+    metadata.icon === undefined ? '' : `sourceIcon=${metadata.icon ?? 'none'}`,
+    metadata.icon2 === undefined ? '' : `sourceIcon2=${metadata.icon2 ?? 'none'}`,
+    metadata.supporting?.trim() ? `supporting=${metadata.supporting.trim()}` : '',
+    metadata.size === undefined ? '' : `size=${metadata.size}dp`,
+    metadata.size2 === undefined ? '' : `size2=${metadata.size2}dp`,
+    metadata.radiusTop === undefined ? '' : `radiusTop=${metadata.radiusTop}dp`,
+    metadata.radiusBottom === undefined ? '' : `radiusBottom=${metadata.radiusBottom}dp`,
+    metadata.corners ? `corners=${metadata.corners.tl}/${metadata.corners.tr}/${metadata.corners.br}/${metadata.corners.bl}` : '',
+    metadata.selected === undefined ? '' : `selected=${metadata.selected}`,
+    metadata.imagePos ? `imagePos=${metadata.imagePos}` : '',
+    metadata.imageSize === undefined ? '' : `imageSize=${metadata.imageSize}dp`,
+    metadata.contentAlign ? `contentAlign=${metadata.contentAlign}` : '',
+    metadata.textColor ? `textColor=${metadata.textColor}` : '',
+    metadata.fill ? `fill=${metadata.fill}` : '',
+    metadata.iconFill ? `iconFill=${metadata.iconFill}` : '',
+    metadata.src ? `source=${metadata.src}` : '',
+    metadata.contained ? 'contained' : '',
+    metadata.noCheck ? 'noCheck' : '',
+    metadata.noImage ? 'noImage' : '',
+    metadata.wavy ? 'wavy' : '',
+    metadata.trackThickness === undefined ? '' : `trackThickness=${metadata.trackThickness}pt`,
+    metadata.railExpanded ? 'railExpanded' : '',
+    metadata.railModal ? 'railModal' : '',
+    metadata.railExpansionSide ? `railExpansionSide=${metadata.railExpansionSide}` : '',
+  ].filter(Boolean);
+  return parts.length > 0 ? ` / M3E ${parts.join(' / ')}` : '';
+}
+
 function describe(node: CanvasNode, depth = 0): string[] {
   const pad = '  '.repeat(depth);
-  const common = `${pad}- ${node.kind}${node.glass ? ` / glass=${node.glass}` : ''}${node.glassInteractive ? ' / interactive' : ''}${node.glassTint ? ` / tint=${node.glassTint}` : ''}${node.glassShape && node.glassShape !== 'automatic' ? ` / glassShape=${node.glassShape}` : ''}${node.padding ? ` / padding=${node.padding}pt` : ''}${node.frameWidth === 'max' ? ' / frame=max' : ''}${node.background && node.background !== 'none' ? ` / background=${node.background}` : ''}${node.cornerRadius ? ` / cornerRadius=${node.cornerRadius}` : ''}${node.overlay ? ' / overlay' : ''}${node.shadow && node.shadow !== 'none' ? ` / shadow=${node.shadow}` : ''}${node.notes?.trim() ? ` / memo=${node.notes.trim()}` : ''}`;
+  const m3eKind = node.m3eKind ? ` / M3E kind=${node.m3eKind}${node.m3eVariant ? ` / variant=${node.m3eVariant}` : ''}` : '';
+  const common = `${pad}- ${node.kind}${node.glass ? ` / glass=${node.glass}` : ''}${node.glassInteractive ? ' / interactive' : ''}${node.glassTint ? ` / tint=${node.glassTint}` : ''}${node.glassShape && node.glassShape !== 'automatic' ? ` / glassShape=${node.glassShape}` : ''}${node.padding ? ` / padding=${node.padding}pt` : ''}${node.frameWidth === 'max' ? ' / frame=max' : ''}${node.background && node.background !== 'none' ? ` / background=${node.background}` : ''}${node.cornerRadius ? ` / cornerRadius=${node.cornerRadius}` : ''}${node.overlay ? ' / overlay' : ''}${node.shadow && node.shadow !== 'none' ? ` / shadow=${node.shadow}` : ''}${node.notes?.trim() ? ` / memo=${node.notes.trim()}` : ''}${m3eKind}${m3eMetadataDetails(node.m3eMetadata)}`;
   switch (node.kind) {
     case 'text':
       return [`${common}: ${node.text} / ${node.textStyle && node.textStyle !== 'custom' ? node.textStyle : `${node.fontSize}pt`} / ${node.weight}${node.fontDesign && node.fontDesign !== 'default' ? ` / design=${node.fontDesign}` : ''}${node.textAlignment && node.textAlignment !== 'leading' ? ` / alignment=${node.textAlignment}` : ''}${node.lineLimit ? ` / lineLimit=${node.lineLimit}` : ''}`];
@@ -105,6 +137,8 @@ function screenDetails(screen: CanvasDocument['screens'][number], document: Canv
     `画面背景: ${screen.background ?? 'surface'}`,
     `プレビュー端末: ${screenDeviceNames[screen.previewDevice ?? 'iphone-16']}`,
     `画面方向: ${screen.previewOrientation === 'landscape' ? '横向き' : '縦向き'}`,
+    ...(screen.m3eTopAppBar ? [`M3E Top App Bar:${m3eMetadataDetails(screen.m3eTopAppBar)}`] : []),
+    ...(screen.m3eBottomNav ? [`M3E Bottom Navigation:${m3eMetadataDetails(screen.m3eBottomNav)}`] : []),
     `ツールバー: ${toolbar}`,
     `タブバー: ${tabBar}`,
     `NavigationLink遷移: ${navigation}`,

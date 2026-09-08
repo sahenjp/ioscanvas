@@ -187,6 +187,7 @@ export interface M3eExportCompatibilityReport {
   approximatedFields: string[];
   lostFields: string[];
   normalizedScreenCount: number;
+  roundTripValid: boolean;
 }
 
 const flattenedOnlyNodeKinds: ReadonlySet<NodeKind> = new Set([
@@ -2016,6 +2017,7 @@ function collectExportCompatibilityKinds(
 
 export function inspectM3eExportCompatibility(document: CanvasDocument): M3eExportCompatibilityReport {
   const exported = exportM3eDocument(document);
+  const roundTripped = convertM3eDocument(exported);
   const frameIds = new Set(document.screens.map((screen) => screen.id));
   const unsupportedNodeKinds = new Set<string>();
   const approximatedKinds = new Set<string>();
@@ -2083,6 +2085,7 @@ export function inspectM3eExportCompatibility(document: CanvasDocument): M3eExpo
     approximatedFields,
     lostFields,
     normalizedScreenCount: exported.frames.length,
+    roundTripValid: roundTripped !== null && roundTripped.screens.length === exported.frames.length,
   };
 }
 

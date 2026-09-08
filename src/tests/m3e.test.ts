@@ -113,6 +113,7 @@ describe('M3E compatibility importer', () => {
       approximatedFields: [],
       lostFields: [],
       normalizedScreenCount: 1,
+      roundTripValid: true,
     });
   });
 
@@ -802,6 +803,8 @@ describe('M3E compatibility importer', () => {
     expect(swiftui).toContain('.frame(minHeight: 52)');
     expect(swiftui).toContain('.clipShape(UnevenRoundedRectangle(cornerRadii: .init(topLeading: 10, bottomLeading: 14, bottomTrailing: 16, topTrailing: 12)))');
     expect(swiftui).toContain('.background(Color.accentColor.opacity(0.10), in: RoundedRectangle(cornerRadius: 8))');
+    expect(swiftui).toContain('.toolbarBackground(Color.secondary.opacity(0.18), for: .navigationBar)');
+    expect(swiftui).toContain('.toolbarBackground(.thinMaterial, for: .tabBar)');
 
     const explicitNone = structuredClone(document);
     const noneFavorite = findNode(explicitNone.screens[0]?.root.children ?? [], 'm3e-favorite');

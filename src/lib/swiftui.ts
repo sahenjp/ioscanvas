@@ -234,6 +234,22 @@ function m3eButtonLabel(
 }`;
 }
 
+function m3eToolbarBackground(metadata: M3eItemMetadata | undefined): string | undefined {
+  if (!metadata) return undefined;
+  if (metadata.fill && metadata.fill !== 'surface') return m3eFillLiteral(metadata.fill);
+  if (metadata.contained && !metadata.fill) return '.thinMaterial';
+  return undefined;
+}
+
+function m3eToolbarModifiers(screen: CanvasScreen): string {
+  const modifiers: string[] = [];
+  const topBackground = m3eToolbarBackground(screen.m3eTopAppBar);
+  const bottomBackground = m3eToolbarBackground(screen.m3eBottomNav);
+  if (topBackground) modifiers.push(`        .toolbarBackground(${topBackground}, for: .navigationBar)`);
+  if (bottomBackground) modifiers.push(`        .toolbarBackground(${bottomBackground}, for: .tabBar)`);
+  return modifiers.length > 0 ? `\n${modifiers.join('\n')}` : '';
+}
+
 function cardRenderContext(
   node: ContainerNode,
   context: RenderContext,
@@ -969,10 +985,10 @@ function renderScreen(
     : '';
   const rootBody = isRoot
     ? tabView
-      ? `${tabView}\n        .tint(${accentColorLiteral(appearance)})${colorScheme}${fontDesign}`
+      ? `${tabView}\n        .tint(${accentColorLiteral(appearance)})${colorScheme}${fontDesign}${m3eToolbarModifiers(screen)}`
       : directSplitContainer
-      ? `${contentWithSwipe}\n        .tint(${accentColorLiteral(appearance)})${colorScheme}${fontDesign}`
-      : `        NavigationStack {\n${indentBlock(contentWithSwipe, 1)}\n        }\n        .tint(${accentColorLiteral(appearance)})${colorScheme}${fontDesign}`
+      ? `${contentWithSwipe}\n        .tint(${accentColorLiteral(appearance)})${colorScheme}${fontDesign}${m3eToolbarModifiers(screen)}`
+      : `        NavigationStack {\n${indentBlock(contentWithSwipe, 1)}\n        }\n        .tint(${accentColorLiteral(appearance)})${colorScheme}${fontDesign}${m3eToolbarModifiers(screen)}`
     : contentWithSwipe;
   const background = screenBackgroundModifier(screen.background, 2);
 

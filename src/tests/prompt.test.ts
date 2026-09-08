@@ -75,6 +75,31 @@ describe('implementation prompt generator', () => {
     expect(generateImplementationPrompt(document)).toContain('- button: 次へ / role=normal / style=bordered / symbol=arrow.right');
   });
 
+  it('keeps M3E display attributes in the implementation brief', () => {
+    const document = structuredClone(defaultDocument);
+    const screen = document.screens[0];
+    const button = screen?.root.children.find((node) => node.kind === 'button');
+    if (!screen || !button) throw new Error('M3E prompt fixture missing');
+    button.m3eKind = 'button';
+    button.m3eVariant = 'tonal';
+    button.m3eMetadata = {
+      fill: 'primaryContainer',
+      textColor: 'onPrimaryContainer',
+      iconFill: 'secondaryContainer',
+      size: 140,
+      corners: { tl: 8, tr: 10, bl: 12, br: 14 },
+      contained: true,
+    };
+    screen.m3eTopAppBar = { fill: 'surfaceContainerHigh', size: 56 };
+
+    const output = generateImplementationPrompt(document);
+
+    expect(output).toContain('M3E kind=button / variant=tonal');
+    expect(output).toContain('fill=primaryContainer / iconFill=secondaryContainer');
+    expect(output).toContain('size=140dp');
+    expect(output).toContain('M3E Top App Bar: / M3E size=56dp / fill=surfaceContainerHigh');
+  });
+
   it('includes SearchField binding and prompt in the implementation brief', () => {
     const document = structuredClone(defaultDocument);
     document.screens[0]?.root.children.push({

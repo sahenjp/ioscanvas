@@ -23,7 +23,8 @@ export function ExportPanel() {
   const m3eHasWarnings = m3eReport.unsupportedNodeKinds.length > 0
     || m3eReport.approximatedKinds.length > 0
     || m3eReport.unresolvedDestinationCount > 0
-    || m3eReport.lostFields.length > 0;
+    || m3eReport.lostFields.length > 0
+    || !m3eReport.roundTripValid;
 
   useEffect(() => {
     if (!open) return;
@@ -85,6 +86,7 @@ export function ExportPanel() {
           <div className={`m3e-compatibility ${m3eHasWarnings ? 'has-warning' : ''}`} role="status" aria-label="M3E互換診断">
             <strong>M3E互換診断</strong>
             <span>{m3eReport.flattenedItemCount}要素を平坦化 / {m3eReport.normalizedScreenCount}画面を端末プリセットへ正規化</span>
+            <span>再読込検証: {m3eReport.roundTripValid ? '成功' : '要確認'}</span>
             {m3eReport.unsupportedNodeKinds.length > 0 && <span>直接対応なし: {m3eReport.unsupportedNodeKinds.join(', ')}</span>}
             {m3eReport.approximatedKinds.length > 0 && <span>近似変換: {m3eReport.approximatedKinds.join(', ')}</span>}
             {m3eReport.unresolvedDestinationCount > 0 && <span>未解決の遷移: {m3eReport.unresolvedDestinationCount}件</span>}
