@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { parseCanvasDocument } from '../lib/document';
-import { convertM3eDocument } from '../lib/m3e';
+import { convertM3eDocument, inspectM3eCompatibility } from '../lib/m3e';
 import { lintDocument } from '../lib/hig';
 import { findNode } from '../lib/nodes';
 import { copyText, createShareUrl } from '../lib/share';
@@ -25,6 +25,7 @@ export function TopBar() {
   const pasteNode = useEditorStore((state) => state.pasteNode);
   const fileInput = useRef<HTMLInputElement>(null);
   const [fileError, setFileError] = useState<string | null>(null);
+  const [fileNotice, setFileNotice] = useState<string | null>(null);
   const [shareState, setShareState] = useState<'idle' | 'copied' | 'error'>('idle');
   const issues = lintDocument(document);
   const warnings = issues.filter((issue) => issue.severity === 'warning').length;
@@ -60,12 +61,28 @@ export function TopBar() {
 
     try {
       const raw: unknown = JSON.parse(await file.text());
-      const parsed = parseCanvasDocument(raw) ?? convertM3eDocument(raw);
-      if (!parsed) throw new Error('Invalid project file');
-      loadDocument(parsed);
+      const parsed = parseCanvasDocument(raw);
+      const imported = parsed ? null : convertM3eDocument(raw);
+      const loadedDocument = parsed ?? imported;
+      if (!loadedDocument) throw new Error('Invalid project file');
+      loadDocument(loadedDocument);
+      const report = imported ? inspectM3eCompatibility(raw) : null;
+      if (report) {
+        const details = [
+          report.invalidFrameCount > 0 ? `無効な画面${report.invalidFrameCount}件` : '',
+          report.invalidGroupCount > 0 ? `無効なグループ${report.invalidGroupCount}件` : '',
+          report.discardedItemCount > 0 ? `破棄した項目${report.discardedItemCount}件` : '',
+          report.unresolvedDestinationCount > 0 ? `未解決の遷移${report.unresolvedDestinationCount}件` : '',
+          report.unsupportedKinds.length > 0 ? `未対応パーツ: ${report.unsupportedKinds.join(', ')}` : '',
+        ].filter(Boolean);
+        setFileNotice(details.length > 0 ? `M3E互換確認: ${details.join(' / ')}` : null);
+      } else {
+        setFileNotice(null);
+      }
       setFileError(null);
     } catch {
       setFileError('プロジェクトファイルを開けませんでした。');
+      setFileNotice(null);
     }
   };
 
@@ -119,6 +136,7 @@ export function TopBar() {
           {notes > 0 && <span className="status-notes">補足 {notes}</span>}
         </button>
         {fileError && <span className="project-error" role="status">{fileError}</span>}
+        {fileNotice && <span className="project-notice" role="status">{fileNotice}</span>}
       </div>
 
       <div className="topbar-actions">

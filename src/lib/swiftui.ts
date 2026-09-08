@@ -1,4 +1,4 @@
-import type { CanvasDocument, CanvasNode, CanvasScreen, ContainerNode, SwipeDirection, ToolbarItem } from '../types/document';
+import type { CanvasDocument, CanvasNode, CanvasScreen, ContainerNode, ScreenBackground, SwipeDirection, ToolbarItem } from '../types/document';
 
 const indent = (depth: number) => '    '.repeat(depth);
 const indentBlock = (value: string, depth: number) => value
@@ -110,6 +110,9 @@ function accentColorLiteral(appearance: CanvasDocument['appearance']): string {
 function renderNode(node: CanvasNode, depth: number, context: RenderContext): string {
   const rendered = renderNodeContent(node, depth, context);
   const pad = indent(depth);
+  const transitionNote = node.navigationTransition
+    ? `${pad}// iOSCanvas navigation transition: ${node.navigationTransition}. NavigationStack keeps the native transition; use a custom route if this exact motion is required.\n`
+    : '';
   const modifiers: string[] = [];
   if (node.padding !== undefined && node.padding > 0) modifiers.push(`${pad}.padding(${node.padding})`);
   if (node.frameWidth === 'max') modifiers.push(`${pad}.frame(maxWidth: .infinity, alignment: .leading)`);
@@ -138,7 +141,8 @@ function renderNode(node: CanvasNode, depth: number, context: RenderContext): st
     modifiers.push(`${pad}.accessibilityLabel(${quoted(node.accessibilityLabel)})`);
   }
   modifiers.push(...(context.nodeModifiers?.get(node.id) ?? []).map((modifier) => `${pad}${modifier}`));
-  return modifiers.length > 0 ? `${rendered}\n${modifiers.join('\n')}` : rendered;
+  const output = modifiers.length > 0 ? `${rendered}\n${modifiers.join('\n')}` : rendered;
+  return transitionNote + output;
 }
 
 function cardRenderContext(
@@ -229,13 +233,26 @@ function renderToolbarButton(item: ToolbarItem, viewNames: Map<string, string>):
   const withSelection = (value: string) => item.selected
     ? `${value}\n${buttonPad}.accessibilityAddTraits(.isSelected)`
     : value;
+  const transitionNote = item.navigationTransition
+    ? `${buttonPad}// iOSCanvas navigation transition: ${item.navigationTransition}. NavigationStack keeps the native transition; use a custom route if this exact motion is required.\n`
+    : '';
   const role = item.role && item.role !== 'normal' ? `, role: .${item.role}` : '';
   const destination = item.destinationScreenId ? viewNames.get(item.destinationScreenId) : undefined;
+  if (item.navigationAction === 'back') {
+    const label = item.systemName?.trim()
+      ? `Label(${quoted(item.title)}, systemImage: ${quoted(item.systemName)})`
+      : `Text(${quoted(item.title)})`;
+    return withSelection(`${transitionNote}${buttonPad}Button {
+${contentPad}dismiss()
+${buttonPad}} label: {
+${contentPad}${label}
+${buttonPad}}`);
+  }
   if (destination) {
     const label = item.systemName?.trim()
       ? `Label(${quoted(item.title)}, systemImage: ${quoted(item.systemName)})`
       : `Text(${quoted(item.title)})`;
-    return withSelection(`${buttonPad}NavigationLink {
+    return withSelection(`${transitionNote}${buttonPad}NavigationLink {
 ${contentPad}${destination}()
 ${buttonPad}} label: {
 ${contentPad}${label}
@@ -401,6 +418,15 @@ function renderNodeContent(node: CanvasNode, depth: number, context: RenderConte
     }
     case 'button': {
       const destination = node.destinationScreenId ? context.viewNames.get(node.destinationScreenId) : undefined;
+      if (node.navigationAction === 'back') {
+        const label = node.systemName?.trim()
+          ? `Label(${quoted(node.label)}, systemImage: ${quoted(node.systemName)})`
+          : `Text(${quoted(node.label)})`;
+        const style = !node.glass && node.buttonStyle && node.buttonStyle !== 'automatic'
+          ? `\n${pad}.buttonStyle(.${node.buttonStyle})`
+          : '';
+        return `${pad}Button {\n${pad}    dismiss()\n${pad}} label: {\n${pad}    ${label}\n${pad}}\n${pad}.frame(minHeight: ${node.minHeight})${style}`;
+      }
       if (destination) {
         const label = node.systemName?.trim()
           ? `Label(${quoted(node.label)}, systemImage: ${quoted(node.systemName)})`
@@ -729,6 +755,26 @@ function tabBarSelectedIndex(items: ToolbarItem[]): number {
   return selected < 0 ? 0 : selected;
 }
 
+function screenBackgroundModifier(background: ScreenBackground | undefined, depth: number): string {
+  if (!background || background === 'surface') return '';
+  const style = {
+    surfaceContainerLow: 'Color(uiColor: .secondarySystemBackground)',
+    surfaceContainer: 'Color(uiColor: .tertiarySystemBackground)',
+    surfaceContainerHigh: 'Color(uiColor: .tertiarySystemBackground)',
+    surfaceContainerHighest: 'Color(uiColor: .secondarySystemBackground)',
+    primaryContainer: 'Color.accentColor.opacity(0.16)',
+    secondaryContainer: 'Color.accentColor.opacity(0.10)',
+    tertiaryContainer: 'Color.orange.opacity(0.10)',
+    primary: 'Color.accentColor',
+    inverseSurface: 'Color(uiColor: .label)',
+  }[background];
+  return `\n${indent(depth)}.background(${style}, ignoresSafeAreaEdges: .all)`;
+}
+
+function hasBackAction(nodes: CanvasNode[]): boolean {
+  return nodes.some((node) => node.navigationAction === 'back' || (node.children ? hasBackAction(node.children) : false));
+}
+
 function renderScreen(
   screen: CanvasScreen,
   context: RenderContext,
@@ -740,6 +786,9 @@ function renderScreen(
   const tabBarItems = isRoot ? screen.tabBarItems ?? [] : [];
   const tabSelectionName = tabBarItems.length > 0 ? tabBarSelectionName(screen.id) : undefined;
   const stateLines = [
+    ...(hasBackAction(screen.root.children) || (screen.toolbarItems ?? []).some((item) => item.navigationAction === 'back')
+      ? ['    @Environment(\\.dismiss) private var dismiss']
+      : []),
     ...[...context.bindings.values()].map(({ name, type, initial }) => `    @State private var ${name}: ${type} = ${initial}`),
     ...swipeStates.map(({ stateName }) => `    @State private var ${stateName} = false`),
     ...(tabSelectionName ? [`    @State private var ${tabSelectionName}: Int = ${tabBarSelectedIndex(tabBarItems)}`] : []),
@@ -759,8 +808,14 @@ function renderScreen(
   if ((directScrollContainer || directSplitContainer) && firstChild) {
     content = `${renderNode(firstChild, 2, context)}\n${navigationTitle}${titleDisplayMode}${toolbar}`;
   } else {
-    const body = screen.root.children.map((node) => renderNode(node, 4, context)).join('\n');
-    content = `        ScrollView {\n            VStack(alignment: .leading, spacing: ${screen.root.spacing ?? 16}) {\n${body}\n            }\n            .padding()\n        }\n${navigationTitle}${titleDisplayMode}${toolbar}`;
+    const placement = screen.contentPlacement ?? 'top';
+    const body = screen.root.children
+      .map((node) => renderNode(node, 4, context))
+      .join(placement === 'spread' ? `\n${indent(4)}Spacer(minLength: 0)\n` : '\n');
+    const placementModifier = placement === 'top'
+      ? ''
+      : `\n            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .${placement === 'center' ? 'center' : placement === 'bottom' ? 'bottom' : 'top'})`;
+    content = `        ScrollView {\n            VStack(alignment: .leading, spacing: ${screen.root.spacing ?? 16}) {\n${body}\n            }${placementModifier}\n            .padding()\n        }\n${navigationTitle}${titleDisplayMode}${toolbar}`;
   }
   const colorScheme = appearance.colorScheme === 'system'
     ? ''
@@ -788,8 +843,9 @@ function renderScreen(
       ? `${contentWithSwipe}\n        .tint(${accentColorLiteral(appearance)})${colorScheme}${fontDesign}`
       : `        NavigationStack {\n${indentBlock(contentWithSwipe, 1)}\n        }\n        .tint(${accentColorLiteral(appearance)})${colorScheme}${fontDesign}`
     : contentWithSwipe;
+  const background = screenBackgroundModifier(screen.background, 2);
 
-  return `struct ${viewName}: View {\n${stateLines ? `${stateLines}\n\n` : ''}    var body: some View {\n${rootBody}\n    }\n}`;
+  return `struct ${viewName}: View {\n${stateLines ? `${stateLines}\n\n` : ''}    var body: some View {\n${rootBody}${background}\n    }\n}`;
 }
 
 function hasNodeKind(nodes: CanvasNode[], kind: CanvasNode['kind']): boolean {
@@ -807,8 +863,11 @@ export function generateSwiftUI(document: CanvasDocument): string {
     return renderScreen(candidate, { bindings, viewNames }, candidate.id === screen.id, viewName, document.appearance);
   }).join('\n\n');
 
-  const imports = hasNodeKind(document.screens.flatMap((candidate) => candidate.root.children), 'map')
-    ? 'import Foundation\nimport SwiftUI\nimport MapKit'
-    : 'import Foundation\nimport SwiftUI';
+  const imports = [
+    'import Foundation',
+    'import SwiftUI',
+    ...(hasNodeKind(document.screens.flatMap((candidate) => candidate.root.children), 'map') ? ['import MapKit'] : []),
+    ...(document.screens.some((candidate) => candidate.background && candidate.background !== 'surface') ? ['import UIKit'] : []),
+  ].join('\n');
   return `${imports}\n\n${views}\n`;
 }

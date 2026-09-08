@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { findNode } from '../lib/nodes';
-import { convertM3eDocument, isM3eDocument } from '../lib/m3e';
+import { convertM3eDocument, inspectM3eCompatibility, isM3eDocument } from '../lib/m3e';
 import { generateSwiftUI } from '../lib/swiftui';
 
 const m3eDocument = {
@@ -8,7 +8,7 @@ const m3eDocument = {
   paletteKey: 'teal',
   theme: { dark: true, font: 'robotoSerif' },
   frames: [
-    { id: 'home', name: 'ホーム', x: 0, y: 0, note: '一覧画面' },
+    { id: 'home', name: 'ホーム', x: 0, y: 0, note: '一覧画面', place: 'center', bg: 'surfaceContainerLow' },
     { id: 'detail', name: '詳細', x: 492, y: 0, swipe: { right: 'home' } },
   ],
   groups: [
@@ -65,7 +65,7 @@ describe('M3E compatibility importer', () => {
     });
     const home = document?.screens[0];
     const detail = document?.screens[1];
-    expect(home).toMatchObject({ name: 'ホーム', navigationTitle: 'ホーム', notes: '一覧画面' });
+    expect(home).toMatchObject({ name: 'ホーム', navigationTitle: 'ホーム', notes: '一覧画面', contentPlacement: 'center', background: 'surfaceContainerLow' });
     expect(home?.toolbarItems).toEqual(expect.arrayContaining([
       expect.objectContaining({ placement: 'topBarLeading', systemName: 'line.3.horizontal' }),
       expect.objectContaining({ placement: 'topBarTrailing', systemName: 'gearshape.fill' }),
@@ -78,6 +78,7 @@ describe('M3E compatibility importer', () => {
     expect(recipeRow).toMatchObject({
       kind: 'navigation-link',
       destinationScreenId: detail?.id,
+      navigationTransition: 'slide',
       notes: expect.stringContaining('タップで'),
       children: [expect.objectContaining({ kind: 'hstack' })],
     });
@@ -86,9 +87,60 @@ describe('M3E compatibility importer', () => {
     expect(detail?.swipe).toEqual({ right: home?.id });
   });
 
+  it('keeps back actions as executable semantic controls', () => {
+    const document = convertM3eDocument({
+      frames: [{ id: 'home', name: 'ホーム', x: 0, y: 0 }, { id: 'detail', name: '詳細', x: 492, y: 0 }],
+      groups: [{
+        id: 'detail-actions',
+        x: 492,
+        y: 80,
+        axis: 'y',
+        items: [{ id: 'close', kind: 'button', label: '閉じる', icon: 'close', variant: 'text', action: { to: 'back', transition: 'fade' } }],
+      }],
+    });
+
+    expect(document?.screens[1]?.root.children[0]).toMatchObject({
+      kind: 'button',
+      navigationAction: 'back',
+      navigationTransition: 'fade',
+    });
+    expect(document ? generateSwiftUI(document) : '').toContain('dismiss()');
+  });
+
   it('rejects values that are not M3E project documents', () => {
     expect(isM3eDocument({ screens: [] })).toBe(false);
     expect(convertM3eDocument({ frames: [], groups: [] })).toBeNull();
+  });
+
+  it('reports M3E data that needs review after import', () => {
+    const report = inspectM3eCompatibility({
+      frames: [
+        { id: 'home', name: 'ホーム', x: 0, y: 0, swipe: { left: 'missing' } },
+        { id: 'broken', x: 0, y: 0 },
+      ],
+      groups: [
+        {
+          id: 'body',
+          x: 0,
+          y: 0,
+          axis: 'y',
+          items: [
+            { id: 'unknown', kind: 'unknownPart', label: '独自パーツ' },
+            { id: 'bad-action', kind: 'button', label: '開く', action: { to: 'missing' } },
+            null,
+          ],
+        },
+        { id: 'broken-group', x: 0, y: 0, axis: 'z', items: [] },
+      ],
+    });
+
+    expect(report).toEqual({
+      invalidFrameCount: 1,
+      invalidGroupCount: 1,
+      discardedItemCount: 1,
+      unresolvedDestinationCount: 2,
+      unsupportedKinds: ['unknownPart'],
+    });
   });
 
   it('keeps a toggle button valid when its M3E action also names a destination', () => {

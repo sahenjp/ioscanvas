@@ -121,6 +121,34 @@ describe('editor screen workflow', () => {
     expect(toolbarItem?.destinationScreenId).toBeUndefined();
   });
 
+  it('clears tab bar navigation references when deleting their destination screen', () => {
+    const store = useEditorStore.getState();
+
+    store.addScreen();
+    const destinationId = useEditorStore.getState().document.activeScreenId;
+    store.selectScreen('screen-home');
+    store.updateActiveScreen({ tabBarItems: [{ id: 'tab-link', title: '詳細', placement: 'bottomBar', destinationScreenId: destinationId }] });
+    store.selectScreen(destinationId);
+    store.deleteActiveScreen();
+
+    const tabItem = useEditorStore.getState().document.screens[0]?.tabBarItems?.[0];
+    expect(tabItem?.destinationScreenId).toBeUndefined();
+  });
+
+  it('gives duplicated screens independent toolbar and tab bar IDs', () => {
+    const store = useEditorStore.getState();
+    store.updateActiveScreen({
+      toolbarItems: [{ id: 'toolbar-home', title: 'ヘルプ', placement: 'topBarTrailing' }],
+      tabBarItems: [{ id: 'tab-home', title: 'ホーム', placement: 'bottomBar', selected: true }],
+    });
+
+    store.duplicateActiveScreen();
+
+    const screens = useEditorStore.getState().document.screens;
+    expect(screens[1]?.toolbarItems?.[0]?.id).not.toBe(screens[0]?.toolbarItems?.[0]?.id);
+    expect(screens[1]?.tabBarItems?.[0]?.id).not.toBe(screens[0]?.tabBarItems?.[0]?.id);
+  });
+
   it('reorders screens without changing their identity or active screen', () => {
     const store = useEditorStore.getState();
 

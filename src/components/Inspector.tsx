@@ -1,7 +1,7 @@
 import { createId, findNode, findNodeLocation, isContainerNode } from '../lib/nodes';
 import { lintDocument } from '../lib/hig';
 import { useEditorStore } from '../store/editor';
-import type { AccentColor, BackgroundStyle, CanvasNode, CanvasScreen, FontDesign, FrameWidth, GlassShape, GlassStyle, ImageSource, NavigationTitleDisplayMode, ShadowStyle, StackAlignment, SwipeDirection, TextAlignment, TextStyle, ToolbarItem, ToolbarPlacement } from '../types/document';
+import type { AccentColor, BackgroundStyle, CanvasNode, CanvasScreen, ContentPlacement, FontDesign, FrameWidth, GlassShape, GlassStyle, ImageSource, NavigationTitleDisplayMode, NavigationTransition, ScreenBackground, ShadowStyle, StackAlignment, SwipeDirection, TextAlignment, TextStyle, ToolbarItem, ToolbarPlacement } from '../types/document';
 
 const swipeDirections: { key: SwipeDirection; label: string }[] = [
   { key: 'left', label: '左へスワイプ' },
@@ -225,6 +225,34 @@ export function Inspector() {
                     <option value="automatic">自動</option>
                     <option value="large">大きく表示</option>
                     <option value="inline">インライン</option>
+                  </select>
+                </Field>
+                <Field label="本文の配置">
+                  <select
+                    value={screen.contentPlacement ?? 'top'}
+                    onChange={(event) => updateActiveScreen({ contentPlacement: event.target.value as ContentPlacement })}
+                  >
+                    <option value="top">上寄せ</option>
+                    <option value="center">中央</option>
+                    <option value="bottom">下寄せ</option>
+                    <option value="spread">均等配置</option>
+                  </select>
+                </Field>
+                <Field label="画面背景">
+                  <select
+                    value={screen.background ?? 'surface'}
+                    onChange={(event) => updateActiveScreen({ background: event.target.value as ScreenBackground })}
+                  >
+                    <option value="surface">標準の背景</option>
+                    <option value="surfaceContainerLow">低いコンテナ</option>
+                    <option value="surfaceContainer">コンテナ</option>
+                    <option value="surfaceContainerHigh">高いコンテナ</option>
+                    <option value="surfaceContainerHighest">最も高いコンテナ</option>
+                    <option value="primaryContainer">プライマリコンテナ</option>
+                    <option value="secondaryContainer">セカンダリコンテナ</option>
+                    <option value="tertiaryContainer">ターシャリコンテナ</option>
+                    <option value="primary">プライマリ</option>
+                    <option value="inverseSurface">反転サーフェス</option>
                   </select>
                 </Field>
               </>
@@ -756,9 +784,11 @@ export function Inspector() {
                     onChange={(event) => updateSelectedNode(event.target.value === 'toggle'
                       ? {
                           destinationScreenId: undefined,
+                          navigationAction: undefined,
+                          navigationTransition: undefined,
                           toggle: node.toggle ?? { isOn: false, onLabel: `${node.label}（オン）` },
                         }
-                      : { toggle: undefined } as Partial<CanvasNode>)}
+                      : { toggle: undefined, navigationAction: undefined, navigationTransition: undefined } as Partial<CanvasNode>)}
                   >
                     <option value="action">アクション</option>
                     <option value="toggle">オン／オフ切替</option>
@@ -827,15 +857,34 @@ export function Inspector() {
                 </Field>
                 {!node.toggle && <Field label="タップ時の遷移">
                   <select
-                    value={node.destinationScreenId ?? ''}
-                    onChange={(event) => updateSelectedNode({ destinationScreenId: event.target.value || undefined } as Partial<CanvasNode>)}
+                    value={node.navigationAction === 'back' ? '__back' : node.destinationScreenId ?? ''}
+                    onChange={(event) => updateSelectedNode(event.target.value === '__back'
+                      ? { destinationScreenId: undefined, navigationAction: 'back', navigationTransition: node.navigationTransition ?? 'slide' }
+                      : { destinationScreenId: event.target.value || undefined, navigationAction: undefined, navigationTransition: event.target.value ? node.navigationTransition : undefined } as Partial<CanvasNode>)}
                   >
                     <option value="">なし（アクション）</option>
+                    <option value="__back">前の画面へ戻る</option>
                     {document.screens.filter((candidate) => candidate.id !== screen?.id).map((candidate) => (
                       <option key={candidate.id} value={candidate.id}>{candidate.name}</option>
                     ))}
                   </select>
                 </Field>}
+                {!node.toggle && (node.destinationScreenId || node.navigationAction === 'back') && (
+                  <Field label="遷移アニメーション">
+                    <select
+                      value={node.navigationTransition ?? 'slide'}
+                      onChange={(event) => updateSelectedNode({ navigationTransition: event.target.value as NavigationTransition } as Partial<CanvasNode>)}
+                    >
+                      <option value="slide">右からスライド</option>
+                      <option value="slideLeft">左からスライド</option>
+                      <option value="slideUp">下からスライド</option>
+                      <option value="slideDown">上からスライド</option>
+                      <option value="fade">フェード</option>
+                      <option value="expand">拡大</option>
+                      <option value="none">なし</option>
+                    </select>
+                  </Field>
+                )}
               </>
             )}
             {node.kind === 'alert' && (
@@ -908,14 +957,29 @@ export function Inspector() {
               </>
             )}
             {node.kind === 'navigation-link' && (
-              <Field label="遷移先">
-                <select value={node.destinationScreenId} onChange={(event) => updateSelectedNode({ destinationScreenId: event.target.value } as Partial<CanvasNode>)}>
-                  <option value="">画面を選択</option>
-                  {document.screens.filter((candidate) => candidate.id !== screen?.id).map((candidate) => (
-                    <option key={candidate.id} value={candidate.id}>{candidate.name}</option>
-                  ))}
-                </select>
-              </Field>
+              <>
+                <Field label="遷移先">
+                  <select value={node.destinationScreenId} onChange={(event) => updateSelectedNode({ destinationScreenId: event.target.value } as Partial<CanvasNode>)}>
+                    <option value="">画面を選択</option>
+                    {document.screens.filter((candidate) => candidate.id !== screen?.id).map((candidate) => (
+                      <option key={candidate.id} value={candidate.id}>{candidate.name}</option>
+                    ))}
+                  </select>
+                </Field>
+                {node.destinationScreenId && (
+                  <Field label="遷移アニメーション">
+                    <select value={node.navigationTransition ?? 'slide'} onChange={(event) => updateSelectedNode({ navigationTransition: event.target.value as NavigationTransition } as Partial<CanvasNode>)}>
+                      <option value="slide">右からスライド</option>
+                      <option value="slideLeft">左からスライド</option>
+                      <option value="slideUp">下からスライド</option>
+                      <option value="slideDown">上からスライド</option>
+                      <option value="fade">フェード</option>
+                      <option value="expand">拡大</option>
+                      <option value="none">なし</option>
+                    </select>
+                  </Field>
+                )}
+              </>
             )}
             {(node.kind === 'section' || node.kind === 'disclosure-group' || node.kind === 'sheet' || node.kind === 'groupbox') && (
               <>
@@ -1145,11 +1209,27 @@ function ToolbarItemEditor({
         </Field>
       )}
       <Field label="遷移先">
-        <select value={item.destinationScreenId ?? ''} onChange={(event) => onChange({ destinationScreenId: event.target.value || undefined })}>
+        <select value={item.navigationAction === 'back' ? '__back' : item.destinationScreenId ?? ''} onChange={(event) => onChange(event.target.value === '__back'
+          ? { destinationScreenId: undefined, navigationAction: 'back', navigationTransition: item.navigationTransition ?? 'slide' }
+          : { destinationScreenId: event.target.value || undefined, navigationAction: undefined, navigationTransition: event.target.value ? item.navigationTransition : undefined })}>
           <option value="">なし（アクション）</option>
+          <option value="__back">前の画面へ戻る</option>
           {screens.filter((screen) => screen.id !== screenId).map((screen) => <option value={screen.id} key={screen.id}>{screen.name}</option>)}
         </select>
       </Field>
+      {(item.destinationScreenId || item.navigationAction === 'back') && (
+        <Field label="遷移アニメーション">
+          <select value={item.navigationTransition ?? 'slide'} onChange={(event) => onChange({ navigationTransition: event.target.value as NavigationTransition })}>
+            <option value="slide">右からスライド</option>
+            <option value="slideLeft">左からスライド</option>
+            <option value="slideUp">下からスライド</option>
+            <option value="slideDown">上からスライド</option>
+            <option value="fade">フェード</option>
+            <option value="expand">拡大</option>
+            <option value="none">なし</option>
+          </select>
+        </Field>
+      )}
     </div>
   );
 }

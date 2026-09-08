@@ -39,7 +39,7 @@ interface EditorState {
   updateSelectedNode: (patch: Partial<CanvasNode>) => void;
   updateSelectedNodes: (patch: Partial<CanvasNode>) => void;
   updateDocumentName: (name: string) => void;
-  updateActiveScreen: (patch: Partial<Pick<CanvasScreen, 'name' | 'navigationTitle' | 'notes' | 'navigationTitleDisplayMode' | 'toolbarItems' | 'tabBarItems' | 'swipe'>>) => void;
+  updateActiveScreen: (patch: Partial<Pick<CanvasScreen, 'name' | 'navigationTitle' | 'notes' | 'navigationTitleDisplayMode' | 'contentPlacement' | 'background' | 'toolbarItems' | 'tabBarItems' | 'swipe'>>) => void;
   updateAppearance: (patch: Partial<DocumentAppearance>) => void;
   deleteSelectedNode: () => void;
   loadDocument: (document: CanvasDocument) => void;
@@ -226,6 +226,8 @@ export const useEditorStore = create<EditorState>()(
             ...screen,
             id: createId('screen'),
             name: `${screen.name} のコピー`,
+            ...(screen.toolbarItems ? { toolbarItems: screen.toolbarItems.map((item) => ({ ...item, id: createId('toolbar') })) } : {}),
+            ...(screen.tabBarItems ? { tabBarItems: screen.tabBarItems.map((item) => ({ ...item, id: createId('tab') })) } : {}),
             root,
           };
           return withHistory(state, {
@@ -247,6 +249,7 @@ export const useEditorStore = create<EditorState>()(
               ...screen,
               root: { ...screen.root, children: clearScreenReferences(screen.root.children, deletedScreenId) },
               toolbarItems: screen.toolbarItems?.map((item) => item.destinationScreenId === deletedScreenId ? { ...item, destinationScreenId: undefined } : item),
+              tabBarItems: screen.tabBarItems?.map((item) => item.destinationScreenId === deletedScreenId ? { ...item, destinationScreenId: undefined } : item),
               swipe: clearSwipeReferences(screen.swipe, deletedScreenId),
             }));
           const nextScreen = screens[Math.max(0, index - 1)] ?? screens[0];

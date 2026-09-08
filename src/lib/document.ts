@@ -1,5 +1,5 @@
 import { isContainerNode } from './nodes';
-import type { AccentColor, AppearanceAccentColor, BackgroundStyle, ButtonStyle, ButtonToggle, CanvasDocument, CanvasNode, CanvasScreen, CardContentAlignment, CardImagePosition, ColorScheme, FontDesign, FrameWidth, GlassShape, GlassStyle, ImageSource, NavigationTitleDisplayMode, NodeKind, ProgressStyle, ShadowStyle, StackAlignment, SwipeDirection, TextAlignment, TextStyle, ToolbarItem, ToolbarPlacement } from '../types/document';
+import type { AccentColor, AppearanceAccentColor, BackgroundStyle, ButtonStyle, ButtonToggle, CanvasDocument, CanvasNode, CanvasScreen, CardContentAlignment, CardImagePosition, ColorScheme, ContentPlacement, FontDesign, FrameWidth, GlassShape, GlassStyle, ImageSource, NavigationTitleDisplayMode, NavigationTransition, NodeKind, ProgressStyle, ScreenBackground, ShadowStyle, StackAlignment, SwipeDirection, TextAlignment, TextStyle, ToolbarItem, ToolbarPlacement } from '../types/document';
 
 type RecordValue = Record<string, unknown>;
 
@@ -45,6 +45,11 @@ function readButtonToggle(value: unknown): ButtonToggle | null | undefined {
   };
 }
 
+function readNavigationTransition(value: unknown): NavigationTransition | null | undefined {
+  if (value === undefined) return undefined;
+  return isOneOf(value, ['slide', 'slideLeft', 'slideUp', 'slideDown', 'fade', 'expand', 'none']) ? value : null;
+}
+
 function readNodeProperties(value: RecordValue): {
   tabTitle?: string;
   tabSystemName?: string;
@@ -59,6 +64,8 @@ function readNodeProperties(value: RecordValue): {
   cornerRadius?: number;
   overlay?: boolean;
   shadow?: ShadowStyle;
+  navigationAction?: 'back';
+  navigationTransition?: NavigationTransition;
 } | null {
   const glass = readGlass(value.glass);
   if (glass === null) return null;
@@ -74,6 +81,9 @@ function readNodeProperties(value: RecordValue): {
   if (value.cornerRadius !== undefined && (!isNumber(value.cornerRadius) || value.cornerRadius < 0 || value.cornerRadius > 64)) return null;
   if (value.overlay !== undefined && typeof value.overlay !== 'boolean') return null;
   if (value.shadow !== undefined && !isOneOf(value.shadow, ['none', 'subtle', 'medium'])) return null;
+  if (value.navigationAction !== undefined && value.navigationAction !== 'back') return null;
+  const navigationTransition = readNavigationTransition(value.navigationTransition);
+  if (navigationTransition === null) return null;
 
   return {
     ...(value.tabTitle === undefined ? {} : { tabTitle: value.tabTitle }),
@@ -89,6 +99,8 @@ function readNodeProperties(value: RecordValue): {
     ...(value.cornerRadius === undefined ? {} : { cornerRadius: value.cornerRadius }),
     ...(value.overlay === undefined ? {} : { overlay: value.overlay }),
     ...(value.shadow === undefined ? {} : { shadow: value.shadow as ShadowStyle }),
+    ...(value.navigationAction === undefined ? {} : { navigationAction: 'back' as const }),
+    ...(navigationTransition === undefined ? {} : { navigationTransition }),
   };
 }
 
@@ -104,6 +116,9 @@ function readToolbarItems(value: unknown, ids: Set<string>): ToolbarItem[] | nul
     if (item.role !== undefined && !isOneOf(item.role, ['normal', 'destructive', 'cancel'])) return null;
     if (item.selected !== undefined && typeof item.selected !== 'boolean') return null;
     if (item.destinationScreenId !== undefined && !isString(item.destinationScreenId)) return null;
+    if (item.navigationAction !== undefined && item.navigationAction !== 'back') return null;
+    const navigationTransition = readNavigationTransition(item.navigationTransition);
+    if (navigationTransition === null) return null;
     ids.add(item.id);
     items.push({
       id: item.id,
@@ -113,6 +128,8 @@ function readToolbarItems(value: unknown, ids: Set<string>): ToolbarItem[] | nul
       ...(item.role === undefined ? {} : { role: item.role }),
       ...(item.selected === undefined ? {} : { selected: item.selected }),
       ...(item.destinationScreenId === undefined ? {} : { destinationScreenId: item.destinationScreenId }),
+      ...(item.navigationAction === undefined ? {} : { navigationAction: 'back' as const }),
+      ...(navigationTransition === undefined ? {} : { navigationTransition }),
     });
   }
   return items;
@@ -418,6 +435,8 @@ function readScreen(value: unknown, ids: Set<string>): CanvasScreen | null {
   ids.add(value.id);
   if (value.notes !== undefined && !isString(value.notes)) return null;
   if (value.navigationTitleDisplayMode !== undefined && !isOneOf(value.navigationTitleDisplayMode, ['automatic', 'inline', 'large'])) return null;
+  if (value.contentPlacement !== undefined && !isOneOf(value.contentPlacement, ['top', 'center', 'bottom', 'spread'])) return null;
+  if (value.background !== undefined && !isOneOf(value.background, ['surface', 'surfaceContainerLow', 'surfaceContainer', 'surfaceContainerHigh', 'surfaceContainerHighest', 'primaryContainer', 'secondaryContainer', 'tertiaryContainer', 'primary', 'inverseSurface'])) return null;
   const toolbarItems = readToolbarItems(value.toolbarItems, ids);
   if (toolbarItems === null) return null;
   const tabBarItems = readToolbarItems(value.tabBarItems, ids);
@@ -432,6 +451,8 @@ function readScreen(value: unknown, ids: Set<string>): CanvasScreen | null {
         navigationTitle: value.navigationTitle,
         ...(value.notes === undefined ? {} : { notes: value.notes }),
         ...(value.navigationTitleDisplayMode === undefined ? {} : { navigationTitleDisplayMode: value.navigationTitleDisplayMode as NavigationTitleDisplayMode }),
+        ...(value.contentPlacement === undefined ? {} : { contentPlacement: value.contentPlacement as ContentPlacement }),
+        ...(value.background === undefined ? {} : { background: value.background as ScreenBackground }),
         ...(toolbarItems === undefined ? {} : { toolbarItems }),
         ...(tabBarItems === undefined ? {} : { tabBarItems }),
         ...(swipe === undefined ? {} : { swipe }),

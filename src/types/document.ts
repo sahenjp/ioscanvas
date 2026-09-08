@@ -62,6 +62,9 @@ export type ColorScheme = 'system' | 'light' | 'dark';
 export type AccentColor = 'blue' | 'purple' | 'pink' | 'orange' | 'green';
 export type AppearanceAccentColor = AccentColor | 'custom';
 export type NavigationTitleDisplayMode = 'automatic' | 'inline' | 'large';
+export type ContentPlacement = 'top' | 'center' | 'bottom' | 'spread';
+export type NavigationTransition = 'slide' | 'slideLeft' | 'slideUp' | 'slideDown' | 'fade' | 'expand' | 'none';
+export type ScreenBackground = 'surface' | 'surfaceContainerLow' | 'surfaceContainer' | 'surfaceContainerHigh' | 'surfaceContainerHighest' | 'primaryContainer' | 'secondaryContainer' | 'tertiaryContainer' | 'primary' | 'inverseSurface';
 export type ToolbarPlacement = 'topBarLeading' | 'topBarTrailing' | 'bottomBar';
 export type SwipeDirection = 'left' | 'right' | 'up' | 'down';
 export type PatternId = 'glass-card' | 'settings-section' | 'list-row' | 'empty-state';
@@ -92,6 +95,8 @@ export interface BaseNode {
   cornerRadius?: number;
   overlay?: boolean;
   shadow?: ShadowStyle;
+  navigationAction?: 'back';
+  navigationTransition?: NavigationTransition;
 }
 
 export interface TextNode extends BaseNode {
@@ -309,6 +314,8 @@ export interface ToolbarItem {
   role?: ButtonRole;
   selected?: boolean;
   destinationScreenId?: string;
+  navigationAction?: 'back';
+  navigationTransition?: NavigationTransition;
 }
 
 export interface ContainerNode extends BaseNode {
@@ -372,6 +379,8 @@ export interface CanvasScreen {
   navigationTitle: string;
   notes?: string;
   navigationTitleDisplayMode?: NavigationTitleDisplayMode;
+  contentPlacement?: ContentPlacement;
+  background?: ScreenBackground;
   toolbarItems?: ToolbarItem[];
   tabBarItems?: ToolbarItem[];
   swipe?: Partial<Record<SwipeDirection, string>>;

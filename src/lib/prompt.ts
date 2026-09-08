@@ -8,7 +8,7 @@ function describe(node: CanvasNode, depth = 0): string[] {
     case 'text':
       return [`${common}: ${node.text} / ${node.textStyle && node.textStyle !== 'custom' ? node.textStyle : `${node.fontSize}pt`} / ${node.weight}${node.fontDesign && node.fontDesign !== 'default' ? ` / design=${node.fontDesign}` : ''}${node.textAlignment && node.textAlignment !== 'leading' ? ` / alignment=${node.textAlignment}` : ''}${node.lineLimit ? ` / lineLimit=${node.lineLimit}` : ''}`];
     case 'button':
-      return [`${common}: ${node.label} / role=${node.role}${node.buttonStyle && node.buttonStyle !== 'automatic' ? ` / style=${node.buttonStyle}` : ''}${node.systemName ? ` / symbol=${node.systemName}` : ''}${node.accessibilityLabel ? ` / accessibility=${node.accessibilityLabel}` : ''}${node.toggle ? ` / toggle=${node.toggle.isOn ? 'on' : 'off'} / onLabel=${node.toggle.onLabel}${node.toggle.onSystemName ? ` / onSymbol=${node.toggle.onSystemName}` : ''}` : ''}${node.destinationScreenId ? ` / destination=${node.destinationScreenId}` : ''}`];
+      return [`${common}: ${node.label} / role=${node.role}${node.buttonStyle && node.buttonStyle !== 'automatic' ? ` / style=${node.buttonStyle}` : ''}${node.systemName ? ` / symbol=${node.systemName}` : ''}${node.accessibilityLabel ? ` / accessibility=${node.accessibilityLabel}` : ''}${node.toggle ? ` / toggle=${node.toggle.isOn ? 'on' : 'off'} / onLabel=${node.toggle.onLabel}${node.toggle.onSystemName ? ` / onSymbol=${node.toggle.onSystemName}` : ''}` : ''}${node.navigationAction === 'back' ? ' / action=back' : ''}${node.destinationScreenId ? ` / destination=${node.destinationScreenId}` : ''}${node.navigationTransition ? ` / transition=${node.navigationTransition}` : ''}`];
     case 'alert':
       return [`${common}: ${node.label} / title=${node.title} / message=${node.message} / primary=${node.primaryButton}${node.secondaryButton ? ` / secondary=${node.secondaryButton}` : ''}`];
     case 'confirmation-dialog':
@@ -39,7 +39,7 @@ function describe(node: CanvasNode, depth = 0): string[] {
     case 'content-unavailable':
       return [`${common}: ${node.title} / symbol=${node.systemName}${node.description ? ` / description=${node.description}` : ''}`];
     case 'navigation-link':
-      return [`${common}: ${node.label} / destination=${node.destinationScreenId || 'unset'}`];
+      return [`${common}: ${node.label} / destination=${node.destinationScreenId || 'unset'}${node.navigationTransition ? ` / transition=${node.navigationTransition}` : ''}`];
     case 'label':
       return [`${common}: ${node.title} / symbol=${node.systemName} / accessibility=${node.accessibilityLabel || 'decorative'}`];
     case 'link':
@@ -81,10 +81,11 @@ function describe(node: CanvasNode, depth = 0): string[] {
 export type PromptScope = 'active' | 'all';
 
 function screenDetails(screen: CanvasDocument['screens'][number], document: CanvasDocument): string[] {
-  const toolbar = (screen.toolbarItems ?? []).map((item) => `${item.placement}: ${item.title}${item.systemName ? ` / symbol=${item.systemName}` : ''}${item.selected ? ' / selected' : ''}${item.destinationScreenId ? ` / destination=${document.screens.find((candidate) => candidate.id === item.destinationScreenId)?.name ?? '未設定'}` : ''}`).join(', ') || 'なし';
-  const tabBar = (screen.tabBarItems ?? []).map((item) => `${item.title}${item.systemName ? ` / symbol=${item.systemName}` : ''}${item.selected ? ' / selected' : ''}${item.destinationScreenId ? ` / destination=${document.screens.find((candidate) => candidate.id === item.destinationScreenId)?.name ?? '未設定'}` : ''}`).join(', ') || 'なし';
+  const actionDetails = (item: { navigationAction?: 'back'; navigationTransition?: string; destinationScreenId?: string }) => `${item.navigationAction === 'back' ? ' / action=back' : ''}${item.destinationScreenId ? ` / destination=${document.screens.find((candidate) => candidate.id === item.destinationScreenId)?.name ?? '未設定'}` : ''}${item.navigationTransition ? ` / transition=${item.navigationTransition}` : ''}`;
+  const toolbar = (screen.toolbarItems ?? []).map((item) => `${item.placement}: ${item.title}${item.systemName ? ` / symbol=${item.systemName}` : ''}${item.selected ? ' / selected' : ''}${actionDetails(item)}`).join(', ') || 'なし';
+  const tabBar = (screen.tabBarItems ?? []).map((item) => `${item.title}${item.systemName ? ` / symbol=${item.systemName}` : ''}${item.selected ? ' / selected' : ''}${actionDetails(item)}`).join(', ') || 'なし';
   const navigation = navigationLinks(screen.root.children)
-    .map((node) => `${node.label}=${document.screens.find((candidate) => candidate.id === node.destinationScreenId)?.name ?? '未設定'}`)
+    .map((node) => `${node.label}=${node.navigationAction === 'back' ? '前の画面' : document.screens.find((candidate) => candidate.id === node.destinationScreenId)?.name ?? '未設定'}${node.navigationTransition ? ` (${node.navigationTransition})` : ''}`)
     .join(', ') || 'なし';
   const swipe = Object.entries(screen.swipe ?? {}).map(([direction, destination]) => `${direction}=${document.screens.find((candidate) => candidate.id === destination)?.name ?? destination}`).join(', ') || 'なし';
 
@@ -93,6 +94,8 @@ function screenDetails(screen: CanvasDocument['screens'][number], document: Canv
     `ナビゲーションタイトル: ${screen.navigationTitle}`,
     ...(screen.notes?.trim() ? [`画面メモ: ${screen.notes.trim()}`] : []),
     `タイトル表示: ${screen.navigationTitleDisplayMode ?? 'automatic'}`,
+    `本文の配置: ${screen.contentPlacement ?? 'top'}`,
+    `画面背景: ${screen.background ?? 'surface'}`,
     `ツールバー: ${toolbar}`,
     `タブバー: ${tabBar}`,
     `NavigationLink遷移: ${navigation}`,
@@ -104,7 +107,7 @@ function screenDetails(screen: CanvasDocument['screens'][number], document: Canv
 
 function navigationLinks(nodes: CanvasNode[]): Extract<CanvasNode, { kind: 'navigation-link' | 'button' }>[] {
   return nodes.flatMap((node) => [
-    ...(node.kind === 'navigation-link' || node.kind === 'button' ? (node.destinationScreenId ? [node] : []) : []),
+    ...(node.kind === 'navigation-link' || node.kind === 'button' ? (node.destinationScreenId || node.navigationAction === 'back' ? [node] : []) : []),
     ...(node.children ? navigationLinks(node.children) : []),
   ]);
 }

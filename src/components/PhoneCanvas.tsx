@@ -10,7 +10,7 @@ import {
   NODE_DRAG_MIME,
 } from '../lib/nodes';
 import { useEditorStore } from '../store/editor';
-import type { AlertNode, CanvasDocument, CanvasNode, CanvasScreen, ConfirmationDialogNode, ContainerNode, FontDesign, SwipeDirection, TextStyle, ToolbarItem } from '../types/document';
+import type { AlertNode, CanvasDocument, CanvasNode, CanvasScreen, ConfirmationDialogNode, ContainerNode, FontDesign, NavigationTransition, ScreenBackground, SwipeDirection, TextStyle, ToolbarItem } from '../types/document';
 
 function readDragData(event: React.DragEvent): ReturnType<typeof decodeDragData> {
   const value = event.dataTransfer.getData(NODE_DRAG_MIME) || event.dataTransfer.getData('text/plain');
@@ -66,12 +66,14 @@ function NodeView({
   screenId,
   onOpenSheet,
   onNavigateScreen,
+  onNavigateBack,
 }: {
   node: CanvasNode;
   allNodes: CanvasNode[];
   screenId: string;
   onOpenSheet?: (nodeId: string) => void;
-  onNavigateScreen?: (screenId: string) => void;
+  onNavigateScreen?: (screenId: string, transition?: NavigationTransition) => void;
+  onNavigateBack?: (transition?: NavigationTransition) => void;
 }) {
   const activeScreenId = useEditorStore((state) => state.document.activeScreenId);
   const selectedNodeIds = useEditorStore((state) => state.selectedNodeIds);
@@ -177,8 +179,11 @@ function NodeView({
   const destinationScreenId = node.kind === 'navigation-link' || node.kind === 'button'
     ? node.destinationScreenId
     : undefined;
-  const navigate = previewMode && destinationScreenId
-    ? () => onNavigateScreen ? onNavigateScreen(destinationScreenId) : selectScreen(destinationScreenId)
+  const navigationAction = node.kind === 'button' ? node.navigationAction : undefined;
+  const navigate = previewMode && (destinationScreenId || navigationAction === 'back')
+    ? () => navigationAction === 'back'
+      ? onNavigateBack?.(node.navigationTransition)
+      : destinationScreenId && (onNavigateScreen ? onNavigateScreen(destinationScreenId, node.navigationTransition) : selectScreen(destinationScreenId))
     : undefined;
   const content = renderNodeContent(
     node,
@@ -188,6 +193,7 @@ function NodeView({
     previewMode ? { value: previewValue, onChange: (value) => setPreviewValue(value) } : undefined,
     onOpenSheet,
     onNavigateScreen,
+    onNavigateBack,
   );
 
   return (
@@ -215,7 +221,8 @@ function renderNodeContent(
   onNavigate?: () => void,
   controls?: PreviewControls,
   onOpenSheet?: (nodeId: string) => void,
-  onNavigateScreen?: (screenId: string) => void,
+  onNavigateScreen?: (screenId: string, transition?: NavigationTransition) => void,
+  onNavigateBack?: (transition?: NavigationTransition) => void,
 ): React.ReactNode {
   switch (node.kind) {
     case 'text':
@@ -528,7 +535,7 @@ function renderNodeContent(
       {
         const label = node.children && node.children.length > 0 ? (
           <span className="ios-navigation-content">
-            {node.children.map((child) => <NodeView key={child.id} node={child} allNodes={allNodes} screenId={screenId} onOpenSheet={onOpenSheet} onNavigateScreen={onNavigateScreen} />)}
+            {node.children.map((child) => <NodeView key={child.id} node={child} allNodes={allNodes} screenId={screenId} onOpenSheet={onOpenSheet} onNavigateScreen={onNavigateScreen} onNavigateBack={onNavigateBack} />)}
           </span>
         ) : <span>{node.label || 'Open screen'}</span>;
         return onNavigate ? (
@@ -592,7 +599,7 @@ function renderNodeContent(
           <div className="node-column" style={{ gap: 8 }}>
             {node.children.length === 0
               ? <div className="empty-container">ここへパーツをドロップ</div>
-              : node.children.map((child) => <NodeView key={child.id} node={child} allNodes={allNodes} screenId={screenId} onOpenSheet={onOpenSheet} onNavigateScreen={onNavigateScreen} />)}
+              : node.children.map((child) => <NodeView key={child.id} node={child} allNodes={allNodes} screenId={screenId} onOpenSheet={onOpenSheet} onNavigateScreen={onNavigateScreen} onNavigateBack={onNavigateBack} />)}
           </div>
         </div>
       );
@@ -659,13 +666,13 @@ function renderNodeContent(
           <div className="navigation-rail-preview">
             {sidebar.children.map((child, index) => (
               <div className={`navigation-rail-item ${index === selectedIndex ? 'is-selected' : ''}`} key={child.id}>
-                <NodeView node={child} allNodes={allNodes} screenId={screenId} onOpenSheet={onOpenSheet} onNavigateScreen={onNavigateScreen} />
+                <NodeView node={child} allNodes={allNodes} screenId={screenId} onOpenSheet={onOpenSheet} onNavigateScreen={onNavigateScreen} onNavigateBack={onNavigateBack} />
               </div>
             ))}
           </div>
         )
         : sidebar
-          ? <NodeView key={sidebar.id} node={sidebar} allNodes={allNodes} screenId={screenId} onOpenSheet={onOpenSheet} onNavigateScreen={onNavigateScreen} />
+          ? <NodeView key={sidebar.id} node={sidebar} allNodes={allNodes} screenId={screenId} onOpenSheet={onOpenSheet} onNavigateScreen={onNavigateScreen} onNavigateBack={onNavigateBack} />
           : <div className="empty-container">サイドバーを追加</div>;
       return (
         <div className={`canvas-navigation-split ${node.railExpanded ? 'rail-expanded' : ''} ${node.railModal ? 'rail-modal' : ''}`}>
@@ -674,7 +681,7 @@ function renderNodeContent(
           </div>
           <div className="navigation-split-pane navigation-split-detail">
             {detail.length > 0
-              ? detail.map((child) => <NodeView key={child.id} node={child} allNodes={allNodes} screenId={screenId} onOpenSheet={onOpenSheet} onNavigateScreen={onNavigateScreen} />)
+              ? detail.map((child) => <NodeView key={child.id} node={child} allNodes={allNodes} screenId={screenId} onOpenSheet={onOpenSheet} onNavigateScreen={onNavigateScreen} onNavigateBack={onNavigateBack} />)
               : <div className="empty-container">詳細画面を追加</div>}
           </div>
         </div>
@@ -705,7 +712,7 @@ function renderNodeContent(
           <div className="canvas-container canvas-tabview tabview-preview">
             <div className="tabview-preview-content">
               {activeChild
-                ? <NodeView key={activeChild.id} node={activeChild} allNodes={allNodes} screenId={screenId} onOpenSheet={onOpenSheet} onNavigateScreen={onNavigateScreen} />
+                ? <NodeView key={activeChild.id} node={activeChild} allNodes={allNodes} screenId={screenId} onOpenSheet={onOpenSheet} onNavigateScreen={onNavigateScreen} onNavigateBack={onNavigateBack} />
                 : <div className="empty-container">タブを追加してください</div>}
             </div>
             {node.children.length > 0 && (
@@ -744,7 +751,7 @@ function renderNodeContent(
               <div className="node-column" style={{ gap: 8 }}>
                 {node.children.length === 0
                   ? <div className="empty-container">ここへパーツをドロップ</div>
-                  : node.children.map((child) => <NodeView key={child.id} node={child} allNodes={allNodes} screenId={screenId} onOpenSheet={onOpenSheet} onNavigateScreen={onNavigateScreen} />)}
+                  : node.children.map((child) => <NodeView key={child.id} node={child} allNodes={allNodes} screenId={screenId} onOpenSheet={onOpenSheet} onNavigateScreen={onNavigateScreen} onNavigateBack={onNavigateBack} />)}
               </div>
             )}
           </div>
@@ -776,7 +783,7 @@ function renderNodeContent(
           <div className={childrenClass} style={cardStyle}>
             {node.children.length === 0
               ? <div className="empty-container">ここへパーツをドロップ</div>
-              : node.children.map((child) => <NodeView key={child.id} node={child} allNodes={allNodes} screenId={screenId} onOpenSheet={onOpenSheet} onNavigateScreen={onNavigateScreen} />)}
+              : node.children.map((child) => <NodeView key={child.id} node={child} allNodes={allNodes} screenId={screenId} onOpenSheet={onOpenSheet} onNavigateScreen={onNavigateScreen} onNavigateBack={onNavigateBack} />)}
           </div>
         </div>
       );
@@ -807,6 +814,8 @@ function ScreenPreview({
   const moveNode = useEditorStore((state) => state.moveNode);
   const [isOver, setIsOver] = useState(false);
   const [openSheetId, setOpenSheetId] = useState<string | null>(null);
+  const [previewMotion, setPreviewMotion] = useState<{ transition: NavigationTransition; id: number } | null>(null);
+  const motionId = useRef(0);
   const [previewHistory, setPreviewHistory] = useState<string[]>([initialScreen.id]);
   const validPreviewHistory = previewHistory.filter((id) => document.screens.some((candidate) => candidate.id === id));
   const previewScreenId = [...validPreviewHistory].reverse()[0] ?? initialScreen.id;
@@ -831,14 +840,30 @@ function ScreenPreview({
   const swipeStart = useRef<{ x: number; y: number } | null>(null);
   const connections = screenConnections(initialScreen);
 
-  const navigatePreview = (screenId: string) => {
+  useEffect(() => {
+    if (!previewMotion) return undefined;
+    const timer = window.setTimeout(() => setPreviewMotion(null), 360);
+    return () => window.clearTimeout(timer);
+  }, [previewMotion]);
+
+  const triggerPreviewMotion = (transition: NavigationTransition | undefined) => {
+    if (!transition || transition === 'none') {
+      setPreviewMotion(null);
+      return;
+    }
+    setPreviewMotion({ transition, id: ++motionId.current });
+  };
+
+  const navigatePreview = (screenId: string, transition: NavigationTransition = 'slide') => {
     if (!document.screens.some((candidate) => candidate.id === screenId)) return;
+    triggerPreviewMotion(transition);
     setOpenSheetId(null);
     setPreviewHistory((current) => [...current, screenId]);
   };
 
-  const backPreview = () => {
+  const backPreview = (transition: NavigationTransition = 'slideLeft') => {
     setOpenSheetId(null);
+    triggerPreviewMotion(transition);
     setPreviewHistory((current) => current.length > 1 ? current.slice(0, -1) : current);
   };
 
@@ -853,8 +878,8 @@ function ScreenPreview({
       ? dx < 0 ? 'left' : 'right'
       : dy < 0 ? 'up' : 'down';
     const destination = screen.swipe?.[direction];
-    if (destination) navigatePreview(destination);
-    else if (direction === 'right' && canGoBack) backPreview();
+    if (destination) navigatePreview(destination, swipeTransition(direction));
+    else if (direction === 'right' && canGoBack) backPreview('slideLeft');
   };
 
   const dropOnScreen = (event: React.DragEvent) => {
@@ -925,8 +950,12 @@ function ScreenPreview({
         onDrop={previewMode ? undefined : dropOnScreen}
       >
         <div
-          className={`phone-screen scheme-${previewScheme} accent-${document.appearance.accentColor} type-${document.appearance.fontDesign ?? 'default'} text-scale-${textScale} ${hasGlass ? 'has-glass' : ''} ${swipeEnabled ? 'swipe-enabled' : ''}`}
-          style={customAccent ? { '--preview-accent': customAccent } as CSSProperties : undefined}
+        className={`phone-screen scheme-${previewScheme} accent-${document.appearance.accentColor} type-${document.appearance.fontDesign ?? 'default'} text-scale-${textScale} ${hasGlass ? 'has-glass' : ''} ${swipeEnabled ? 'swipe-enabled' : ''} ${previewMotion ? `preview-motion-${previewMotion.transition}-${previewMotion.id}` : ''}`}
+        style={{
+          '--preview-accent': customAccent ?? previewAccentColor(document.appearance.accentColor),
+          '--screen-background': previewScreenBackground(screen.background, previewScheme, customAccent ?? previewAccentColor(document.appearance.accentColor)),
+          '--screen-foreground': previewScreenForeground(screen.background, previewScheme),
+        } as CSSProperties}
           aria-label={`${screen.name} iPhoneプレビュー`}
           onPointerDown={previewMode ? (event) => { swipeStart.current = { x: event.clientX, y: event.clientY }; } : undefined}
           onPointerUp={previewMode ? finishSwipe : undefined}
@@ -942,19 +971,19 @@ function ScreenPreview({
                     <span aria-hidden="true">‹</span><span>戻る</span>
                   </button>
                 )}
-                {leadingItems.map((item) => <PreviewToolbarButton item={item} onNavigate={previewMode && item.destinationScreenId ? () => navigatePreview(item.destinationScreenId as string) : undefined} key={item.id} />)}
+                {leadingItems.map((item) => <PreviewToolbarButton item={item} onNavigate={previewMode ? item.navigationAction === 'back' ? () => backPreview(item.navigationTransition) : item.destinationScreenId ? () => navigatePreview(item.destinationScreenId as string, item.navigationTransition) : undefined : undefined} key={item.id} />)}
               </div>
             )}
             <div className="navigation-title">{screen.navigationTitle}</div>
             {trailingItems.length > 0 && (
               <div className="navigation-toolbar-slot trailing">
-                {trailingItems.map((item) => <PreviewToolbarButton item={item} onNavigate={previewMode && item.destinationScreenId ? () => navigatePreview(item.destinationScreenId as string) : undefined} key={item.id} />)}
+                {trailingItems.map((item) => <PreviewToolbarButton item={item} onNavigate={previewMode ? item.navigationAction === 'back' ? () => backPreview(item.navigationTransition) : item.destinationScreenId ? () => navigatePreview(item.destinationScreenId as string, item.navigationTransition) : undefined : undefined} key={item.id} />)}
               </div>
             )}
           </div>
-          <div className="screen-content">
+          <div className={`screen-content placement-${screen.contentPlacement ?? 'top'}`}>
             {screen.root.children.length === 0 && <div className="screen-drop-hint">ここへパーツをドロップ</div>}
-            {screen.root.children.map((node) => <NodeView key={node.id} node={node} allNodes={screen.root.children} screenId={screen.id} onOpenSheet={setOpenSheetId} onNavigateScreen={navigatePreview} />)}
+            {screen.root.children.map((node) => <NodeView key={node.id} node={node} allNodes={screen.root.children} screenId={screen.id} onOpenSheet={setOpenSheetId} onNavigateScreen={navigatePreview} onNavigateBack={backPreview} />)}
           </div>
           {previewMode && sheet && (
             <SheetPreview
@@ -964,6 +993,7 @@ function ScreenPreview({
               onClose={() => setOpenSheetId(null)}
               onOpenSheet={setOpenSheetId}
               onNavigateScreen={navigatePreview}
+              onNavigateBack={backPreview}
             />
           )}
           {previewMode && alert && (
@@ -989,7 +1019,8 @@ function ScreenPreview({
                     key={item.id}
                     onClick={(event) => {
                       event.stopPropagation();
-                      if (destination && previewMode) navigatePreview(destination);
+                      if (item.navigationAction === 'back' && previewMode) backPreview(item.navigationTransition);
+                      else if (destination && previewMode) navigatePreview(destination, item.navigationTransition);
                       else if (destination && !previewMode) selectScreen(destination);
                     }}
                   >
@@ -1001,7 +1032,7 @@ function ScreenPreview({
             </nav>
           ) : bottomItems.length > 0 && (
             <div className="ios-bottom-toolbar" role="toolbar" aria-label="下部ツールバー">
-              {bottomItems.map((item) => <PreviewToolbarButton item={item} onNavigate={previewMode && item.destinationScreenId ? () => navigatePreview(item.destinationScreenId as string) : undefined} key={item.id} />)}
+              {bottomItems.map((item) => <PreviewToolbarButton item={item} onNavigate={previewMode ? item.navigationAction === 'back' ? () => backPreview(item.navigationTransition) : item.destinationScreenId ? () => navigatePreview(item.destinationScreenId as string, item.navigationTransition) : undefined : undefined} key={item.id} />)}
             </div>
           )}
           <div className="home-indicator" aria-hidden="true" />
@@ -1113,13 +1144,15 @@ function SheetPreview({
   onClose,
   onOpenSheet,
   onNavigateScreen,
+  onNavigateBack,
 }: {
   node: ContainerNode;
   allNodes: CanvasNode[];
   screenId: string;
   onClose: () => void;
   onOpenSheet: (nodeId: string) => void;
-  onNavigateScreen?: (screenId: string) => void;
+  onNavigateScreen?: (screenId: string, transition?: NavigationTransition) => void;
+  onNavigateBack?: (transition?: NavigationTransition) => void;
 }) {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -1141,7 +1174,7 @@ function SheetPreview({
         <div className="ios-sheet-content node-column" style={{ gap: 8 }}>
           {node.children.length === 0
             ? <div className="empty-container">シートの内容を追加してください</div>
-            : node.children.map((child) => <NodeView key={child.id} node={child} allNodes={allNodes} screenId={screenId} onOpenSheet={onOpenSheet} onNavigateScreen={onNavigateScreen} />)}
+            : node.children.map((child) => <NodeView key={child.id} node={child} allNodes={allNodes} screenId={screenId} onOpenSheet={onOpenSheet} onNavigateScreen={onNavigateScreen} onNavigateBack={onNavigateBack} />)}
         </div>
       </section>
     </div>
@@ -1337,6 +1370,49 @@ function textStyleSize(style: TextStyle | undefined): number | undefined {
     caption: 12,
     caption2: 11,
   }[style];
+}
+
+function previewAccentColor(accent: CanvasDocument['appearance']['accentColor']): string {
+  return {
+    blue: '#007aff',
+    purple: '#af52de',
+    pink: '#ff2d55',
+    orange: '#ff9500',
+    green: '#34c759',
+    custom: '#007aff',
+  }[accent];
+}
+
+function previewScreenBackground(background: ScreenBackground | undefined, scheme: 'light' | 'dark', accent: string): string {
+  const dark = scheme === 'dark';
+  switch (background ?? 'surface') {
+    case 'surfaceContainerLow': return dark ? '#1c1c1e' : '#f2f2f7';
+    case 'surfaceContainer': return dark ? '#242426' : '#e5e5ea';
+    case 'surfaceContainerHigh': return dark ? '#2c2c2e' : '#d1d1d6';
+    case 'surfaceContainerHighest': return dark ? '#3a3a3c' : '#c7c7cc';
+    case 'primaryContainer': return `color-mix(in srgb, ${accent} ${dark ? '28%' : '16%'}, ${dark ? '#1c1c1e' : '#f2f2f7'})`;
+    case 'secondaryContainer': return `color-mix(in srgb, ${accent} ${dark ? '18%' : '10%'}, ${dark ? '#1c1c1e' : '#f2f2f7'})`;
+    case 'tertiaryContainer': return `color-mix(in srgb, #ff9500 ${dark ? '18%' : '10%'}, ${dark ? '#1c1c1e' : '#f2f2f7'})`;
+    case 'primary': return accent;
+    case 'inverseSurface': return dark ? '#f5f5f7' : '#1c1c1e';
+    case 'surface':
+    default: return dark ? '#000' : '#f2f2f7';
+  }
+}
+
+function previewScreenForeground(background: ScreenBackground | undefined, scheme: 'light' | 'dark'): string {
+  if (background === 'primary' || background === 'inverseSurface') return '#fff';
+  return scheme === 'dark' ? '#f5f5f7' : '#111';
+}
+
+function swipeTransition(direction: SwipeDirection): NavigationTransition {
+  switch (direction) {
+    case 'right': return 'slideLeft';
+    case 'up': return 'slideUp';
+    case 'down': return 'slideDown';
+    case 'left':
+    default: return 'slide';
+  }
 }
 
 function fontDesignFamily(design: FontDesign | undefined): string | undefined {

@@ -8,7 +8,10 @@ import type {
   BackgroundStyle,
   CardContentAlignment,
   CardImagePosition,
+  ContentPlacement,
   ImageSource,
+  NavigationTransition,
+  ScreenBackground,
   SwipeDirection,
   TextStyle,
   ToolbarItem,
@@ -23,6 +26,8 @@ interface M3eFrame {
   y: number;
   width: number;
   height: number;
+  place?: ContentPlacement;
+  background?: ScreenBackground;
   note?: string;
   swipe?: Partial<Record<SwipeDirection, string>>;
 }
@@ -39,6 +44,21 @@ interface ConversionContext {
   usedIds: Set<string>;
   frameIds: Map<string, string>;
 }
+
+export interface M3eCompatibilityReport {
+  invalidFrameCount: number;
+  invalidGroupCount: number;
+  discardedItemCount: number;
+  unresolvedDestinationCount: number;
+  unsupportedKinds: string[];
+}
+
+const supportedM3eKinds = new Set([
+  'box', 'button', 'iconButton', 'fab', 'extendedFab', 'chip', 'topAppBar', 'bottomNav', 'navRail',
+  'searchBar', 'card', 'listItem', 'dialog', 'snackbar', 'textField', 'select', 'switch', 'checkbox',
+  'slider', 'text', 'image', 'camera', 'map', 'divider', 'loadingIndicator', 'linearProgress',
+  'circularProgress', 'splitButton', 'fabMenu', 'toolbar', 'tabs', 'radio', 'badge',
+]);
 
 const symbolAliases: Record<string, string> = {
   add: 'plus',
@@ -114,6 +134,18 @@ function readFrame(value: unknown): M3eFrame | null {
   const x = numberValue(value, 'x');
   const y = numberValue(value, 'y');
   if (!id || !name || x === undefined || y === undefined) return null;
+  const place = value.place === undefined
+    ? undefined
+    : isOneOf(value.place, ['top', 'center', 'bottom', 'spread'])
+      ? value.place
+      : null;
+  if (place === null) return null;
+  const background = value.bg === undefined
+    ? undefined
+    : isOneOf(value.bg, ['surface', 'surfaceContainerLow', 'surfaceContainer', 'surfaceContainerHigh', 'surfaceContainerHighest', 'primaryContainer', 'secondaryContainer', 'tertiaryContainer', 'primary', 'inverseSurface'])
+      ? value.bg
+      : null;
+  if (background === null) return null;
 
   const swipeValue = recordValue(value, 'swipe');
   const swipe: Partial<Record<SwipeDirection, string>> = {};
@@ -129,6 +161,8 @@ function readFrame(value: unknown): M3eFrame | null {
     y,
     width: Math.max(1, numberValue(value, 'w') ?? 412),
     height: Math.max(1, numberValue(value, 'h') ?? 892),
+    ...(place === undefined ? {} : { place }),
+    ...(background === undefined ? {} : { background: background as ScreenBackground }),
     ...(stringValue(value, 'note')?.trim() ? { note: stringValue(value, 'note') } : {}),
     ...(Object.keys(swipe).length > 0 ? { swipe } : {}),
   };
@@ -214,13 +248,16 @@ function tabEntries(item: JsonObject): JsonObject[] {
   return Array.isArray(item.tabs) ? item.tabs.filter(isRecord) : [];
 }
 
-function actionTarget(item: JsonObject, context: ConversionContext): { destination?: string; back: boolean } {
+function actionTarget(item: JsonObject, context: ConversionContext): { destination?: string; back: boolean; transition?: NavigationTransition } {
   const action = recordValue(item, 'action');
   const target = action && stringValue(action, 'to');
   if (!target) return { back: false };
-  if (target === 'back') return { back: true };
+  const transition = action && isOneOf(action.transition, ['slide', 'slideLeft', 'slideUp', 'slideDown', 'fade', 'expand', 'none'])
+    ? action.transition
+    : undefined;
+  if (target === 'back') return { back: true, ...(transition === undefined ? {} : { transition }) };
   const destination = context.frameIds.get(target);
-  return destination ? { destination, back: false } : { back: false };
+  return destination ? { destination, back: false, ...(transition === undefined ? {} : { transition }) } : { back: false };
 }
 
 function appendNotes(node: CanvasNode, item: JsonObject, extra: string[] = []): CanvasNode {
@@ -241,17 +278,32 @@ function setButtonAction(node: Extract<CanvasNode, { kind: 'button' }>, item: Js
       node.notes = [node.notes, 'M3Eのトグル状態を優先しました。遷移先は実装時に組み合わせてください。'].filter(Boolean).join('\n');
     } else {
       node.destinationScreenId = action.destination;
+      if (action.transition) node.navigationTransition = action.transition;
     }
   }
-  if (action.back) node.notes = [node.notes, 'タップで前の画面へ戻る'].filter(Boolean).join('\n');
+  if (action.back) {
+    node.navigationAction = 'back';
+    if (action.transition) node.navigationTransition = action.transition;
+    node.notes = [node.notes, 'タップで前の画面へ戻る'].filter(Boolean).join('\n');
+  }
 }
 
 function linkM3eNode(node: CanvasNode, item: JsonObject, context: ConversionContext, fallbackLabel: string, extra: string[] = []): CanvasNode {
   const annotated = appendNotes(node, item, extra);
   const action = actionTarget(item, context);
   if (action.back) {
-    annotated.notes = [annotated.notes, 'タップで前の画面へ戻る'].filter(Boolean).join('\n');
-    return annotated;
+    const label = labelOf(item, node.kind === 'text' ? node.text : fallbackLabel);
+    return {
+      id: stableId('m3e-back', node.id, context.usedIds),
+      kind: 'button',
+      label,
+      role: 'normal',
+      minHeight: 44,
+      ...(node.kind === 'image' && node.systemName.trim() ? { systemName: node.systemName } : {}),
+      navigationAction: 'back',
+      ...(action.transition === undefined ? {} : { navigationTransition: action.transition }),
+      notes: [annotated.notes, 'タップで前の画面へ戻る'].filter(Boolean).join('\n'),
+    };
   }
   if (!action.destination) return annotated;
 
@@ -262,6 +314,7 @@ function linkM3eNode(node: CanvasNode, item: JsonObject, context: ConversionCont
     destinationScreenId: action.destination,
     minHeight: 44,
     children: [annotated],
+    ...(action.transition === undefined ? {} : { navigationTransition: action.transition }),
     notes: 'タップで画面へ遷移',
   };
 }
@@ -294,8 +347,22 @@ function tabViewNode(item: JsonObject, context: ConversionContext): CanvasNode {
           minHeight: 44,
           tabTitle: title,
           tabSystemName: iconOf(tab) ?? 'square',
+          ...(tabAction && isOneOf(tabAction.transition, ['slide', 'slideLeft', 'slideUp', 'slideDown', 'fade', 'expand', 'none']) ? { navigationTransition: tabAction.transition } : {}),
           notes: 'M3Eのタブ操作をNavigationLinkへ変換しました。',
         }
+      : target === 'back'
+        ? {
+            id: tabId,
+            kind: 'button' as const,
+            label: title,
+            role: 'normal' as const,
+            minHeight: 44,
+            tabTitle: title,
+            tabSystemName: iconOf(tab) ?? 'square',
+            navigationAction: 'back' as const,
+            ...(tabAction && isOneOf(tabAction.transition, ['slide', 'slideLeft', 'slideUp', 'slideDown', 'fade', 'expand', 'none']) ? { navigationTransition: tabAction.transition } : {}),
+            notes: 'M3Eのタブ操作は前の画面へ戻る動作です。',
+          }
       : {
           id: tabId,
           kind: 'text' as const,
@@ -304,7 +371,6 @@ function tabViewNode(item: JsonObject, context: ConversionContext): CanvasNode {
           weight: 'regular' as const,
           tabTitle: title,
           tabSystemName: iconOf(tab) ?? 'square',
-          notes: target === 'back' ? 'M3Eのタブ操作は前の画面へ戻る動作です。' : undefined,
         };
   });
   const selected = numberValue(item, 'selected');
@@ -382,9 +448,14 @@ function listItemNode(item: JsonObject, context: ConversionContext): CanvasNode 
       destinationScreenId: action.destination,
       minHeight: 44,
       children: [node],
+      ...(action.transition === undefined ? {} : { navigationTransition: action.transition }),
     }, item, ['タップで画面へ遷移']);
   }
-  if (action.back) node.notes = 'タップで前の画面へ戻る';
+  if (action.back) {
+    node.navigationAction = 'back';
+    if (action.transition) node.navigationTransition = action.transition;
+    node.notes = 'タップで前の画面へ戻る';
+  }
   return appendNotes(node, item);
 }
 
@@ -652,6 +723,8 @@ function toolbarItem(item: JsonObject, icon: string | undefined, placement: Tool
     title: target === 'back' ? '戻る' : icon,
     systemName: icon,
     placement,
+    ...(target === 'back' ? { navigationAction: 'back' as const } : {}),
+    ...(action && isOneOf(action.transition, ['slide', 'slideLeft', 'slideUp', 'slideDown', 'fade', 'expand', 'none']) ? { navigationTransition: action.transition } : {}),
     ...(target && target !== 'back' && context.frameIds.has(target) ? { destinationScreenId: context.frameIds.get(target) } : {}),
   };
 }
@@ -669,6 +742,8 @@ function bottomNavigationItems(item: JsonObject, context: ConversionContext): To
       title: labelOf(tab, `タブ${index + 1}`),
       ...(iconOf(tab) ? { systemName: iconOf(tab) } : {}),
       placement: 'bottomBar' as const,
+      ...(target === 'back' ? { navigationAction: 'back' as const } : {}),
+      ...(action && isOneOf(action.transition, ['slide', 'slideLeft', 'slideUp', 'slideDown', 'fade', 'expand', 'none']) ? { navigationTransition: action.transition } : {}),
       ...(selectedIndex !== undefined && Number.isInteger(selectedIndex) ? { selected: selectedIndex === index } : {}),
       ...(destination ? { destinationScreenId: destination } : {}),
     };
@@ -743,7 +818,9 @@ function convertScreen(frame: M3eFrame, groups: M3eGroup[], frames: M3eFrame[], 
     id: context.frameIds.get(frame.id) ?? stableId('m3e-screen', frame.id, context.usedIds),
     name: frame.name,
     navigationTitle,
+    ...(frame.background === undefined ? {} : { background: frame.background }),
     ...(frame.note ? { notes: frame.note } : {}),
+    ...(frame.place ? { contentPlacement: frame.place } : {}),
     ...(toolbarItems.length > 0 ? { toolbarItems } : {}),
     ...(tabBarItems.length > 0 ? { tabBarItems } : {}),
     ...(frame.swipe ? {
@@ -757,6 +834,60 @@ function convertScreen(frame: M3eFrame, groups: M3eGroup[], frames: M3eFrame[], 
 
 export function isM3eDocument(value: unknown): value is JsonObject {
   return isRecord(value) && Array.isArray(value.frames) && Array.isArray(value.groups) && !Array.isArray(value.screens);
+}
+
+export function inspectM3eCompatibility(value: unknown): M3eCompatibilityReport | null {
+  if (!isM3eDocument(value)) return null;
+
+  const rawFrames = value.frames as unknown[];
+  const frames = rawFrames.map(readFrame).filter((frame): frame is M3eFrame => frame !== null);
+  const frameIds = new Set(frames.map((frame) => frame.id));
+  const unsupportedKinds = new Set<string>();
+  let invalidGroupCount = 0;
+  let discardedItemCount = 0;
+  let unresolvedDestinationCount = 0;
+
+  for (const rawGroup of value.groups as unknown[]) {
+    if (!isRecord(rawGroup) || !Array.isArray(rawGroup.items)) {
+      invalidGroupCount += 1;
+      continue;
+    }
+    const group = readGroup(rawGroup);
+    if (!group) {
+      invalidGroupCount += 1;
+      continue;
+    }
+    for (const rawItem of rawGroup.items) {
+      if (!isRecord(rawItem)) {
+        discardedItemCount += 1;
+        continue;
+      }
+      const kind = stringValue(rawItem, 'kind');
+      if (!kind || !supportedM3eKinds.has(kind)) unsupportedKinds.add(kind || 'unknown');
+      const actionTargets = [
+        recordValue(rawItem, 'action'),
+        ...Object.values(recordValue(rawItem, 'actions') ?? {}).filter(isRecord),
+      ].filter(isRecord);
+      for (const action of actionTargets) {
+        const target = stringValue(action, 'to');
+        if (target && target !== 'back' && !frameIds.has(target)) unresolvedDestinationCount += 1;
+      }
+    }
+  }
+
+  for (const frame of frames) {
+    for (const destination of Object.values(frame.swipe ?? {})) {
+      if (destination && !frameIds.has(destination)) unresolvedDestinationCount += 1;
+    }
+  }
+
+  return {
+    invalidFrameCount: rawFrames.length - frames.length,
+    invalidGroupCount,
+    discardedItemCount,
+    unresolvedDestinationCount,
+    unsupportedKinds: [...unsupportedKinds].sort(),
+  };
 }
 
 export function convertM3eDocument(value: unknown): CanvasDocument | null {

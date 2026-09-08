@@ -14,6 +14,37 @@ describe('SwiftUI generator', () => {
     expect(output).toMatch(/VStack\(alignment: \.leading, spacing: 16\) \{\n\s{20}Image\(systemName:/);
   });
 
+  it('exports semantic screen backgrounds and back actions', () => {
+    const document = structuredClone(defaultDocument);
+    const screen = document.screens[0];
+    if (!screen) throw new Error('Fixture screen missing');
+    screen.background = 'surfaceContainerLow';
+    const button = screen.root.children.find((node) => node.kind === 'button');
+    if (!button || button.kind !== 'button') throw new Error('Button fixture missing');
+    button.navigationAction = 'back';
+    button.navigationTransition = 'fade';
+
+    const output = generateSwiftUI(document);
+
+    expect(output).toContain('@Environment(\\.dismiss) private var dismiss');
+    expect(output).toContain('dismiss()');
+    expect(output).toContain('navigation transition: fade');
+    expect(output).toContain('Color(uiColor: .secondarySystemBackground)');
+    expect(output).toContain('import UIKit');
+  });
+
+  it('exports semantic screen content placement without coordinates', () => {
+    const document = structuredClone(defaultDocument);
+    const screen = document.screens[0];
+    if (!screen) throw new Error('Fixture screen missing');
+    screen.contentPlacement = 'spread';
+
+    const output = generateSwiftUI(document);
+
+    expect(output).toContain('Spacer(minLength: 0)');
+    expect(output).not.toContain('position(');
+  });
+
   it('keeps generated Swift identifiers valid and Dynamic Type-aware', () => {
     const document = structuredClone(defaultDocument);
     const screen = document.screens[0];

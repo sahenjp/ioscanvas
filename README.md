@@ -14,7 +14,7 @@
 - Duplicate selected elements with Cmd/Ctrl+D, including nested children.
 - Keep screen and element implementation notes alongside the semantic tree and include them in the exported brief.
 - Save and open validated `.ioscanvas.json` project files.
-- Open M3E Canvas JSON projects and convert their screens, bars, controls, links, palette, and font choices into a SwiftUI semantic tree without retaining absolute coordinates; actionable content and list rows become editable NavigationLinks, bottom navigation becomes native TabView tabs, and Picker selections, loading states, and semantic text sizes are preserved.
+- Open M3E Canvas JSON projects and convert their screens, bars, controls, links, palette, and font choices into a SwiftUI semantic tree without retaining absolute coordinates; actionable content and list rows become editable NavigationLinks, bottom navigation becomes native TabView tabs, screen body placement is preserved, and lossy or unresolved imports are reported.
 - Copy a local share link that reopens the validated document in another browser.
 - Save the active iPhone preview as a PNG for review or handoff.
 - Opt into iOS 26 Liquid Glass styles from the Inspector and export the corresponding SwiftUI modifiers.
@@ -36,6 +36,7 @@
 - Follow NavigationLink transitions directly in Preview to check the screen flow.
 - Configure left, right, up, and down swipe destinations per screen and try them in Preview.
 - Configure TabView item names and SF Symbols from the Inspector, then switch tabs in Preview and export `.tabItem` code.
+- Preserve M3E screen body placement (`top`, `center`, `bottom`, or `spread`) as a semantic screen setting in Preview and SwiftUI output.
 - Use a Navigator and Parts library with filtering, canvas zoom, and guide visibility controls.
 - Switch the preview between iPhone SE, iPhone 16, iPad mini, and iPad Pro 11-inch sizes without changing the semantic tree.
 - Preview standard, large, and accessibility text sizes to catch Dynamic Type layout pressure before implementation.
@@ -150,4 +151,4 @@ See [`ACKNOWLEDGEMENTS.md`](./ACKNOWLEDGEMENTS.md) for attribution details.
 
 ## Status
 
-Version 1.24.0. The semantic editor, multi-screen flow workspace, nested drag-and-drop, precise element ordering, Navigator and Parts library with Favorites and semantic patterns, multi-selection style editing, inspector, NavigationStack and NavigationSplitView editing, Appearance controls with custom accent colors, interactive Preview mode with screen and swipe flow, TabView switching, Sheet, Alert, ConfirmationDialog, and SearchField presentation, GroupBox and LazyVGrid / LazyHGrid layouts, M3E JSON and share-link import into a semantic SwiftUI tree, actionable imported content and list rows, native bottom navigation mapping, palette and font conversion, preserved control initial state, Picker selections, indeterminate and circular progress state, M3E card image layouts and bottom-sheet handles, semantic text-size mapping, ColorPicker and other native controls, Gauge metrics, empty states, stateful toggle Buttons, VoiceOver labels for icon-only Buttons, history controls, semantic layout tidying, project files, share links, PNG preview export, SF Symbol images, Liquid Glass presets and shape preview, HIG checks, linked SwiftUI export, and an xtool SwiftUI target are present.
+Version 1.26.0. The semantic editor, multi-screen flow workspace, nested drag-and-drop, precise element ordering, Navigator and Parts library with Favorites and semantic patterns, multi-selection style editing, inspector, NavigationStack and NavigationSplitView editing, Appearance controls with custom accent colors, interactive Preview mode with screen and swipe flow, TabView switching, Sheet, Alert, ConfirmationDialog, and SearchField presentation, GroupBox and LazyVGrid / LazyHGrid layouts, M3E JSON and share-link import into a semantic SwiftUI tree, actionable imported content and list rows, native bottom navigation mapping, palette and font conversion, preserved control initial state, Picker selections, indeterminate and circular progress state, M3E card image layouts and bottom-sheet handles, semantic text-size mapping, ColorPicker and other native controls, Gauge metrics, empty states, stateful toggle Buttons, VoiceOver labels for icon-only Buttons, history controls, semantic layout tidying, project files, share links, PNG preview export, SF Symbol images, Liquid Glass presets and shape preview, HIG checks, linked SwiftUI export, and an xtool SwiftUI target are present.

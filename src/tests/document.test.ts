@@ -275,6 +275,8 @@ describe('project document parsing', () => {
     const screen = document.screens[0];
     if (!screen) throw new Error('Home screen missing');
     screen.navigationTitleDisplayMode = 'inline';
+    screen.contentPlacement = 'spread';
+    screen.background = 'surfaceContainerHigh';
     screen.toolbarItems = [{
       id: 'toolbar-help',
       title: 'ヘルプ',
@@ -282,6 +284,7 @@ describe('project document parsing', () => {
       placement: 'topBarTrailing',
       role: 'normal',
       destinationScreenId: 'screen-settings',
+      navigationTransition: 'fade',
     }];
     screen.tabBarItems = [{
       id: 'tab-home',
@@ -290,12 +293,16 @@ describe('project document parsing', () => {
       placement: 'bottomBar',
       selected: true,
       destinationScreenId: 'screen-home',
+      navigationAction: undefined,
     }];
     screen.swipe = { left: 'screen-settings' };
 
     expect(parseCanvasDocument(document)).toEqual(document);
     expect(parseCanvasDocument({ ...document, screens: [{ ...screen, toolbarItems: [{ ...screen.toolbarItems[0], placement: 'invalid' }] }] })).toBeNull();
     expect(parseCanvasDocument({ ...document, screens: [{ ...screen, tabBarItems: [{ ...screen.tabBarItems[0], placement: 'topBarLeading' }] }] })).toBeNull();
+    expect(parseCanvasDocument({ ...document, screens: [{ ...screen, contentPlacement: 'diagonal' }] })).toBeNull();
+    expect(parseCanvasDocument({ ...document, screens: [{ ...screen, background: 'flat' }] })).toBeNull();
+    expect(parseCanvasDocument({ ...document, screens: [{ ...screen, toolbarItems: [{ ...screen.toolbarItems[0], navigationTransition: 'warp' }] }] })).toBeNull();
     expect(parseCanvasDocument({ ...document, screens: [{ ...screen, swipe: { left: 'missing-screen' } }] })).toBeNull();
   });
 
