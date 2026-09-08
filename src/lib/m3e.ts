@@ -1321,13 +1321,54 @@ function exportNavigationSplitNode(node: ContainerNode, frameIds: Map<string, st
   };
 }
 
+function exportCardPresentation(node: ContainerNode): Pick<M3eExportItem, 'icon' | 'supporting' | 'src'> {
+  const descendants: CanvasNode[] = [];
+  const visit = (current: CanvasNode): void => {
+    descendants.push(current);
+    if (Array.isArray(current.children)) current.children.forEach(visit);
+  };
+  node.children.forEach(visit);
+  const image = descendants.find((child): child is Extract<CanvasNode, { kind: 'image' }> => child.kind === 'image');
+  const texts = descendants.filter((child): child is Extract<CanvasNode, { kind: 'text' }> => child.kind === 'text');
+  const supporting = texts.find((child) => child.text.trim() && child.text !== node.title)?.text.trim();
+  const remote = image?.source === 'remote' && /^https?:\/\//i.test(image.systemName);
+  return {
+    icon: remote ? null : image?.systemName ?? null,
+    ...(remote ? { src: image.systemName } : {}),
+    ...(supporting ? { supporting } : {}),
+  };
+}
+
+function exportSnackbarNode(node: ContainerNode, inheritedNote: string): M3eExportItem | null {
+  if (node.kind !== 'hstack' || node.background !== 'material' || node.cornerRadius !== 12 || node.children.length < 1 || node.children.length > 2) return null;
+  const message = node.children.find((child): child is Extract<CanvasNode, { kind: 'text' }> => child.kind === 'text');
+  const action = node.children.find((child): child is Extract<CanvasNode, { kind: 'button' }> => child.kind === 'button');
+  if (!message || node.children.some((child) => child !== message && child !== action)) return null;
+  return {
+    id: node.id,
+    kind: 'snackbar',
+    label: message.text,
+    icon: null,
+    variant: exportVariant(node),
+    ...(action ? { supporting: action.label } : {}),
+    ...(exportNote(node, inheritedNote) ? { note: exportNote(node, inheritedNote) } : {}),
+  };
+}
+
 function isExportContainer(node: CanvasNode): node is ContainerNode {
   return isContainerNode(node);
 }
 
 function exportContainerItems(node: ContainerNode, frameIds: Map<string, string>, inheritedNote = ''): M3eExportItem[] {
   if (node.kind === 'tabview') return [exportTabsNode(node, frameIds, inheritedNote)];
-  if (node.kind === 'navigation-split-view') return [exportNavigationSplitNode(node, frameIds, inheritedNote)];
+  if (node.kind === 'navigation-split-view') {
+    const detail = node.children[1];
+    const detailItems = detail && isExportContainer(detail) ? exportContainerItems(detail, frameIds, inheritedNote) : [];
+    return [exportNavigationSplitNode(node, frameIds, inheritedNote), ...detailItems];
+  }
+
+  const snackbar = exportSnackbarNode(node, inheritedNote);
+  if (snackbar) return [snackbar];
 
   const containerNote = node.kind === 'zstack'
     ? [inheritedNote, 'SwiftUI ZStackの重なりを含みます。'].filter(Boolean).join('\n')
@@ -1339,18 +1380,23 @@ function exportContainerItems(node: ContainerNode, frameIds: Map<string, string>
   if (!titled) return children;
 
   const title = node.title || node.label || (node.kind === 'sheet' ? 'シート' : 'グループ');
+  const isBottomSheet = node.isBottomSheet === true;
+  const isCard = node.kind === 'groupbox' && !isBottomSheet;
+  const card = isCard ? exportCardPresentation(node) : { icon: null };
   const containerItem: M3eExportItem = {
     id: `${node.id}-container`,
-    kind: node.kind === 'groupbox' ? 'card' : 'box',
+    kind: isCard ? 'card' : 'box',
     label: title,
-    icon: null,
+    icon: card.icon,
     variant: node.background === 'accent' ? 'filled' : 'outlined',
     ...(exportFill(node.background) ? { fill: exportFill(node.background) } : {}),
-    ...(node.kind === 'sheet' && node.isBottomSheet ? { checked: true } : {}),
-    ...(node.kind === 'groupbox' && node.cardNoImage ? { noImage: true } : {}),
-    ...(node.kind === 'groupbox' && node.cardImagePosition ? { imagePos: node.cardImagePosition } : {}),
-    ...(node.kind === 'groupbox' && node.cardImageSize !== undefined ? { imageSize: node.cardImageSize } : {}),
-    ...(node.kind === 'groupbox' && node.cardContentAlignment ? { contentAlign: node.cardContentAlignment } : {}),
+    ...(isBottomSheet ? { checked: true } : {}),
+    ...(isCard && node.cardNoImage ? { noImage: true } : {}),
+    ...(isCard && node.cardImagePosition ? { imagePos: node.cardImagePosition } : {}),
+    ...(isCard && node.cardImageSize !== undefined ? { imageSize: node.cardImageSize } : {}),
+    ...(isCard && node.cardContentAlignment ? { contentAlign: node.cardContentAlignment } : {}),
+    ...(isCard && card.supporting ? { supporting: card.supporting } : {}),
+    ...(isCard && card.src ? { src: card.src } : {}),
     note: exportNote(node, node.kind === 'sheet' ? 'SwiftUI sheetとして再構成します。' : undefined),
   };
   return [containerItem, ...children];

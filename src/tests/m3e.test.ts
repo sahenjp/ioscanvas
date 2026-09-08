@@ -437,6 +437,11 @@ describe('M3E compatibility importer', () => {
     expect(card.children?.[0]).toMatchObject({ kind: 'hstack' });
     expect(output).toContain('.frame(width: 96)');
     expect(output).toContain('.frame(maxWidth: .infinity, alignment: .center)');
+    const exportedItems = exportM3eDocument(document).groups.flatMap((group) => group.items);
+    expect(exportedItems).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: 'box', label: 'メニュー', checked: true }),
+      expect.objectContaining({ kind: 'card', label: 'おすすめ', icon: 'star.fill', supporting: '説明', imagePos: 'leading', imageSize: 96, contentAlign: 'center' }),
+    ]));
   });
 
   it('keeps a camera import as a semantic camera control', () => {
@@ -517,5 +522,11 @@ describe('M3E compatibility importer', () => {
     expect(output).toContain('Map()');
     expect(output).toContain('Button("元に戻す")');
     expect(output).toContain('List(selection: $selected_m3e_rail)');
+    const exportedItems = exportM3eDocument(document).groups.flatMap((group) => group.items);
+    expect(exportedItems).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: 'navRail' }),
+      expect.objectContaining({ kind: 'map', label: '現在地' }),
+      expect.objectContaining({ kind: 'snackbar', label: '保存しました', supporting: '元に戻す' }),
+    ]));
   });
 });
