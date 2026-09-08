@@ -249,6 +249,14 @@ function renderNodeContent(
           ) : <span className="ios-image-symbol" aria-hidden="true">{symbolGlyph(node.systemName)}</span>}
         </div>
       );
+    case 'map':
+      return (
+        <div className="ios-map" role="img" aria-label={node.label || '地図'}>
+          <span className="ios-map-symbol" aria-hidden="true">{symbolGlyph('map.fill')}</span>
+          <strong>MapKit Map</strong>
+          <span>{node.label || '地図'}</span>
+        </div>
+      );
     case 'button':
       {
         const toggleOn = node.toggle && controls ? controls.value === true : node.toggle?.isOn ?? false;
@@ -629,12 +637,26 @@ function renderNodeContent(
     case 'navigation-split-view': {
       const sidebar = node.children[0];
       const detail = node.children.slice(1);
+      const selectedIndex = controls && sidebar?.kind === 'list'
+        ? Math.max(0, Math.min(sidebar.children.length - 1, Math.round(numberPreviewValue(controls.value, node.selectedIndex ?? 0))))
+        : node.selectedIndex ?? 0;
+      const sidebarContent = controls && sidebar?.kind === 'list'
+        ? (
+          <div className="navigation-rail-preview">
+            {sidebar.children.map((child, index) => (
+              <div className={`navigation-rail-item ${index === selectedIndex ? 'is-selected' : ''}`} key={child.id}>
+                <NodeView node={child} allNodes={allNodes} screenId={screenId} onOpenSheet={onOpenSheet} onNavigateScreen={onNavigateScreen} />
+              </div>
+            ))}
+          </div>
+        )
+        : sidebar
+          ? <NodeView key={sidebar.id} node={sidebar} allNodes={allNodes} screenId={screenId} onOpenSheet={onOpenSheet} onNavigateScreen={onNavigateScreen} />
+          : <div className="empty-container">サイドバーを追加</div>;
       return (
-        <div className="canvas-navigation-split">
+        <div className={`canvas-navigation-split ${node.railExpanded ? 'rail-expanded' : ''} ${node.railModal ? 'rail-modal' : ''}`}>
           <div className="navigation-split-pane navigation-split-sidebar">
-            {sidebar
-              ? <NodeView key={sidebar.id} node={sidebar} allNodes={allNodes} screenId={screenId} onOpenSheet={onOpenSheet} onNavigateScreen={onNavigateScreen} />
-              : <div className="empty-container">サイドバーを追加</div>}
+            {sidebarContent}
           </div>
           <div className="navigation-split-pane navigation-split-detail">
             {detail.length > 0
@@ -960,10 +982,11 @@ function useSystemDarkMode(): boolean {
 function PreviewToolbarButton({ item, onNavigate }: { item: ToolbarItem; onNavigate?: () => void }) {
   return (
     <button
-      className={`ios-toolbar-button ${item.role === 'destructive' ? 'destructive' : ''}`}
+      className={`ios-toolbar-button ${item.role === 'destructive' ? 'destructive' : ''} ${item.selected ? 'is-selected' : ''}`}
       type="button"
       aria-label={item.title || 'Toolbar action'}
       title={item.title || 'Toolbar action'}
+      aria-current={item.selected ? 'page' : undefined}
       onClick={(event) => {
         event.stopPropagation();
         onNavigate?.();
@@ -1301,6 +1324,7 @@ function symbolGlyph(systemName: string): string {
     'trash': '♲',
     'pencil': '✎',
     'photo': '▧',
+    'map.fill': '⌖',
     'folder.fill': '▰',
     'doc.fill': '▤',
     'calendar': '▦',
@@ -1328,6 +1352,7 @@ function initialPreviewValue(node: CanvasNode): PreviewValue {
     case 'button': return node.toggle?.isOn ?? false;
     case 'toggle': return node.isOn ?? false;
     case 'tabview': return node.selectedIndex ?? 0;
+    case 'navigation-split-view': return node.selectedIndex ?? 0;
     case 'disclosure-group': return true;
     case 'picker': return node.initialOption ?? node.options[0] ?? '';
     case 'menu': return node.options[0] ?? '';

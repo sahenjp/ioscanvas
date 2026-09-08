@@ -27,7 +27,7 @@ const swiftKeywords = new Set([
 
 interface BindingInfo {
   name: string;
-  type: 'Bool' | 'String' | 'Double' | 'Int' | 'Date' | 'Color';
+  type: 'Bool' | 'String' | 'Double' | 'Int' | 'Int?' | 'Date' | 'Color';
   initial: string;
 }
 
@@ -73,6 +73,10 @@ function confirmationDialogBindingKey(node: Extract<CanvasNode, { kind: 'confirm
 
 function tabSelectionKey(node: CanvasNode): string {
   return `TabView:${node.id}`;
+}
+
+function railSelectionKey(node: CanvasNode): string {
+  return `NavigationRail:${node.id}`;
 }
 
 function buttonToggleKey(node: Extract<CanvasNode, { kind: 'button' }>): string {
@@ -183,36 +187,39 @@ function tabSystemName(node: CanvasNode): string {
 function renderToolbarButton(item: ToolbarItem, viewNames: Map<string, string>): string {
   const buttonPad = '                ';
   const contentPad = `${buttonPad}    `;
+  const withSelection = (value: string) => item.selected
+    ? `${value}\n${buttonPad}.accessibilityAddTraits(.isSelected)`
+    : value;
   const role = item.role && item.role !== 'normal' ? `, role: .${item.role}` : '';
   const destination = item.destinationScreenId ? viewNames.get(item.destinationScreenId) : undefined;
   if (destination) {
     const label = item.systemName?.trim()
       ? `Label(${quoted(item.title)}, systemImage: ${quoted(item.systemName)})`
       : `Text(${quoted(item.title)})`;
-    return `${buttonPad}NavigationLink {
+    return withSelection(`${buttonPad}NavigationLink {
 ${contentPad}${destination}()
 ${buttonPad}} label: {
 ${contentPad}${label}
-${buttonPad}}`;
+${buttonPad}}`);
   }
   if (!item.systemName?.trim()) {
-    return `${buttonPad}Button(${quoted(item.title)}${role}) {
+    return withSelection(`${buttonPad}Button(${quoted(item.title)}${role}) {
 ${contentPad}// Action
-${buttonPad}}`;
+${buttonPad}}`);
   }
   const label = `Label(${quoted(item.title)}, systemImage: ${quoted(item.systemName)})`;
   if (role) {
-    return `${buttonPad}Button(role: .${item.role}) {
+    return withSelection(`${buttonPad}Button(role: .${item.role}) {
 ${contentPad}// Action
 ${buttonPad}} label: {
 ${contentPad}${label}
-${buttonPad}}`;
+${buttonPad}}`);
   }
-  return `${buttonPad}Button {
+  return withSelection(`${buttonPad}Button {
 ${contentPad}// Action
 ${buttonPad}} label: {
 ${contentPad}${label}
-${buttonPad}}`;
+${buttonPad}}`);
 }
 
 function renderToolbarModifier(screen: CanvasScreen, viewNames: Map<string, string>): string {
@@ -287,6 +294,13 @@ function renderTabChild(node: CanvasNode, index: number, depth: number, context:
   const pad = indent(depth);
   const tag = selection ? `\n${pad}.tag(${index})` : '';
   return `${renderNode(node, depth, context)}\n${pad}.tabItem {\n${indent(depth + 1)}Label(${quoted(tabTitle(node))}, systemImage: ${quoted(tabSystemName(node))})\n${pad}}${tag}`;
+}
+
+function renderNavigationSplitSidebar(node: CanvasNode | undefined, depth: number, context: RenderContext): string {
+  const pad = indent(depth);
+  if (node?.kind !== 'list') return node ? renderNode(node, depth, context) : `${pad}EmptyView()`;
+  const children = node.children.map((child, index) => `${renderNode(child, depth + 1, context)}\n${indent(depth + 1)}.tag(${index})`).join('\n');
+  return `${pad}List {\n${children}\n${pad}}`;
 }
 
 function buttonStyleModifier(style: string | undefined, depth: number): string {
@@ -459,6 +473,8 @@ function renderNodeContent(node: CanvasNode, depth: number, context: RenderConte
         : `Image(systemName: ${quoted(node.systemName)})`;
       return `${pad}${image}\n${pad}    ${accessibility}`;
     }
+    case 'map':
+      return `${pad}Map()\n${pad}    .frame(minHeight: 220)\n${pad}    .accessibilityLabel(${quoted(node.label || '地図')})`;
     case 'label': {
       const accessibility = node.accessibilityLabel.trim().length > 0
         ? `\n${pad}    .accessibilityLabel(${quoted(node.accessibilityLabel)})`
@@ -476,9 +492,13 @@ function renderNodeContent(node: CanvasNode, depth: number, context: RenderConte
     case 'spacer':
       return `${pad}Spacer()`;
     case 'navigation-split-view': {
-      const sidebar = node.children[0]
-        ? renderNode(node.children[0], depth + 1, context)
-        : `${indent(depth + 1)}EmptyView()`;
+      const selection = node.selectedIndex !== undefined;
+      const binding = selection ? context.bindings.get(railSelectionKey(node))?.name : undefined;
+      const sidebar = binding
+        ? `${indent(depth + 1)}List(selection: $${binding}) {\n${node.children[0]?.kind === 'list'
+          ? node.children[0].children.map((child, index) => `${renderNode(child, depth + 2, context)}\n${indent(depth + 2)}.tag(${index})`).join('\n')
+          : `${indent(depth + 2)}EmptyView()`}\n${indent(depth + 1)}}`
+        : renderNavigationSplitSidebar(node.children[0], depth + 1, context);
       const detailNodes = node.children.slice(1);
       let detail: string;
       if (detailNodes.length === 0) {
@@ -489,7 +509,10 @@ function renderNodeContent(node: CanvasNode, depth: number, context: RenderConte
         const detailChildren = detailNodes.map((child) => renderNode(child, depth + 2, context)).join('\n');
         detail = `${indent(depth + 1)}VStack {\n${detailChildren}\n${indent(depth + 1)}}`;
       }
-      return `${pad}NavigationSplitView {\n${sidebar}\n${pad}} detail: {\n${detail}\n${pad}}`;
+      const railNote = node.railExpanded !== undefined || node.railModal !== undefined
+        ? `${pad}// Navigation Rail: expanded=${node.railExpanded ?? false}, modal=${node.railModal ?? false}. NavigationSplitViewの適応レイアウトを使用します。\n`
+        : '';
+      return `${railNote}${pad}NavigationSplitView {\n${sidebar}\n${pad}} detail: {\n${detail}\n${pad}}`;
     }
     case 'vstack':
     case 'hstack':
@@ -621,6 +644,17 @@ function collectBindings(
         result.set(key, { name, type: 'Int', initial: String(node.selectedIndex) });
       }
     }
+    if (node.kind === 'navigation-split-view' && node.selectedIndex !== undefined) {
+      const key = railSelectionKey(node);
+      if (!result.has(key)) {
+        const base = swiftIdentifier(`selected_${node.id}`, 'selectedRail');
+        let name = base;
+        let suffix = 2;
+        while (usedNames.has(name)) name = `${base}${suffix++}`;
+        usedNames.add(name);
+        result.set(key, { name, type: 'Int?', initial: String(node.selectedIndex) });
+      }
+    }
     if (node.children) collectBindings(node.children, result, usedNames);
   }
   return result;
@@ -689,6 +723,10 @@ function renderScreen(
   return `struct ${viewName}: View {\n${stateLines ? `${stateLines}\n\n` : ''}    var body: some View {\n${rootBody}\n    }\n}`;
 }
 
+function hasNodeKind(nodes: CanvasNode[], kind: CanvasNode['kind']): boolean {
+  return nodes.some((node) => node.kind === kind || (node.children ? hasNodeKind(node.children, kind) : false));
+}
+
 export function generateSwiftUI(document: CanvasDocument): string {
   const screen = document.screens.find((candidate) => candidate.id === document.activeScreenId) ?? document.screens[0];
   if (!screen) return '';
@@ -700,5 +738,8 @@ export function generateSwiftUI(document: CanvasDocument): string {
     return renderScreen(candidate, { bindings, viewNames }, candidate.id === screen.id, viewName, document.appearance);
   }).join('\n\n');
 
-  return `import Foundation\nimport SwiftUI\n\n${views}\n`;
+  const imports = hasNodeKind(document.screens.flatMap((candidate) => candidate.root.children), 'map')
+    ? 'import Foundation\nimport SwiftUI\nimport MapKit'
+    : 'import Foundation\nimport SwiftUI';
+  return `${imports}\n\n${views}\n`;
 }

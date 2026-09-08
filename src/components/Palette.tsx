@@ -38,6 +38,7 @@ const groups: { title: string; items: { kind: NodeKind; name: string; descriptio
     items: [
       { kind: 'text', name: 'Text', description: 'テキストを表示' },
       { kind: 'image', name: 'Image', description: 'SF Symbolを表示' },
+      { kind: 'map', name: 'MapKit Map', description: 'MapKitの地図を表示' },
       { kind: 'button', name: 'Button', description: 'アクション' },
       { kind: 'alert', name: 'Alert', description: '確認ダイアログを表示' },
       { kind: 'confirmation-dialog', name: 'ConfirmationDialog', description: '選択肢を表示' },
@@ -78,6 +79,7 @@ const searchAliases: Partial<Record<NodeKind, string>> = {
   zstack: '重ねる スタック',
   text: 'テキスト 文字',
   image: '画像 アイコン シンボル',
+  map: '地図 MapKit 位置情報',
   button: 'ボタン 操作',
   alert: '確認 ダイアログ 警告',
   'confirmation-dialog': '確認 選択肢 ダイアログ アクションシート',
@@ -766,6 +768,7 @@ function nodeLabel(node: CanvasNode): string {
     case 'content-unavailable': return node.title || nodeKindLabel(node.kind);
     case 'label': return node.title || 'Label';
     case 'image': return node.systemName || 'Image';
+    case 'map': return node.label || 'MapKit Map';
     default: return nodeKindLabel(node.kind);
   }
 }
@@ -814,5 +817,6 @@ function nodeKindLabel(kind: NodeKind): string {
     case 'confirmation-dialog': return 'ConfirmationDialog';
     case 'toggle': return 'Toggle';
     case 'image': return 'Image';
+    case 'map': return 'MapKit Map';
   }
 }

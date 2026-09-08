@@ -102,6 +102,7 @@ function readToolbarItems(value: unknown, ids: Set<string>): ToolbarItem[] | nul
     if (ids.has(item.id)) return null;
     if (item.systemName !== undefined && !isString(item.systemName)) return null;
     if (item.role !== undefined && !isOneOf(item.role, ['normal', 'destructive', 'cancel'])) return null;
+    if (item.selected !== undefined && typeof item.selected !== 'boolean') return null;
     if (item.destinationScreenId !== undefined && !isString(item.destinationScreenId)) return null;
     ids.add(item.id);
     items.push({
@@ -110,6 +111,7 @@ function readToolbarItems(value: unknown, ids: Set<string>): ToolbarItem[] | nul
       placement: item.placement as ToolbarPlacement,
       ...(item.systemName === undefined ? {} : { systemName: item.systemName }),
       ...(item.role === undefined ? {} : { role: item.role }),
+      ...(item.selected === undefined ? {} : { selected: item.selected }),
       ...(item.destinationScreenId === undefined ? {} : { destinationScreenId: item.destinationScreenId }),
     });
   }
@@ -324,6 +326,10 @@ function readNode(value: unknown, ids: Set<string>): CanvasNode | null {
         && (value.source === undefined || isOneOf(value.source, ['symbol', 'asset', 'remote']))
         ? { id: value.id, kind: 'image', systemName: value.systemName, accessibilityLabel: value.accessibilityLabel, ...(value.source === undefined ? {} : { source: value.source as ImageSource }), ...nodeProperties }
         : null;
+    case 'map':
+      return isString(value.label)
+        ? { id: value.id, kind: 'map', label: value.label, ...nodeProperties }
+        : null;
     case 'divider':
       return { id: value.id, kind: 'divider', ...nodeProperties };
     case 'spacer':
@@ -354,7 +360,14 @@ function readNode(value: unknown, ids: Set<string>): CanvasNode | null {
       if (value.kind === 'lazyvgrid' && value.columns === undefined) return null;
       if (value.rows !== undefined && (!isNumber(value.rows) || !Number.isInteger(value.rows) || value.rows < 1 || value.rows > 8)) return null;
       if (value.kind === 'lazyhgrid' && value.rows === undefined) return null;
-      if (value.selectedIndex !== undefined && (!isNumber(value.selectedIndex) || !Number.isInteger(value.selectedIndex) || value.selectedIndex < 0 || value.selectedIndex >= value.children.length)) return null;
+      const selectionLength = value.kind === 'navigation-split-view'
+        && isRecord(value.children[0])
+        && Array.isArray(value.children[0].children)
+        ? value.children[0].children.length
+        : value.children.length;
+      if (value.selectedIndex !== undefined && (!isNumber(value.selectedIndex) || !Number.isInteger(value.selectedIndex) || value.selectedIndex < 0 || value.selectedIndex >= selectionLength)) return null;
+      if (value.railExpanded !== undefined && typeof value.railExpanded !== 'boolean') return null;
+      if (value.railModal !== undefined && typeof value.railModal !== 'boolean') return null;
       if (value.isBottomSheet !== undefined && typeof value.isBottomSheet !== 'boolean') return null;
       if (value.cardImagePosition !== undefined && !isOneOf(value.cardImagePosition, ['top', 'leading', 'trailing', 'background'])) return null;
       if (value.cardImageSize !== undefined && (!isNumber(value.cardImageSize) || value.cardImageSize < 1 || value.cardImageSize > 1024)) return null;
@@ -380,6 +393,8 @@ function readNode(value: unknown, ids: Set<string>): CanvasNode | null {
         ...(value.columns === undefined ? {} : { columns: value.columns }),
         ...(value.rows === undefined ? {} : { rows: value.rows }),
         ...(value.selectedIndex === undefined ? {} : { selectedIndex: value.selectedIndex }),
+        ...(value.railExpanded === undefined ? {} : { railExpanded: value.railExpanded }),
+        ...(value.railModal === undefined ? {} : { railModal: value.railModal }),
         ...(value.isBottomSheet === undefined ? {} : { isBottomSheet: value.isBottomSheet }),
         ...(value.cardImagePosition === undefined ? {} : { cardImagePosition: value.cardImagePosition as CardImagePosition }),
         ...(value.cardImageSize === undefined ? {} : { cardImageSize: value.cardImageSize }),

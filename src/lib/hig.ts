@@ -226,6 +226,15 @@ function lintNode(
     }
   }
 
+  if (node.kind === 'map' && node.label.trim().length === 0) {
+    issues.push({
+      nodeId: node.id,
+      severity: 'warning',
+      code: 'ACCESSIBILITY',
+      message: 'Mapには表示内容を説明するラベルを付けてください。',
+    });
+  }
+
   if (node.kind === 'section' || node.kind === 'disclosure-group') {
     if (!node.title?.trim()) {
       issues.push({

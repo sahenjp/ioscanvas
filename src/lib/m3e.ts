@@ -461,7 +461,7 @@ function mapItem(item: JsonObject, context: ConversionContext): CanvasNode | nul
     case 'camera':
       return appendNotes(imageNode(id, 'camera.fill', 'symbol', label || 'カメラ'), item, ['M3EのカメラプレースホルダーをImageとして読み込みました。']);
     case 'map':
-      return appendNotes(imageNode(id, 'map.fill', 'symbol', label || '地図'), item, ['M3Eの地図プレースホルダーです。実装時はMapKitのMapへ置き換えてください。']);
+      return appendNotes({ id, kind: 'map', label: label || '地図' }, item, ['M3Eの地図をMapKitのMapへ変換しました。位置情報や注釈は実装側で追加してください。']);
     case 'divider':
       return appendNotes({ id, kind: 'divider' }, item);
     case 'loadingIndicator':
@@ -552,8 +552,41 @@ function mapItem(item: JsonObject, context: ConversionContext): CanvasNode | nul
       return listItemNode(item, context);
     case 'dialog':
       return appendNotes({ id, kind: 'alert', label: '確認を表示', title: label || '確認', message: stringValue(item, 'supporting') ?? '', primaryButton: '続ける', primaryRole: 'normal', minHeight: 44 }, item);
-    case 'snackbar':
-      return appendNotes({ id, kind: 'text', text: label || '通知', fontSize: 15, weight: 'regular', textStyle: 'callout' }, item, ['M3EのSnackbarです。実装時はToastまたは独自の表示状態へ置き換えてください。']);
+    case 'snackbar': {
+      const actionLabel = stringValue(item, 'supporting')?.trim();
+      const children: CanvasNode[] = [
+        {
+          id: stableId('m3e-snackbar-message', sourceId, context.usedIds),
+          kind: 'text',
+          text: label || '通知',
+          fontSize: 15,
+          weight: 'regular',
+          textStyle: 'callout',
+          frameWidth: 'max',
+        },
+      ];
+      if (actionLabel) {
+        children.push({
+          id: stableId('m3e-snackbar-action', sourceId, context.usedIds),
+          kind: 'button',
+          label: actionLabel,
+          role: 'normal',
+          buttonStyle: 'plain',
+          minHeight: 44,
+        });
+      }
+      return appendNotes({
+        id,
+        kind: 'hstack',
+        spacing: 8,
+        alignment: 'center',
+        frameWidth: 'max',
+        padding: 8,
+        background: 'material',
+        cornerRadius: 12,
+        children,
+      }, item, ['M3EのSnackbarをTextとButtonの意味構造へ変換しました。表示時間や再表示はSwiftUI側で状態管理してください。']);
+    }
     case 'fabMenu':
     case 'toolbar': {
       const actions = recordValue(item, 'actions');
@@ -584,9 +617,16 @@ function mapItem(item: JsonObject, context: ConversionContext): CanvasNode | nul
           minHeight: 44,
         };
       });
+      const selectedIndex = numberValue(item, 'selected');
+      const normalizedSelectedIndex = selectedIndex !== undefined && Number.isInteger(selectedIndex) && links.length > 0
+        ? Math.max(0, Math.min(links.length - 1, selectedIndex))
+        : undefined;
       return appendNotes({
         id,
         kind: 'navigation-split-view',
+        ...(normalizedSelectedIndex === undefined ? {} : { selectedIndex: normalizedSelectedIndex }),
+        ...(booleanValue(item, 'railExpanded') === undefined ? {} : { railExpanded: booleanValue(item, 'railExpanded') }),
+        ...(booleanValue(item, 'railModal') === undefined ? {} : { railModal: booleanValue(item, 'railModal') }),
         children: [
           { id: stableId('m3e-rail-sidebar', sourceId, context.usedIds), kind: 'list', children: links },
           { id: stableId('m3e-rail-detail', sourceId, context.usedIds), kind: 'vstack', spacing: 12, children: [] },
@@ -619,6 +659,7 @@ function toolbarItem(item: JsonObject, icon: string | undefined, placement: Tool
 function bottomNavigationItems(item: JsonObject, context: ConversionContext): ToolbarItem[] {
   const sourceId = stringValue(item, 'id') ?? 'bottom-nav';
   const actions = recordValue(item, 'actions');
+  const selectedIndex = numberValue(item, 'selected');
   return tabEntries(item).map((tab, index) => {
     const action = actions && recordValue(actions, `tab:${index}`);
     const target = action && stringValue(action, 'to');
@@ -628,6 +669,7 @@ function bottomNavigationItems(item: JsonObject, context: ConversionContext): To
       title: labelOf(tab, `タブ${index + 1}`),
       ...(iconOf(tab) ? { systemName: iconOf(tab) } : {}),
       placement: 'bottomBar' as const,
+      ...(selectedIndex !== undefined && Number.isInteger(selectedIndex) ? { selected: selectedIndex === index } : {}),
       ...(destination ? { destinationScreenId: destination } : {}),
     };
   });

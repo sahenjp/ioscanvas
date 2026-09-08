@@ -48,6 +48,8 @@ function describe(node: CanvasNode, depth = 0): string[] {
       return [`${common}: ${node.label} / binding=${node.binding}`];
     case 'image':
       return [`${common}: ${node.systemName} / source=${node.source ?? 'symbol'} / accessibility=${node.accessibilityLabel || 'decorative'}`];
+    case 'map':
+      return [`${common}: ${node.label || '地図'} / MapKit`];
     case 'section':
       return [`${common}: ${node.title ?? 'Section'}`, ...node.children.flatMap((child) => describe(child, depth + 1))];
     case 'vstack':
@@ -77,7 +79,7 @@ function describe(node: CanvasNode, depth = 0): string[] {
 export type PromptScope = 'active' | 'all';
 
 function screenDetails(screen: CanvasDocument['screens'][number], document: CanvasDocument): string[] {
-  const toolbar = (screen.toolbarItems ?? []).map((item) => `${item.placement}: ${item.title}${item.systemName ? ` / symbol=${item.systemName}` : ''}${item.destinationScreenId ? ` / destination=${document.screens.find((candidate) => candidate.id === item.destinationScreenId)?.name ?? '未設定'}` : ''}`).join(', ') || 'なし';
+  const toolbar = (screen.toolbarItems ?? []).map((item) => `${item.placement}: ${item.title}${item.systemName ? ` / symbol=${item.systemName}` : ''}${item.selected ? ' / selected' : ''}${item.destinationScreenId ? ` / destination=${document.screens.find((candidate) => candidate.id === item.destinationScreenId)?.name ?? '未設定'}` : ''}`).join(', ') || 'なし';
   const navigation = navigationLinks(screen.root.children)
     .map((node) => `${node.label}=${document.screens.find((candidate) => candidate.id === node.destinationScreenId)?.name ?? '未設定'}`)
     .join(', ') || 'なし';

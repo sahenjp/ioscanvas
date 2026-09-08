@@ -10,7 +10,7 @@ export type DragData =
 const patternIds = new Set<PatternId>(['glass-card', 'settings-section', 'list-row', 'empty-state']);
 
 const nodeKinds = new Set<NodeKind>([
-  'vstack', 'hstack', 'lazyvstack', 'lazyhstack', 'zstack', 'navigation-split-view', 'glass-container', 'group', 'tabview', 'disclosure-group', 'sheet', 'groupbox', 'lazyvgrid', 'lazyhgrid', 'scrollview', 'list', 'form', 'section', 'text', 'button', 'alert', 'confirmation-dialog', 'toggle', 'textfield', 'searchfield', 'securefield', 'texteditor', 'picker', 'colorpicker', 'slider', 'stepper', 'menu', 'progress', 'gauge', 'content-unavailable', 'navigation-link', 'label', 'link', 'datepicker', 'image', 'divider', 'spacer',
+  'vstack', 'hstack', 'lazyvstack', 'lazyhstack', 'zstack', 'navigation-split-view', 'glass-container', 'group', 'tabview', 'disclosure-group', 'sheet', 'groupbox', 'lazyvgrid', 'lazyhgrid', 'scrollview', 'list', 'form', 'section', 'text', 'button', 'alert', 'confirmation-dialog', 'toggle', 'textfield', 'searchfield', 'securefield', 'texteditor', 'picker', 'colorpicker', 'slider', 'stepper', 'menu', 'progress', 'gauge', 'content-unavailable', 'navigation-link', 'label', 'link', 'datepicker', 'image', 'map', 'divider', 'spacer',
 ]);
 
 let sequence = 0;
@@ -87,6 +87,8 @@ export function createNode(kind: NodeKind): CanvasNode {
       return { id, kind, label: 'Date', binding: 'selectedDate', minHeight: 44 };
     case 'image':
       return { id, kind, systemName: 'star.fill', accessibilityLabel: 'Image' };
+    case 'map':
+      return { id, kind, label: '地図' };
     case 'vstack':
       return { id, kind, spacing: 12, children: [] };
     case 'hstack':

@@ -169,6 +169,15 @@ describe('HIG linter', () => {
     );
   });
 
+  it('flags a map without an accessible label', () => {
+    const document = structuredClone(defaultDocument);
+    document.screens[0]?.root.children.push({ id: 'map-test', kind: 'map', label: ' ' });
+
+    expect(lintDocument(document)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ nodeId: 'map-test', code: 'ACCESSIBILITY' }),
+    ]));
+  });
+
   it('flags a navigation link without a destination screen', () => {
     const document = structuredClone(defaultDocument);
     document.screens[0]?.root.children.push({

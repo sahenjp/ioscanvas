@@ -927,6 +927,21 @@ export function Inspector() {
                 </select>
               </Field>
             )}
+            {node.kind === 'navigation-split-view' && node.children[0]?.kind === 'list' && node.children[0].children.length > 0 && (
+              <>
+                <Field label="初期選択">
+                  <select value={String(node.selectedIndex ?? 0)} onChange={(event) => updateSelectedNode({ selectedIndex: Number(event.target.value) } as Partial<CanvasNode>)}>
+                    {node.children[0].children.map((child, index) => <option key={child.id} value={index}>{index + 1} · {defaultTabTitle(child)}</option>)}
+                  </select>
+                </Field>
+                <Field label="Railを展開">
+                  <input className="toggle-input" type="checkbox" checked={node.railExpanded ?? false} onChange={(event) => updateSelectedNode({ railExpanded: event.target.checked } as Partial<CanvasNode>)} />
+                </Field>
+                <Field label="モーダルRail">
+                  <input className="toggle-input" type="checkbox" checked={node.railModal ?? false} onChange={(event) => updateSelectedNode({ railModal: event.target.checked } as Partial<CanvasNode>)} />
+                </Field>
+              </>
+            )}
             {(node.kind === 'vstack' || node.kind === 'hstack' || node.kind === 'lazyvstack' || node.kind === 'lazyhstack' || node.kind === 'glass-container' || node.kind === 'lazyvgrid' || node.kind === 'lazyhgrid') && (
               <Field label="間隔">
                 <DraftInput key={`${node.id}-spacing-${node.spacing ?? 0}`} type="number" min="0" max="64" value={node.spacing ?? 0} onCommit={(value) => updateSelectedNode({ spacing: numericValue(value, node.spacing ?? 0, 0, 64) } as Partial<CanvasNode>)} />
@@ -1081,6 +1096,11 @@ function ToolbarItemEditor({
           <option value="cancel">キャンセル</option>
         </select>
       </Field>
+      {item.placement === 'bottomBar' && (
+        <Field label="選択中">
+          <input className="toggle-input" type="checkbox" checked={item.selected ?? false} onChange={(event) => onChange({ selected: event.target.checked })} />
+        </Field>
+      )}
       <Field label="遷移先">
         <select value={item.destinationScreenId ?? ''} onChange={(event) => onChange({ destinationScreenId: event.target.value || undefined })}>
           <option value="">なし（アクション）</option>
@@ -1241,5 +1261,6 @@ function nodeKindLabel(kind: CanvasNode['kind']): string {
     case 'confirmation-dialog': return 'ConfirmationDialog';
     case 'toggle': return 'Toggle';
     case 'image': return 'Image';
+    case 'map': return 'MapKit Map';
   }
 }

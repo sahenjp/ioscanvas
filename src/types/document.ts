@@ -39,6 +39,7 @@ export type NodeKind =
   | 'link'
   | 'datepicker'
   | 'image'
+  | 'map'
   | 'divider'
   | 'spacer';
 
@@ -288,12 +289,18 @@ export interface ImageNode extends BaseNode {
   source?: ImageSource;
 }
 
+export interface MapNode extends BaseNode {
+  kind: 'map';
+  label: string;
+}
+
 export interface ToolbarItem {
   id: string;
   title: string;
   systemName?: string;
   placement: ToolbarPlacement;
   role?: ButtonRole;
+  selected?: boolean;
   destinationScreenId?: string;
 }
 
@@ -305,6 +312,8 @@ export interface ContainerNode extends BaseNode {
   columns?: number;
   rows?: number;
   selectedIndex?: number;
+  railExpanded?: boolean;
+  railModal?: boolean;
   isBottomSheet?: boolean;
   cardImagePosition?: CardImagePosition;
   cardImageSize?: number;
@@ -344,6 +353,7 @@ export type CanvasNode =
   | LinkNode
   | DatePickerNode
   | ImageNode
+  | MapNode
   | ContainerNode
   | DividerNode
   | SpacerNode;

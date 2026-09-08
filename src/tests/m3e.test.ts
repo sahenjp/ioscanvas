@@ -209,4 +209,73 @@ describe('M3E compatibility importer', () => {
     if (!card) throw new Error('Card fixture missing');
     expect(card.children?.[0]).toMatchObject({ kind: 'hstack' });
   });
+
+  it('keeps MapKit, Snackbar actions, and navigation selection state semantic', () => {
+    const document = convertM3eDocument({
+      frames: [{ id: 'home', name: 'ホーム', x: 0, y: 0 }, { id: 'detail', name: '詳細', x: 492, y: 0 }],
+      groups: [
+        {
+          id: 'rail',
+          x: 0,
+          y: 0,
+          axis: 'y',
+          items: [{
+            id: 'rail',
+            kind: 'navRail',
+            label: '',
+            icon: 'menu',
+            variant: 'filled',
+            selected: 1,
+            railExpanded: true,
+            railModal: true,
+            tabs: [{ label: 'ホーム', icon: 'house' }, { label: '詳細', icon: 'info', }],
+            actions: { 'tab:0': { to: 'home' }, 'tab:1': { to: 'detail' } },
+          }],
+        },
+        {
+          id: 'content',
+          x: 16,
+          y: 80,
+          axis: 'y',
+          items: [
+            { id: 'map', kind: 'map', label: '現在地', icon: null, variant: 'filled' },
+            { id: 'snackbar', kind: 'snackbar', label: '保存しました', supporting: '元に戻す', icon: null, variant: 'filled' },
+          ],
+        },
+        {
+          id: 'bottom',
+          x: 0,
+          y: 780,
+          axis: 'x',
+          items: [{
+            id: 'bottom-nav',
+            kind: 'bottomNav',
+            label: '',
+            icon: null,
+            variant: 'filled',
+            selected: 1,
+            tabs: [{ label: 'ホーム', icon: 'home' }, { label: '詳細', icon: 'info' }],
+          }],
+        },
+      ],
+    });
+
+    expect(document).not.toBeNull();
+    if (!document) throw new Error('M3E document was not converted');
+    const nodes = document.screens[0]?.root.children ?? [];
+    expect(findNode(nodes, 'm3e-map')).toMatchObject({ kind: 'map', label: '現在地' });
+    expect(findNode(nodes, 'm3e-snackbar')).toMatchObject({
+      kind: 'hstack',
+      children: [expect.objectContaining({ kind: 'text' }), expect.objectContaining({ kind: 'button', label: '元に戻す' })],
+    });
+    expect(findNode(nodes, 'm3e-rail')).toMatchObject({ kind: 'navigation-split-view', selectedIndex: 1, railExpanded: true, railModal: true });
+    expect(document.screens[0]?.toolbarItems).toEqual(expect.arrayContaining([
+      expect.objectContaining({ title: '詳細', placement: 'bottomBar', selected: true }),
+    ]));
+    const output = generateSwiftUI(document);
+    expect(output).toContain('import MapKit');
+    expect(output).toContain('Map()');
+    expect(output).toContain('Button("元に戻す")');
+    expect(output).toContain('List(selection: $selected_m3e_rail)');
+  });
 });
