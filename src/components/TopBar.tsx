@@ -148,7 +148,7 @@ export function TopBar() {
         </button>
         <span className="toolbar-divider" aria-hidden="true" />
         <button className="toolbar-button" type="button" onClick={resetProject}>リセット</button>
-        <button className="primary-toolbar-button" type="button" onClick={() => setExportOpen(true)}>SwiftUIを書き出す</button>
+        <button className="primary-toolbar-button" type="button" onClick={() => setExportOpen(true)}>書き出す</button>
       </div>
     </header>
   );

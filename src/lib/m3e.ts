@@ -44,6 +44,85 @@ interface M3eGroup {
   items: JsonObject[];
 }
 
+type M3eVariant = 'filled' | 'tonal' | 'elevated' | 'outlined' | 'text';
+
+interface M3eExportTab {
+  label: string;
+  icon: string | null;
+}
+
+interface M3eExportAction {
+  to: string;
+  transition: NavigationTransition;
+}
+
+interface M3eExportItem {
+  id: string;
+  kind: string;
+  label: string;
+  icon: string | null;
+  icon2?: string | null;
+  variant: M3eVariant;
+  supporting?: string;
+  size?: number;
+  size2?: number;
+  bold?: boolean;
+  checked?: boolean;
+  value?: number;
+  minimum?: number;
+  maximum?: number;
+  step?: number;
+  tabs?: M3eExportTab[];
+  selected?: number;
+  action?: M3eExportAction;
+  actions?: Record<string, M3eExportAction>;
+  note?: string;
+  wavy?: boolean;
+  trackThickness?: number;
+  contained?: boolean;
+  fill?: ScreenBackground;
+  noImage?: boolean;
+  imagePos?: CardImagePosition;
+  imageSize?: number;
+  contentAlign?: CardContentAlignment;
+  src?: string;
+}
+
+interface M3eExportFrame {
+  id: string;
+  name: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  bg?: ScreenBackground;
+  note?: string;
+  place?: ContentPlacement;
+  swipe?: Partial<Record<SwipeDirection, string>>;
+}
+
+interface M3eExportGroup {
+  id: string;
+  x: number;
+  y: number;
+  axis: 'x' | 'y';
+  items: M3eExportItem[];
+}
+
+export interface M3eExportDocument {
+  title: string;
+  paletteKey: string;
+  theme: {
+    dark: boolean;
+    bothModes: boolean;
+    font: string;
+  };
+  platform: 'web';
+  frame: string;
+  frames: M3eExportFrame[];
+  groups: M3eExportGroup[];
+}
+
 interface ConversionContext {
   usedIds: Set<string>;
   frameIds: Map<string, string>;
@@ -978,4 +1057,350 @@ export function convertM3eDocument(value: unknown): CanvasDocument | null {
     activeScreenId,
   };
   return parseCanvasDocument(document);
+}
+
+function exportVariant(node: CanvasNode): M3eVariant {
+  if (node.kind !== 'button') return node.glass === 'prominent' ? 'filled' : node.glass ? 'elevated' : 'filled';
+  switch (node.buttonStyle) {
+    case 'plain': return 'text';
+    case 'bordered': return 'outlined';
+    case 'borderedProminent': return 'filled';
+    default: return 'filled';
+  }
+}
+
+function exportFill(background: BackgroundStyle | undefined): ScreenBackground | undefined {
+  switch (background) {
+    case 'secondary': return 'surfaceContainerLow';
+    case 'tertiary': return 'tertiaryContainer';
+    case 'accent': return 'primaryContainer';
+    case 'material': return 'surfaceContainer';
+    default: return undefined;
+  }
+}
+
+function exportNote(node: CanvasNode, extra?: string): string | undefined {
+  const notes = [node.notes?.trim() ?? '', extra?.trim() ?? ''].filter(Boolean);
+  return notes.length > 0 ? notes.join('\n') : undefined;
+}
+
+function exportAction(node: CanvasNode, frameIds: Map<string, string>): M3eExportAction | undefined {
+  const navigable = node.kind === 'button' || node.kind === 'navigation-link' ? node : undefined;
+  if (!navigable) return undefined;
+  const target = navigable.navigationAction === 'back'
+    ? 'back'
+    : navigable.destinationScreenId && frameIds.has(navigable.destinationScreenId)
+      ? frameIds.get(navigable.destinationScreenId)
+      : undefined;
+  if (!target) return undefined;
+  return {
+    to: target,
+    transition: navigable.navigationTransition ?? (target === 'back' ? 'slideLeft' : 'slide'),
+  };
+}
+
+function exportToolbarAction(item: ToolbarItem, frameIds: Map<string, string>): M3eExportAction | undefined {
+  const target = item.navigationAction === 'back'
+    ? 'back'
+    : item.destinationScreenId && frameIds.has(item.destinationScreenId)
+      ? frameIds.get(item.destinationScreenId)
+      : undefined;
+  if (!target) return undefined;
+  return { to: target, transition: item.navigationTransition ?? (target === 'back' ? 'slideLeft' : 'slide') };
+}
+
+function exportItem(node: CanvasNode, frameIds: Map<string, string>, inheritedNote = ''): M3eExportItem | null {
+  const base = (kind: string, label: string, icon: string | null = null, extra: Partial<M3eExportItem> = {}): M3eExportItem => ({
+    id: node.id,
+    kind,
+    label,
+    icon,
+    variant: exportVariant(node),
+    ...extra,
+    ...(exportNote(node, inheritedNote) ? { note: exportNote(node, inheritedNote) } : {}),
+  });
+
+  switch (node.kind) {
+    case 'text':
+      return base('text', node.text, null, { size: node.fontSize, ...(node.weight === 'bold' || node.weight === 'semibold' ? { bold: true } : {}) });
+    case 'button':
+      return base('button', node.label, node.systemName ?? null, {
+        ...(node.toggle ? { checked: node.toggle.isOn } : {}),
+        action: exportAction(node, frameIds),
+      });
+    case 'navigation-link':
+      return base('listItem', node.label, null, { action: exportAction(node, frameIds) });
+    case 'toggle':
+      return base('switch', node.label, null, { checked: node.isOn ?? false });
+    case 'textfield':
+      return base('textField', node.label, null);
+    case 'searchfield':
+      return base('searchBar', node.prompt || node.label, 'magnifyingglass');
+    case 'securefield':
+      return base('textField', node.label, null, { note: exportNote(node, 'SwiftUIではSecureFieldとして再構成します。') });
+    case 'texteditor':
+      return base('textField', node.label, null, { note: exportNote(node, 'SwiftUIではTextEditorとして再構成します。') });
+    case 'picker': {
+      const selected = node.initialOption ? Math.max(0, node.options.indexOf(node.initialOption)) : undefined;
+      return base('select', node.label, null, {
+        tabs: node.options.map((label) => ({ label, icon: null })),
+        ...(selected === undefined || selected < 0 ? {} : { selected }),
+      });
+    }
+    case 'colorpicker':
+      return base('textField', node.label, null, { note: exportNote(node, `SwiftUI ColorPickerの色バインディング: ${node.binding}`) });
+    case 'slider':
+      return base('slider', node.label, null, {
+        value: node.maximum > node.minimum ? ((node.value - node.minimum) / (node.maximum - node.minimum)) * 100 : 0,
+        note: exportNote(node, `値の範囲: ${node.minimum}〜${node.maximum} / 刻み: ${node.step}`),
+      });
+    case 'stepper':
+      return base('button', node.label, null, { note: exportNote(node, `SwiftUI Stepperとして再構成します。初期値 ${node.value} / 範囲 ${node.minimum}〜${node.maximum} / 刻み ${node.step}`) });
+    case 'menu':
+      return base('button', node.label, null, { note: exportNote(node, `メニュー項目: ${node.options.join('、')}`) });
+    case 'progress':
+      return base(node.style === 'circular' ? 'circularProgress' : 'linearProgress', node.label, null, {
+        ...(node.indeterminate ? {} : { value: Math.round(node.value * 100) }),
+        ...(node.wavy ? { wavy: true } : {}),
+        ...(node.trackThickness === undefined ? {} : { trackThickness: node.trackThickness }),
+      });
+    case 'gauge':
+      return base('linearProgress', node.label, null, {
+        value: node.maximum > node.minimum ? ((node.value - node.minimum) / (node.maximum - node.minimum)) * 100 : 0,
+        note: exportNote(node, `SwiftUI Gaugeとして再構成します。範囲 ${node.minimum}〜${node.maximum}`),
+      });
+    case 'content-unavailable':
+      return base('box', node.title, node.systemName || null, { supporting: node.description });
+    case 'label':
+      return base('text', node.title, node.systemName || null);
+    case 'link':
+      return base('button', node.label, null, { note: exportNote(node, `外部リンク: ${node.url}`) });
+    case 'datepicker':
+      return base('textField', node.label, 'calendar_month', { note: exportNote(node, 'SwiftUIではDatePickerとして再構成します。') });
+    case 'image': {
+      const remote = node.source === 'remote' && /^https?:\/\//i.test(node.systemName);
+      return base('image', node.accessibilityLabel || '画像', node.source === 'symbol' || node.source === undefined ? node.systemName || null : null, remote ? { src: node.systemName } : {});
+    }
+    case 'camera':
+      return base('camera', node.label, null);
+    case 'map':
+      return base('map', node.label, 'map');
+    case 'divider':
+      return base('divider', '区切り線');
+    case 'spacer':
+      return base('box', 'スペーサー', null, { note: exportNote(node, 'SwiftUI Spacerとして再構成します。') });
+    case 'alert':
+      return base('dialog', node.title || node.label, null, { supporting: node.message, note: exportNote(node, `主ボタン: ${node.primaryButton}${node.secondaryButton ? ` / 副ボタン: ${node.secondaryButton}` : ''}`) });
+    case 'confirmation-dialog':
+      return base('dialog', node.title || node.label, null, { supporting: node.message, note: exportNote(node, `選択肢: ${node.options.join('、')}${node.cancelButton ? ` / キャンセル: ${node.cancelButton}` : ''}`) });
+    default:
+      return null;
+  }
+}
+
+function exportTabItem(node: CanvasNode): M3eExportTab {
+  const label = node.tabTitle
+    || (node.kind === 'text' ? node.text : node.kind === 'button' || node.kind === 'navigation-link' ? node.label : '')
+    || 'タブ';
+  const icon = node.tabSystemName
+    || (node.kind === 'image' ? node.systemName : null);
+  return { label, icon: icon || null };
+}
+
+function exportTabsNode(node: ContainerNode, frameIds: Map<string, string>, inheritedNote: string): M3eExportItem {
+  const tabs = node.children.map((child) => exportTabItem(child));
+  const actions = Object.fromEntries(node.children.flatMap((child, index) => {
+    const action = exportAction(child, frameIds);
+    return action ? [[`tab:${index}`, action]] : [];
+  }));
+  return {
+    id: node.id,
+    kind: 'tabs',
+    label: node.title || 'タブ',
+    icon: null,
+    variant: exportVariant(node),
+    tabs,
+    ...(node.selectedIndex === undefined ? {} : { selected: node.selectedIndex }),
+    ...(Object.keys(actions).length > 0 ? { actions } : {}),
+    ...(exportNote(node, inheritedNote) ? { note: exportNote(node, inheritedNote) } : {}),
+  };
+}
+
+function exportNavigationSplitNode(node: ContainerNode, frameIds: Map<string, string>, inheritedNote: string): M3eExportItem {
+  const sidebar = node.children[0];
+  const entries = sidebar && Array.isArray(sidebar.children) ? sidebar.children : [];
+  const tabs = entries.map((child) => exportTabItem(child));
+  const actions = Object.fromEntries(entries.flatMap((child, index) => {
+    const action = exportAction(child, frameIds);
+    return action ? [[`tab:${index}`, action]] : [];
+  }));
+  return {
+    id: node.id,
+    kind: 'navRail',
+    label: 'ナビゲーションレール',
+    icon: null,
+    variant: exportVariant(node),
+    tabs,
+    ...(node.selectedIndex === undefined ? {} : { selected: node.selectedIndex }),
+    ...(Object.keys(actions).length > 0 ? { actions } : {}),
+    ...(exportNote(node, inheritedNote) ? { note: exportNote(node, inheritedNote) } : {}),
+  };
+}
+
+function isExportContainer(node: CanvasNode): node is ContainerNode {
+  return Array.isArray(node.children);
+}
+
+function exportContainerItems(node: ContainerNode, frameIds: Map<string, string>, inheritedNote = ''): M3eExportItem[] {
+  if (node.kind === 'tabview') return [exportTabsNode(node, frameIds, inheritedNote)];
+  if (node.kind === 'navigation-split-view') return [exportNavigationSplitNode(node, frameIds, inheritedNote)];
+
+  const containerNote = node.kind === 'zstack'
+    ? [inheritedNote, 'SwiftUI ZStackの重なりを含みます。'].filter(Boolean).join('\n')
+    : inheritedNote;
+  const children = node.children.flatMap((child) => isExportContainer(child)
+    ? exportContainerItems(child, frameIds, containerNote)
+    : [exportItem(child, frameIds, containerNote)].filter((item): item is M3eExportItem => item !== null));
+  const titled = node.kind === 'section' || node.kind === 'groupbox' || node.kind === 'disclosure-group' || node.kind === 'sheet';
+  if (!titled) return children;
+
+  const title = node.title || node.label || (node.kind === 'sheet' ? 'シート' : 'グループ');
+  const containerItem: M3eExportItem = {
+    id: `${node.id}-container`,
+    kind: node.kind === 'groupbox' ? 'card' : 'box',
+    label: title,
+    icon: null,
+    variant: node.background === 'accent' ? 'filled' : 'outlined',
+    ...(exportFill(node.background) ? { fill: exportFill(node.background) } : {}),
+    ...(node.kind === 'sheet' && node.isBottomSheet ? { checked: true } : {}),
+    note: exportNote(node, node.kind === 'sheet' ? 'SwiftUI sheetとして再構成します。' : undefined),
+  };
+  return [containerItem, ...children];
+}
+
+function frameDimensions(screen: CanvasScreen): { width: number; height: number } {
+  const sizes: Record<ScreenDevice, { width: number; height: number }> = {
+    'iphone-se': { width: 375, height: 667 },
+    'iphone-16': { width: 412, height: 892 },
+    'ipad-mini': { width: 744, height: 1133 },
+    'ipad-pro-11': { width: 834, height: 1194 },
+  };
+  const size = sizes[screen.previewDevice ?? 'iphone-16'];
+  return screen.previewOrientation === 'landscape'
+    ? { width: size.height, height: size.width }
+    : size;
+}
+
+function exportTopBar(screen: CanvasScreen, frameIds: Map<string, string>): M3eExportItem | null {
+  const leading = (screen.toolbarItems ?? []).find((item) => item.placement === 'topBarLeading');
+  const trailing = (screen.toolbarItems ?? []).find((item) => item.placement === 'topBarTrailing');
+  if (!leading && !trailing && !screen.navigationTitle) return null;
+  const actions = Object.fromEntries([
+    leading ? ['icon', exportToolbarAction(leading, frameIds)] : [],
+    trailing ? ['icon2', exportToolbarAction(trailing, frameIds)] : [],
+  ].filter((entry): entry is [string, M3eExportAction] => entry[1] !== undefined));
+  return {
+    id: `${screen.id}-top-app-bar`,
+    kind: 'topAppBar',
+    label: screen.navigationTitle,
+    icon: leading?.systemName ?? null,
+    variant: 'filled',
+    ...(trailing?.systemName ? { icon2: trailing.systemName } : {}),
+    ...(Object.keys(actions).length > 0 ? { actions } : {}),
+  };
+}
+
+function exportBottomBar(screen: CanvasScreen, frameIds: Map<string, string>): M3eExportItem | null {
+  const items = screen.tabBarItems?.length
+    ? screen.tabBarItems
+    : (screen.toolbarItems ?? []).filter((item) => item.placement === 'bottomBar');
+  if (items.length === 0) return null;
+  const actions = Object.fromEntries(items.flatMap((item, index) => {
+    const action = exportToolbarAction(item, frameIds);
+    return action ? [[`tab:${index}`, action]] : [];
+  }));
+  const selected = items.findIndex((item) => item.selected);
+  return {
+    id: `${screen.id}-bottom-navigation`,
+    kind: 'bottomNav',
+    label: 'タブバー',
+    icon: null,
+    variant: 'filled',
+    tabs: items.map((item) => ({ label: item.title, icon: item.systemName ?? null })),
+    ...(selected >= 0 ? { selected } : {}),
+    ...(Object.keys(actions).length > 0 ? { actions } : {}),
+  };
+}
+
+function exportGroupsForScreen(screen: CanvasScreen, frameIds: Map<string, string>, size: { width: number; height: number }): M3eExportGroup[] {
+  const groups: M3eExportGroup[] = [];
+  const topBar = exportTopBar(screen, frameIds);
+  if (topBar) groups.push({ id: `${screen.id}-group-top-bar`, x: 0, y: 0, axis: 'x', items: [topBar] });
+
+  let y = 80;
+  for (const [index, node] of screen.root.children.entries()) {
+    const items = isExportContainer(node)
+      ? exportContainerItems(node, frameIds)
+      : [exportItem(node, frameIds)].filter((item): item is M3eExportItem => item !== null);
+    if (items.length === 0) continue;
+    const axis = node.kind === 'hstack' || node.kind === 'lazyhstack' || node.kind === 'lazyhgrid' ? 'x' : 'y';
+    groups.push({ id: `${screen.id}-group-${index}`, x: 16, y, axis, items });
+    y += Math.max(80, items.length * 72);
+  }
+
+  const bottomBar = exportBottomBar(screen, frameIds);
+  if (bottomBar) groups.push({ id: `${screen.id}-group-bottom-bar`, x: 0, y: Math.max(y, size.height - 88), axis: 'x', items: [bottomBar] });
+  return groups;
+}
+
+function exportPaletteKey(appearance: CanvasDocument['appearance']): string {
+  if (appearance.accentColor !== 'custom') return appearance.accentColor;
+  switch (appearance.accentHex?.toLowerCase()) {
+    case '#14b8a6': return 'teal';
+    case '#f59e0b': return 'amber';
+    case '#ff6b6b': return 'coral';
+    case '#6e6e73': return 'mono';
+    default: return 'blue';
+  }
+}
+
+function exportFont(appearance: CanvasDocument['appearance']): string {
+  return appearance.fontDesign === 'serif' ? 'robotoSerif' : appearance.fontDesign === 'rounded' ? 'system' : 'system';
+}
+
+export function exportM3eDocument(document: CanvasDocument): M3eExportDocument {
+  const frameIds = new Map(document.screens.map((screen) => [screen.id, screen.id]));
+  const frames = document.screens.map((screen, index) => {
+    const size = frameDimensions(screen);
+    return {
+      id: screen.id,
+      name: screen.name,
+      x: index * (size.width + 120),
+      y: 0,
+      w: size.width,
+      h: size.height,
+      ...(screen.background ? { bg: screen.background } : {}),
+      ...(screen.notes?.trim() ? { note: screen.notes.trim() } : {}),
+      ...(screen.contentPlacement ? { place: screen.contentPlacement } : {}),
+      ...(screen.swipe ? { swipe: screen.swipe } : {}),
+    } satisfies M3eExportFrame;
+  });
+  const groups = document.screens.flatMap((screen) => exportGroupsForScreen(screen, frameIds, frameDimensions(screen)));
+  return {
+    title: document.name,
+    paletteKey: exportPaletteKey(document.appearance),
+    theme: {
+      dark: document.appearance.colorScheme === 'dark',
+      bothModes: document.appearance.colorScheme === 'system',
+      font: exportFont(document.appearance),
+    },
+    platform: 'web',
+    frame: document.activeScreenId,
+    frames,
+    groups,
+  };
+}
+
+export function generateM3eJson(document: CanvasDocument): string {
+  return JSON.stringify(exportM3eDocument(document), null, 2);
 }

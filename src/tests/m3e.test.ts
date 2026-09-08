@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { findNode } from '../lib/nodes';
-import { convertM3eDocument, inspectM3eCompatibility, isM3eDocument } from '../lib/m3e';
+import { convertM3eDocument, exportM3eDocument, generateM3eJson, inspectM3eCompatibility, isM3eDocument } from '../lib/m3e';
+import { defaultDocument } from '../lib/defaultDocument';
 import { generateSwiftUI } from '../lib/swiftui';
 
 const m3eDocument = {
@@ -52,6 +53,25 @@ const m3eDocument = {
 };
 
 describe('M3E compatibility importer', () => {
+  it('exports the semantic iOS document to a readable M3E project and imports it again', () => {
+    const exported = exportM3eDocument(defaultDocument);
+    const parsedJson: unknown = JSON.parse(generateM3eJson(defaultDocument));
+
+    expect(isM3eDocument(exported)).toBe(true);
+    expect(parsedJson).toEqual(exported);
+    expect(exported.frames[0]).toMatchObject({ name: 'ホーム', w: 412, h: 892 });
+    expect(exported.groups.flatMap((group) => group.items)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: 'button', label: '続ける' }),
+    ]));
+
+    const roundTripped = convertM3eDocument(exported);
+    expect(roundTripped?.screens.map((screen) => screen.name)).toEqual(defaultDocument.screens.map((screen) => screen.name));
+    expect(roundTripped?.screens[0]?.previewDevice).toBe('iphone-16');
+    expect(roundTripped?.screens[0]?.root.children).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: 'navigation-link', label: '設定を開く' }),
+    ]));
+  });
+
   it('recognizes and converts M3E screen groups into a semantic iOS document', () => {
     expect(isM3eDocument(m3eDocument)).toBe(true);
 

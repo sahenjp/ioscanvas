@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { generateImplementationPrompt, type PromptScope } from '../lib/prompt';
+import { generateM3eJson } from '../lib/m3e';
 import { copyText } from '../lib/share';
 import { generateSwiftUI } from '../lib/swiftui';
 import { useEditorStore } from '../store/editor';
 
-type ExportTab = 'swiftui' | 'prompt';
+type ExportTab = 'swiftui' | 'prompt' | 'm3e';
 
 export function ExportPanel() {
   const open = useEditorStore((state) => state.exportOpen);
@@ -16,7 +17,8 @@ export function ExportPanel() {
   const [copyError, setCopyError] = useState(false);
   const swiftui = useMemo(() => generateSwiftUI(document), [document]);
   const prompt = useMemo(() => generateImplementationPrompt(document, promptScope), [document, promptScope]);
-  const value = tab === 'swiftui' ? swiftui : prompt;
+  const m3e = useMemo(() => generateM3eJson(document), [document]);
+  const value = tab === 'swiftui' ? swiftui : tab === 'prompt' ? prompt : m3e;
 
   useEffect(() => {
     if (!open) return;
@@ -41,19 +43,29 @@ export function ExportPanel() {
     }
   };
 
+  const saveM3e = () => {
+    const url = URL.createObjectURL(new Blob([m3e], { type: 'application/json' }));
+    const anchor = window.document.createElement('a');
+    anchor.href = url;
+    anchor.download = `${document.name.trim().replace(/[^a-z0-9_-]+/gi, '-') || 'ioscanvas'}.m3e.json`;
+    anchor.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  };
+
   return (
     <div className="modal-backdrop" role="presentation" onMouseDown={() => setOpen(false)}>
-      <section className="export-panel" role="dialog" aria-modal="true" aria-label="SwiftUIを書き出す" onMouseDown={(event) => event.stopPropagation()}>
+      <section className="export-panel" role="dialog" aria-modal="true" aria-label="設計を書き出す" onMouseDown={(event) => event.stopPropagation()}>
         <header className="export-header">
           <div>
-            <strong>SwiftUIを書き出す</strong>
-            <span>意味構造から実装コードを生成します。</span>
+            <strong>設計を書き出す</strong>
+            <span>意味構造から実装コードと互換データを生成します。</span>
           </div>
           <button type="button" className="icon-button" onClick={() => setOpen(false)} aria-label="閉じる">×</button>
         </header>
         <div className="export-tabs">
           <button type="button" className={tab === 'swiftui' ? 'active' : ''} onClick={() => setTab('swiftui')}>SwiftUIコード</button>
           <button type="button" className={tab === 'prompt' ? 'active' : ''} onClick={() => setTab('prompt')}>実装の説明</button>
+          <button type="button" className={tab === 'm3e' ? 'active' : ''} onClick={() => setTab('m3e')}>M3E JSON</button>
           {tab === 'prompt' && (
             <label className="export-scope">
               <span>対象</span>
@@ -66,7 +78,8 @@ export function ExportPanel() {
         </div>
         <pre className="export-code"><code>{value}</code></pre>
         <footer className="export-footer">
-          <span>{copyError ? 'コピーできません。テキストを手動で選択してください。' : tab === 'swiftui' ? 'ドキュメントの意味構造から生成' : '実装条件と現在のHIGチェックを含みます。'}</span>
+          <span>{copyError ? 'コピーできません。テキストを手動で選択してください。' : tab === 'swiftui' ? 'ドキュメントの意味構造から生成' : tab === 'prompt' ? '実装条件と現在のHIGチェックを含みます。' : 'M3E Canvasで開ける座標射影データとして生成'}</span>
+          {tab === 'm3e' && <button type="button" onClick={saveM3e}>M3Eとして保存</button>}
           <button type="button" className="primary-toolbar-button" onClick={copy}>{copied ? 'コピーしました' : 'コピー'}</button>
         </footer>
       </section>
