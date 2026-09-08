@@ -375,6 +375,43 @@ describe('M3E compatibility importer', () => {
     expect(swiftui).toContain('Circle()');
   });
 
+  it('keeps non-action M3E kinds when the semantic tree is edited and exported', () => {
+    const document = convertM3eDocument({
+      frames: [{ id: 'home', name: 'ホーム', x: 0, y: 0 }],
+      groups: [{
+        id: 'content',
+        x: 0,
+        y: 0,
+        axis: 'y',
+        items: [
+          { id: 'search', kind: 'searchBar', label: '検索', icon: 'search', variant: 'filled' },
+          { id: 'row', kind: 'listItem', label: '設定', supporting: '詳細', icon: 'settings', icon2: 'chevron_right', variant: 'filled' },
+          { id: 'box', kind: 'box', label: 'ボックス', icon: null, variant: 'outlined' },
+          { id: 'card', kind: 'card', label: 'カード', supporting: '補足', icon: 'photo', variant: 'tonal' },
+          { id: 'snackbar', kind: 'snackbar', label: '保存しました', supporting: '元に戻す', icon: null, variant: 'filled' },
+        ],
+      }],
+    });
+
+    expect(document).not.toBeNull();
+    if (!document) throw new Error('Semantic M3E fixture was not converted');
+    const nodes = document.screens[0]?.root.children ?? [];
+    expect(findNode(nodes, 'm3e-search')).toMatchObject({ kind: 'searchfield', m3eKind: 'searchBar' });
+    expect(findNode(nodes, 'm3e-row-row')).toMatchObject({ kind: 'hstack', m3eKind: 'listItem' });
+    expect(findNode(nodes, 'm3e-box')).toMatchObject({ kind: 'groupbox', m3eKind: 'box' });
+    expect(findNode(nodes, 'm3e-card')).toMatchObject({ kind: 'groupbox', m3eKind: 'card' });
+    expect(findNode(nodes, 'm3e-snackbar')).toMatchObject({ kind: 'hstack', m3eKind: 'snackbar' });
+
+    const exported = exportM3eDocument(document).groups.flatMap((group) => group.items);
+    expect(exported).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: 'searchBar', label: '検索' }),
+      expect.objectContaining({ kind: 'listItem', label: '設定', supporting: '詳細', icon: 'gearshape.fill', icon2: 'chevron.right' }),
+      expect.objectContaining({ kind: 'box', label: 'ボックス' }),
+      expect.objectContaining({ kind: 'card', label: 'カード', supporting: '補足' }),
+      expect.objectContaining({ kind: 'snackbar', label: '保存しました', supporting: '元に戻す' }),
+    ]));
+  });
+
   it('rejects values that are not M3E project documents', () => {
     expect(isM3eDocument({ screens: [] })).toBe(false);
     expect(convertM3eDocument({ frames: [], groups: [] })).toBeNull();

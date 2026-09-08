@@ -1,9 +1,11 @@
-import type { CanvasNode, ContainerNode, NodeKind, PatternId } from '../types/document';
+import type { CanvasNode, ContainerNode, M3eInsertKind, M3ePresentationKind, M3eScreenPartKind, NodeKind, PatternId } from '../types/document';
 
 export const NODE_DRAG_MIME = 'application/x-ioscanvas-node';
 
 export type DragData =
   | { kind: 'new'; nodeKind: NodeKind }
+  | { kind: 'm3e'; m3eKind: M3eInsertKind }
+  | { kind: 'm3e-screen'; m3eKind: M3eScreenPartKind }
   | { kind: 'pattern'; pattern: PatternId }
   | { kind: 'move'; nodeId: string };
 
@@ -12,6 +14,14 @@ const patternIds = new Set<PatternId>(['glass-card', 'settings-section', 'list-r
 const nodeKinds = new Set<NodeKind>([
   'vstack', 'hstack', 'lazyvstack', 'lazyhstack', 'zstack', 'navigation-split-view', 'glass-container', 'group', 'tabview', 'disclosure-group', 'sheet', 'groupbox', 'lazyvgrid', 'lazyhgrid', 'scrollview', 'list', 'form', 'section', 'text', 'button', 'alert', 'confirmation-dialog', 'toggle', 'textfield', 'searchfield', 'securefield', 'texteditor', 'picker', 'colorpicker', 'slider', 'stepper', 'menu', 'progress', 'gauge', 'content-unavailable', 'navigation-link', 'label', 'link', 'datepicker', 'image', 'camera', 'map', 'divider', 'spacer',
 ]);
+
+const m3eKinds = new Set<M3eInsertKind>([
+  'box', 'button', 'iconButton', 'fab', 'extendedFab', 'chip', 'searchBar', 'card', 'listItem', 'dialog', 'snackbar',
+  'textField', 'select', 'switch', 'checkbox', 'slider', 'text', 'image', 'camera', 'map', 'divider', 'loadingIndicator',
+  'linearProgress', 'circularProgress', 'splitButton', 'fabMenu', 'toolbar', 'tabs', 'radio', 'badge',
+]);
+
+const m3eScreenKinds = new Set<M3eScreenPartKind>(['topAppBar', 'bottomNav', 'navRail']);
 
 let sequence = 0;
 
@@ -139,6 +149,153 @@ export function createNode(kind: NodeKind): CanvasNode {
     case 'spacer':
       return { id, kind };
   }
+}
+
+function m3eButton(kind: Extract<M3ePresentationKind, 'button' | 'iconButton' | 'fab' | 'extendedFab' | 'chip' | 'splitButton'>, patch: Partial<Extract<CanvasNode, { kind: 'button' }>> = {}): Extract<CanvasNode, { kind: 'button' }> {
+  const node = createNode('button');
+  if (node.kind !== 'button') throw new Error('Unable to create M3E button');
+  return { ...node, ...patch, m3eKind: kind };
+}
+
+export function createM3eNode(kind: M3eInsertKind): CanvasNode {
+  switch (kind) {
+    case 'box': {
+      const node = createNode('groupbox');
+      if (node.kind !== 'groupbox') throw new Error('Unable to create M3E box');
+      return { ...node, title: 'ボックス', m3eKind: kind, m3eVariant: 'outlined' };
+    }
+    case 'button':
+      return m3eButton(kind, { label: 'ボタン', m3eVariant: 'filled' });
+    case 'iconButton':
+      return m3eButton(kind, { label: '', systemName: 'star.fill', accessibilityLabel: '操作', m3eVariant: 'tonal' });
+    case 'fab':
+      return m3eButton(kind, { label: '', systemName: 'plus', accessibilityLabel: '追加', minHeight: 56, m3eVariant: 'tonal' });
+    case 'extendedFab':
+      return m3eButton(kind, { label: '作成', systemName: 'plus', minHeight: 56, m3eVariant: 'tonal' });
+    case 'chip':
+      return m3eButton(kind, { label: 'チップ', minHeight: 44, m3eVariant: 'outlined', toggle: { isOn: false, onLabel: 'チップ' } });
+    case 'searchBar': {
+      const node = createNode('searchfield');
+      if (node.kind !== 'searchfield') throw new Error('Unable to create M3E search bar');
+      return { ...node, label: '検索', prompt: '検索', m3eKind: kind };
+    }
+    case 'card': {
+      const node = createNode('groupbox');
+      if (node.kind !== 'groupbox') throw new Error('Unable to create M3E card');
+      return { ...node, title: 'カード', m3eKind: kind, m3eVariant: 'tonal' };
+    }
+    case 'listItem': {
+      const node = createPattern('list-row');
+      if (!isContainerNode(node)) throw new Error('Unable to create M3E list item');
+      return { ...node, m3eKind: kind, m3eVariant: 'filled' };
+    }
+    case 'dialog': {
+      const node = createNode('alert');
+      if (node.kind !== 'alert') throw new Error('Unable to create M3E dialog');
+      return { ...node, m3eKind: kind };
+    }
+    case 'snackbar': {
+      const message = createNode('text');
+      const action = createNode('button');
+      if (message.kind !== 'text' || action.kind !== 'button') throw new Error('Unable to create M3E snackbar');
+      message.text = '保存しました';
+      message.textStyle = 'callout';
+      action.label = '元に戻す';
+      action.buttonStyle = 'plain';
+      return { id: createId(kind), kind: 'hstack', spacing: 8, alignment: 'center', frameWidth: 'max', padding: 8, background: 'material', cornerRadius: 12, children: [message, action], m3eKind: kind };
+    }
+    case 'textField': {
+      const node = createNode('textfield');
+      if (node.kind !== 'textfield') throw new Error('Unable to create M3E text field');
+      return { ...node, label: 'ラベル', m3eKind: kind };
+    }
+    case 'select': {
+      const node = createNode('picker');
+      if (node.kind !== 'picker') throw new Error('Unable to create M3E select');
+      return { ...node, label: '選択', options: ['項目1', '項目2'], m3eKind: kind };
+    }
+    case 'switch':
+    case 'checkbox':
+    case 'radio': {
+      const node = createNode('toggle');
+      if (node.kind !== 'toggle') throw new Error('Unable to create M3E choice');
+      return { ...node, label: kind === 'switch' ? '設定' : '選択', m3eKind: kind };
+    }
+    case 'slider': {
+      const node = createNode('slider');
+      if (node.kind !== 'slider') throw new Error('Unable to create M3E slider');
+      return { ...node, label: '値', m3eKind: kind };
+    }
+    case 'text': {
+      const node = createNode('text');
+      if (node.kind !== 'text') throw new Error('Unable to create M3E text');
+      return { ...node, text: 'テキスト', m3eKind: kind };
+    }
+    case 'badge': {
+      const node = createNode('text');
+      if (node.kind !== 'text') throw new Error('Unable to create M3E badge');
+      return { ...node, text: '1', fontSize: 13, weight: 'semibold', textStyle: 'caption', m3eKind: kind };
+    }
+    case 'image': {
+      const node = createNode('image');
+      if (node.kind !== 'image') throw new Error('Unable to create M3E image');
+      return { ...node, m3eKind: kind };
+    }
+    case 'camera':
+    case 'map': {
+      const node = createNode(kind);
+      if (node.kind !== kind) throw new Error(`Unable to create M3E ${kind}`);
+      return { ...node, m3eKind: kind };
+    }
+    case 'divider': {
+      const node = createNode('divider');
+      return { ...node, m3eKind: kind };
+    }
+    case 'loadingIndicator':
+    case 'linearProgress':
+    case 'circularProgress': {
+      const node = createNode('progress');
+      if (node.kind !== 'progress') throw new Error('Unable to create M3E progress');
+      return { ...node, style: kind === 'linearProgress' ? 'linear' : 'circular', indeterminate: kind === 'loadingIndicator', m3eKind: kind };
+    }
+    case 'splitButton':
+      return m3eButton(kind, { label: 'アクション', systemName: 'arrow.right', m3eVariant: 'filled' });
+    case 'fabMenu':
+      return { id: createId(kind), kind: 'vstack', label: 'メニュー', spacing: 8, alignment: 'trailing', children: [], m3eKind: kind, m3eVariant: 'tonal', m3eIcon: 'plus' };
+    case 'toolbar': {
+      const first = createM3eNode('iconButton');
+      const second = createM3eNode('iconButton');
+      if (first.kind !== 'button' || second.kind !== 'button') throw new Error('Unable to create M3E toolbar');
+      first.systemName = 'undo';
+      first.accessibilityLabel = '戻す';
+      second.systemName = 'ellipsis';
+      second.accessibilityLabel = 'その他';
+      return { id: createId(kind), kind: 'hstack', spacing: 8, alignment: 'center', children: [first, second], m3eKind: kind, m3eVariant: 'filled' };
+    }
+    case 'tabs': {
+      const node = createNode('tabview');
+      if (node.kind !== 'tabview') throw new Error('Unable to create M3E tabs');
+      return { ...node, m3eKind: kind };
+    }
+    default:
+      throw new Error(`Unsupported M3E part: ${String(kind)}`);
+  }
+}
+
+export function createM3eScreenNode(kind: M3eScreenPartKind): CanvasNode {
+  if (kind !== 'navRail') throw new Error(`M3E screen part ${kind} is represented on the screen, not as a node`);
+
+  const node = createNode('navigation-split-view');
+  if (node.kind !== 'navigation-split-view') throw new Error('Unable to create M3E navigation rail');
+  const sidebar = node.children[0];
+  if (sidebar?.kind === 'list') {
+    sidebar.children = [
+      { id: createId('rail-item'), kind: 'button', label: 'ホーム', systemName: 'house.fill', role: 'normal', minHeight: 44 },
+      { id: createId('rail-item'), kind: 'button', label: 'お気に入り', systemName: 'star.fill', role: 'normal', minHeight: 44 },
+      { id: createId('rail-item'), kind: 'button', label: '設定', systemName: 'gearshape.fill', role: 'normal', minHeight: 44 },
+    ];
+  }
+  return { ...node, m3eKind: kind, m3eVariant: 'filled', selectedIndex: 0, railExpanded: true };
 }
 
 function containerWithChildren(kind: Extract<ContainerNode['kind'], 'vstack' | 'hstack' | 'glass-container' | 'section'>, children: CanvasNode[]): ContainerNode {
@@ -274,6 +431,26 @@ export function decodeDragData(value: string): DragData | null {
       nodeKinds.has(data.nodeKind as NodeKind)
     ) {
       return { kind: 'new', nodeKind: data.nodeKind as NodeKind };
+    }
+
+    if (
+      'kind' in data &&
+      data.kind === 'm3e' &&
+      'm3eKind' in data &&
+      typeof data.m3eKind === 'string' &&
+      m3eKinds.has(data.m3eKind as M3eInsertKind)
+    ) {
+      return { kind: 'm3e', m3eKind: data.m3eKind as M3eInsertKind };
+    }
+
+    if (
+      'kind' in data &&
+      data.kind === 'm3e-screen' &&
+      'm3eKind' in data &&
+      typeof data.m3eKind === 'string' &&
+      m3eScreenKinds.has(data.m3eKind as M3eScreenPartKind)
+    ) {
+      return { kind: 'm3e-screen', m3eKind: data.m3eKind as M3eScreenPartKind };
     }
 
     if (

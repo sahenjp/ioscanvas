@@ -2,8 +2,8 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { defaultDocument } from '../lib/defaultDocument';
 import { parseCanvasDocument } from '../lib/document';
-import { cloneNode, createId, createNode, createPattern, findNode, findNodeLocation, insertNode, isContainerNode, moveNode as moveTreeNode, removeNode, updateNode } from '../lib/nodes';
-import type { CanvasDocument, CanvasNode, CanvasScreen, ContainerNode, DocumentAppearance, NodeKind, PatternId } from '../types/document';
+import { cloneNode, createId, createM3eNode, createM3eScreenNode, createNode, createPattern, findNode, findNodeLocation, insertNode, isContainerNode, moveNode as moveTreeNode, removeNode, updateNode } from '../lib/nodes';
+import type { CanvasDocument, CanvasNode, CanvasScreen, ContainerNode, DocumentAppearance, M3eInsertKind, M3eScreenPartKind, NodeKind, PatternId, ToolbarItem } from '../types/document';
 
 const MAX_HISTORY = 50;
 
@@ -22,6 +22,8 @@ interface EditorState {
   setPreviewMode: (open: boolean) => void;
   setExportOpen: (open: boolean) => void;
   addNode: (kind: NodeKind, parentId?: string | null, index?: number) => void;
+  addM3eNode: (kind: M3eInsertKind, parentId?: string | null, index?: number) => void;
+  addM3eScreenPart: (kind: M3eScreenPartKind) => void;
   addPattern: (pattern: PatternId, parentId?: string | null, index?: number) => void;
   tidyActiveScreen: () => void;
   moveActiveScreen: (direction: 'up' | 'down') => void;
@@ -100,6 +102,70 @@ function clearSwipeReferences(
   return Object.keys(next).length > 0 ? next as CanvasScreen['swipe'] : undefined;
 }
 
+function addNodeToActiveScreen(
+  state: EditorState,
+  node: CanvasNode,
+  parentId: string | null = null,
+  index?: number,
+): Partial<EditorState> {
+  const screen = activeScreen(state.document);
+  if (!screen) return state;
+
+  if (parentId === null) {
+    if (node.kind === 'navigation-split-view' && !screen.root.children.some((child) => child.kind === 'navigation-split-view')) {
+      if (!isContainerNode(node)) return state;
+      const detail = node.children[1];
+      if (detail && isContainerNode(detail)) detail.children = [...screen.root.children];
+      return withHistory(state, replaceScreenChildren(state.document, screen.id, [node]), node.id);
+    }
+    const children = [...screen.root.children];
+    const position = index === undefined ? children.length : Math.max(0, Math.min(index, children.length));
+    children.splice(position, 0, node);
+    return withHistory(state, replaceScreenChildren(state.document, screen.id, children), node.id);
+  }
+
+  const target = findNode(screen.root.children, parentId);
+  if (!target || !isContainerNode(target)) return state;
+  const inserted = insertNode(screen.root.children, parentId, node, index);
+  return withHistory(state, replaceScreenChildren(state.document, screen.id, inserted), node.id);
+}
+
+function addM3eScreenPartToActiveScreen(state: EditorState, kind: M3eScreenPartKind): Partial<EditorState> {
+  const screen = activeScreen(state.document);
+  if (!screen) return state;
+
+  if (kind === 'navRail') return addNodeToActiveScreen(state, createM3eScreenNode(kind));
+
+  const screenIndex = state.document.screens.findIndex((candidate) => candidate.id === screen.id);
+  if (kind === 'topAppBar') {
+    if ((screen.toolbarItems ?? []).some((item) => item.placement === 'topBarLeading' || item.placement === 'topBarTrailing')) return state;
+    const toolbarItems: ToolbarItem[] = [
+      ...(screenIndex > 0 ? [{ id: createId('toolbar'), title: '戻る', systemName: 'chevron.left', placement: 'topBarLeading' as const, navigationAction: 'back' as const, navigationTransition: 'slideLeft' as const }] : []),
+      { id: createId('toolbar'), title: 'その他', systemName: 'ellipsis.circle', placement: 'topBarTrailing' },
+    ];
+    const document = {
+      ...state.document,
+      screens: state.document.screens.map((candidate) => candidate.id === screen.id ? { ...candidate, toolbarItems } : candidate),
+    };
+    return withHistory(state, document, null);
+  }
+
+  if ((screen.tabBarItems ?? []).length > 0) return state;
+  const tabBarItems: ToolbarItem[] = state.document.screens.slice(0, 4).map((candidate, index) => ({
+    id: createId('tab'),
+    title: candidate.name,
+    systemName: ['house.fill', 'star.fill', 'gearshape.fill', 'ellipsis.circle'][index] ?? 'circle',
+    placement: 'bottomBar',
+    selected: candidate.id === screen.id,
+    ...(candidate.id === screen.id ? {} : { destinationScreenId: candidate.id }),
+  }));
+  const document = {
+    ...state.document,
+    screens: state.document.screens.map((candidate) => candidate.id === screen.id ? { ...candidate, tabBarItems } : candidate),
+  };
+  return withHistory(state, document, null);
+}
+
 export const useEditorStore = create<EditorState>()(
   persist(
     (set, get) => ({
@@ -133,29 +199,13 @@ export const useEditorStore = create<EditorState>()(
       setPreviewMode: (open) => set({ previewMode: open, selectedNodeId: open ? null : get().selectedNodeId, selectedNodeIds: open ? [] : get().selectedNodeIds }),
       setExportOpen: (open) => set({ exportOpen: open }),
       addNode: (kind, parentId = null, index) => {
-        const node = createNode(kind);
-        set((state) => {
-          const screen = activeScreen(state.document);
-          if (!screen) return state;
-
-          if (parentId === null) {
-            if (kind === 'navigation-split-view' && !screen.root.children.some((child) => child.kind === 'navigation-split-view')) {
-              if (!isContainerNode(node)) return state;
-              const detail = node.children[1];
-              if (detail && isContainerNode(detail)) detail.children = [...screen.root.children];
-              return withHistory(state, replaceScreenChildren(state.document, screen.id, [node]), node.id);
-            }
-            const children = [...screen.root.children];
-            const position = index === undefined ? children.length : Math.max(0, Math.min(index, children.length));
-            children.splice(position, 0, node);
-            return withHistory(state, replaceScreenChildren(state.document, screen.id, children), node.id);
-          }
-
-          const target = findNode(screen.root.children, parentId);
-          if (!target || !isContainerNode(target)) return state;
-          const inserted = insertNode(screen.root.children, parentId, node, index);
-          return withHistory(state, replaceScreenChildren(state.document, screen.id, inserted), node.id);
-        });
+        set((state) => addNodeToActiveScreen(state, createNode(kind), parentId, index));
+      },
+      addM3eNode: (kind, parentId = null, index) => {
+        set((state) => addNodeToActiveScreen(state, createM3eNode(kind), parentId, index));
+      },
+      addM3eScreenPart: (kind) => {
+        set((state) => addM3eScreenPartToActiveScreen(state, kind));
       },
       addPattern: (pattern, parentId = null, index) => {
         const node = createPattern(pattern);

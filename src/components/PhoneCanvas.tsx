@@ -86,6 +86,8 @@ function NodeView({
   const toggleNodeSelection = useEditorStore((state) => state.toggleNodeSelection);
   const selectScreen = useEditorStore((state) => state.selectScreen);
   const addNode = useEditorStore((state) => state.addNode);
+  const addM3eNode = useEditorStore((state) => state.addM3eNode);
+  const addM3eScreenPart = useEditorStore((state) => state.addM3eScreenPart);
   const addPattern = useEditorStore((state) => state.addPattern);
   const moveNode = useEditorStore((state) => state.moveNode);
   const previewMode = useEditorStore((state) => state.previewMode);
@@ -143,11 +145,22 @@ function NodeView({
     const data = readDragData(event);
     if (!data) return;
 
+    if (data.kind === 'm3e-screen') {
+      selectScreen(screenId);
+      addM3eScreenPart(data.m3eKind);
+      return;
+    }
+
     if (data.kind === 'move' && activeScreenId !== screenId) return;
     if (data.kind !== 'move') selectScreen(screenId);
 
     if (data.kind === 'new' && isContainerNode(node)) {
       addNode(data.nodeKind, node.id);
+      return;
+    }
+
+    if (data.kind === 'm3e' && isContainerNode(node)) {
+      addM3eNode(data.m3eKind, node.id);
       return;
     }
 
@@ -177,6 +190,7 @@ function NodeView({
     const insertBefore = pointer < start + size / 2;
     const index = location.index + (insertBefore ? 0 : 1);
     if (data.kind === 'new') addNode(data.nodeKind, location.parentId, index);
+    else if (data.kind === 'm3e') addM3eNode(data.m3eKind, location.parentId, index);
     else if (data.kind === 'pattern') addPattern(data.pattern, location.parentId, index);
     else moveNode(data.nodeId, location.parentId, index);
   };
@@ -857,6 +871,8 @@ function ScreenPreview({
   const selectNode = useEditorStore((state) => state.selectNode);
   const selectScreen = useEditorStore((state) => state.selectScreen);
   const addNode = useEditorStore((state) => state.addNode);
+  const addM3eNode = useEditorStore((state) => state.addM3eNode);
+  const addM3eScreenPart = useEditorStore((state) => state.addM3eScreenPart);
   const addPattern = useEditorStore((state) => state.addPattern);
   const moveNode = useEditorStore((state) => state.moveNode);
   const [isOver, setIsOver] = useState(false);
@@ -940,9 +956,11 @@ function ScreenPreview({
     if (!data) return;
     if (data.kind === 'move' && activeScreenId !== screen.id) return;
     selectScreen(screen.id);
-    if (data.kind === 'new') addNode(data.nodeKind);
+    if (data.kind === 'm3e-screen') addM3eScreenPart(data.m3eKind);
+    else if (data.kind === 'new') addNode(data.nodeKind);
+    else if (data.kind === 'm3e') addM3eNode(data.m3eKind);
     else if (data.kind === 'pattern') addPattern(data.pattern);
-    else moveNode(data.nodeId, null);
+    else if (data.kind === 'move') moveNode(data.nodeId, null);
   };
 
   return (

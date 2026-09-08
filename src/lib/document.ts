@@ -52,7 +52,12 @@ function readNavigationTransition(value: unknown): NavigationTransition | null |
 
 function readM3eKind(value: unknown): M3ePresentationKind | null | undefined {
   if (value === undefined) return undefined;
-  return isOneOf(value, ['fab', 'extendedFab', 'chip', 'splitButton', 'checkbox', 'radio', 'badge', 'fabMenu', 'toolbar']) ? value : null;
+  return isOneOf(value, [
+    'box', 'button', 'iconButton', 'fab', 'extendedFab', 'chip', 'topAppBar', 'bottomNav', 'navRail', 'searchBar',
+    'card', 'listItem', 'dialog', 'snackbar', 'textField', 'select', 'switch', 'checkbox', 'slider', 'text', 'image',
+    'camera', 'map', 'divider', 'loadingIndicator', 'linearProgress', 'circularProgress', 'splitButton', 'fabMenu',
+    'toolbar', 'tabs', 'radio', 'badge',
+  ]) ? value : null;
 }
 
 function readM3eVariant(value: unknown): M3eVariant | null | undefined {

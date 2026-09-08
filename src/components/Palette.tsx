@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { decodeDragData, encodeDragData, findNode, findNodeLocation, isContainerNode, NODE_DRAG_MIME } from '../lib/nodes';
 import { useEditorStore } from '../store/editor';
-import type { CanvasNode, CanvasScreen, NodeKind, PatternId, SwipeDirection } from '../types/document';
+import type { CanvasNode, CanvasScreen, M3eInsertKind, M3ePresentationKind, M3eScreenPartKind, NodeKind, PatternId, SwipeDirection } from '../types/document';
 
 const groups: { title: string; items: { kind: NodeKind; name: string; description: string }[] }[] = [
   {
@@ -69,6 +69,45 @@ const groups: { title: string; items: { kind: NodeKind; name: string; descriptio
   },
 ];
 
+const m3eParts: { kind: M3eInsertKind; name: string; description: string }[] = [
+  { kind: 'button', name: 'Button', description: '標準アクション' },
+  { kind: 'iconButton', name: 'Icon Button', description: 'アイコンだけの操作' },
+  { kind: 'fab', name: 'FAB', description: '主要アクション' },
+  { kind: 'extendedFab', name: 'Extended FAB', description: 'ラベル付き主要アクション' },
+  { kind: 'splitButton', name: 'Split Button', description: '主操作とメニュー' },
+  { kind: 'fabMenu', name: 'FAB Menu', description: '複数アクションの展開' },
+  { kind: 'chip', name: 'Chip', description: '選択可能な短い項目' },
+  { kind: 'toolbar', name: 'Toolbar', description: '操作アイコンの並び' },
+  { kind: 'card', name: 'Card', description: '画像と情報のまとまり' },
+  { kind: 'listItem', name: 'List Item', description: '一覧の1行' },
+  { kind: 'dialog', name: 'Dialog', description: '確認を求める表示' },
+  { kind: 'snackbar', name: 'Snackbar', description: '一時的な通知' },
+  { kind: 'searchBar', name: 'Search Bar', description: '検索入力' },
+  { kind: 'textField', name: 'Text Field', description: 'テキスト入力' },
+  { kind: 'select', name: 'Dropdown', description: '選択入力' },
+  { kind: 'switch', name: 'Switch', description: 'オン・オフ入力' },
+  { kind: 'checkbox', name: 'Checkbox', description: '複数選択入力' },
+  { kind: 'radio', name: 'Radio', description: '単一選択入力' },
+  { kind: 'slider', name: 'Slider', description: '範囲入力' },
+  { kind: 'text', name: 'Text', description: 'テキスト表示' },
+  { kind: 'image', name: 'Image', description: '画像またはアイコン' },
+  { kind: 'camera', name: 'Camera', description: 'カメラ入力' },
+  { kind: 'map', name: 'Map', description: '地図表示' },
+  { kind: 'badge', name: 'Badge', description: '通知数または印' },
+  { kind: 'divider', name: 'Divider', description: '区切り線' },
+  { kind: 'loadingIndicator', name: 'Loading', description: '不確定の読み込み表示' },
+  { kind: 'linearProgress', name: 'Linear Progress', description: '横方向の進捗' },
+  { kind: 'circularProgress', name: 'Circular Progress', description: '円形の進捗' },
+  { kind: 'tabs', name: 'Tabs', description: 'タブ切り替え' },
+  { kind: 'box', name: 'Box', description: '自由なコンテナ' },
+];
+
+const m3eScreenParts: { kind: M3eScreenPartKind; name: string; description: string }[] = [
+  { kind: 'topAppBar', name: 'Top App Bar', description: '画面タイトルと操作' },
+  { kind: 'bottomNav', name: 'Bottom Navigation', description: '画面下部のタブ' },
+  { kind: 'navRail', name: 'Navigation Rail', description: 'サイドバーと詳細' },
+];
+
 const favoriteStorageKey = 's3e-canvas-favorite-parts';
 const defaultFavoriteKinds: NodeKind[] = ['vstack', 'text', 'button', 'section'];
 const knownPartKinds = new Set(groups.flatMap((group) => group.items.map((item) => item.kind)));
@@ -108,6 +147,10 @@ const searchAliases: Partial<Record<NodeKind, string>> = {
 
 function matchesPart(item: { kind: NodeKind; name: string; description: string }, query: string): boolean {
   return `${item.name} ${item.description} ${item.kind} ${searchAliases[item.kind] ?? ''}`.toLowerCase().includes(query);
+}
+
+function matchesM3ePart(item: { kind: M3ePresentationKind; name: string; description: string }, query: string): boolean {
+  return `${item.name} ${item.description} ${item.kind} m3e material`.toLowerCase().includes(query);
 }
 
 function readFavoriteKinds(): NodeKind[] {
@@ -232,6 +275,8 @@ export function Palette() {
 export function PartsLibrary() {
   const document = useEditorStore((state) => state.document);
   const addNode = useEditorStore((state) => state.addNode);
+  const addM3eNode = useEditorStore((state) => state.addM3eNode);
+  const addM3eScreenPart = useEditorStore((state) => state.addM3eScreenPart);
   const addPattern = useEditorStore((state) => state.addPattern);
   const updateSelectedNode = useEditorStore((state) => state.updateSelectedNode);
   const selectedNodeId = useEditorStore((state) => state.selectedNodeId);
@@ -257,6 +302,8 @@ export function PartsLibrary() {
       items: group.items.filter((item) => matchesPart(item, normalizedQuery)),
     }))
     .filter((group) => group.items.length > 0);
+  const filteredM3eParts = m3eParts.filter((item) => matchesM3ePart(item, normalizedQuery));
+  const filteredM3eScreenParts = m3eScreenParts.filter((item) => matchesM3ePart(item, normalizedQuery));
   const filteredGlassPresets = glassPresets.filter((item) => `${item.name} ${item.description}`.toLowerCase().includes(normalizedQuery));
   const filteredStyles = stylePresets.filter((item) => `${item.name} ${item.description}`.toLowerCase().includes(normalizedQuery));
   const filteredPatterns = patterns.filter((item) => `${item.name} ${item.description} ${item.id} ${patternSearchAliases[item.id]}`.toLowerCase().includes(normalizedQuery));
@@ -291,6 +338,35 @@ export function PartsLibrary() {
                   key={`favorite-${item.kind}`}
                   onAdd={() => addNode(item.kind, insertionParentId)}
                   onToggleFavorite={() => toggleFavorite(item.kind)}
+                />
+              ))}
+            </div>
+          </section>
+        )}
+        {filteredM3eParts.length > 0 && (
+          <section className="palette-group palette-m3e-group">
+            <div className="palette-group-title">M3Eパーツ</div>
+            <div className="palette-items">
+              {filteredM3eParts.map((item) => (
+                <M3ePalettePartItem
+                  insertionContainer={insertionContainer}
+                  item={item}
+                  key={item.kind}
+                  onAdd={() => addM3eNode(item.kind, insertionParentId)}
+                />
+              ))}
+            </div>
+          </section>
+        )}
+        {filteredM3eScreenParts.length > 0 && (
+          <section className="palette-group palette-m3e-screen-group">
+            <div className="palette-group-title">M3E画面UI</div>
+            <div className="palette-items">
+              {filteredM3eScreenParts.map((item) => (
+                <M3eScreenPalettePartItem
+                  item={item}
+                  key={item.kind}
+                  onAdd={() => addM3eScreenPart(item.kind)}
                 />
               ))}
             </div>
@@ -387,9 +463,69 @@ export function PartsLibrary() {
             </div>
           </section>
         )}
-        {filteredGroups.length === 0 && filteredStyles.length === 0 && filteredPatterns.length === 0 && <div className="palette-empty">「{query}」に一致するパーツはありません。</div>}
+        {filteredGroups.length === 0 && filteredM3eParts.length === 0 && filteredM3eScreenParts.length === 0 && filteredStyles.length === 0 && filteredPatterns.length === 0 && <div className="palette-empty">「{query}」に一致するパーツはありません。</div>}
       </div>
     </aside>
+  );
+}
+
+function M3ePalettePartItem({
+  item,
+  insertionContainer,
+  onAdd,
+}: {
+  item: { kind: M3eInsertKind; name: string; description: string };
+  insertionContainer?: CanvasNode;
+  onAdd: () => void;
+}) {
+  return (
+    <div
+      className="palette-item"
+      draggable
+      onDragStart={(event) => startDrag(event, { kind: 'm3e', m3eKind: item.kind })}
+    >
+      <button
+        className="palette-item-add"
+        onClick={onAdd}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            onAdd();
+          }
+        }}
+        title={`${item.name} — ${item.description}。${insertionContainer ? '選択中のコンテナ' : '画面'}に追加`}
+        type="button"
+      >
+        <span className="palette-item-name">{item.name}</span>
+        <span className="palette-item-description">{item.description}</span>
+      </button>
+    </div>
+  );
+}
+
+function M3eScreenPalettePartItem({
+  item,
+  onAdd,
+}: {
+  item: { kind: M3eScreenPartKind; name: string; description: string };
+  onAdd: () => void;
+}) {
+  return (
+    <div
+      className="palette-item"
+      draggable
+      onDragStart={(event) => startDrag(event, { kind: 'm3e-screen', m3eKind: item.kind })}
+    >
+      <button
+        className="palette-item-add"
+        onClick={onAdd}
+        title={`${item.name} — ${item.description}を現在の画面に追加`}
+        type="button"
+      >
+        <span className="palette-item-name">{item.name}</span>
+        <span className="palette-item-description">{item.description}</span>
+      </button>
+    </div>
   );
 }
 
@@ -456,6 +592,8 @@ function StructureTree({
   const selectNode = useEditorStore((state) => state.selectNode);
   const toggleNodeSelection = useEditorStore((state) => state.toggleNodeSelection);
   const addNode = useEditorStore((state) => state.addNode);
+  const addM3eNode = useEditorStore((state) => state.addM3eNode);
+  const addM3eScreenPart = useEditorStore((state) => state.addM3eScreenPart);
   const addPattern = useEditorStore((state) => state.addPattern);
   const moveNode = useEditorStore((state) => state.moveNode);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
@@ -497,8 +635,14 @@ function StructureTree({
     const data = readDropData(event);
     if (!data) return;
 
+    if (data.kind === 'm3e-screen') {
+      addM3eScreenPart(data.m3eKind);
+      return;
+    }
+
     if (node.id === root.id) {
       if (data.kind === 'new') addNode(data.nodeKind, null);
+      else if (data.kind === 'm3e') addM3eNode(data.m3eKind, null);
       else if (data.kind === 'pattern') addPattern(data.pattern, null);
       else moveNode(data.nodeId, null);
       return;
@@ -514,6 +658,12 @@ function StructureTree({
     if (data.kind === 'new') {
       if (insertInside) addNode(data.nodeKind, node.id);
       else addNode(data.nodeKind, location.parentId, insertIndex);
+      return;
+    }
+
+    if (data.kind === 'm3e') {
+      if (insertInside) addM3eNode(data.m3eKind, node.id);
+      else addM3eNode(data.m3eKind, location.parentId, insertIndex);
       return;
     }
 

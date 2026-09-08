@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cloneNode, createNode, createPattern, decodeDragData, encodeDragData, findNode, isContainerNode, moveNode, updateNode } from '../lib/nodes';
+import { cloneNode, createM3eNode, createM3eScreenNode, createNode, createPattern, decodeDragData, encodeDragData, findNode, isContainerNode, moveNode, updateNode } from '../lib/nodes';
 import type { CanvasNode } from '../types/document';
 
 describe('semantic node tree operations', () => {
@@ -157,5 +157,26 @@ describe('semantic node tree operations', () => {
       pattern: 'settings-section',
     });
     expect(decodeDragData('{"kind":"pattern","pattern":"unknown"}')).toBeNull();
+  });
+
+  it('creates M3E palette parts without leaving the semantic tree model', () => {
+    const kinds = [
+      'box', 'button', 'iconButton', 'fab', 'extendedFab', 'chip', 'searchBar', 'card', 'listItem', 'dialog', 'snackbar',
+      'textField', 'select', 'switch', 'checkbox', 'slider', 'text', 'image', 'camera', 'map', 'divider', 'loadingIndicator',
+      'linearProgress', 'circularProgress', 'splitButton', 'fabMenu', 'toolbar', 'tabs', 'radio', 'badge',
+    ] as const;
+
+    for (const kind of kinds) {
+      const node = createM3eNode(kind);
+      expect(node, kind).toBeDefined();
+      expect(node?.m3eKind, kind).toBe(kind);
+    }
+    expect(decodeDragData(encodeDragData({ kind: 'm3e', m3eKind: 'extendedFab' }))).toEqual({ kind: 'm3e', m3eKind: 'extendedFab' });
+    expect(decodeDragData('{"kind":"m3e","m3eKind":"topAppBar"}')).toBeNull();
+    expect(decodeDragData(encodeDragData({ kind: 'm3e-screen', m3eKind: 'bottomNav' }))).toEqual({ kind: 'm3e-screen', m3eKind: 'bottomNav' });
+    const rail = createM3eScreenNode('navRail');
+    expect(rail).toMatchObject({ kind: 'navigation-split-view', m3eKind: 'navRail' });
+    expect(rail.children?.[0]).toMatchObject({ kind: 'list' });
+    expect(rail.children?.[0]?.children?.[0]).toMatchObject({ kind: 'button', label: 'ホーム' });
   });
 });

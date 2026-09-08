@@ -67,6 +67,36 @@ describe('editor screen workflow', () => {
     expect(useEditorStore.getState().document.screens[0]?.root.children.find((node) => node.id === parentId)?.children).toHaveLength(0);
   });
 
+  it('adds an M3E part as one undoable semantic insertion', () => {
+    const store = useEditorStore.getState();
+
+    store.addM3eNode('extendedFab');
+
+    const inserted = useEditorStore.getState().document.screens[0]?.root.children.at(-1);
+    expect(inserted).toMatchObject({ kind: 'button', m3eKind: 'extendedFab', label: '作成' });
+    expect(useEditorStore.getState().past).toHaveLength(1);
+
+    store.undo();
+    expect(useEditorStore.getState().document.screens[0]?.root.children.some((node) => node.m3eKind === 'extendedFab')).toBe(false);
+  });
+
+  it('adds M3E screen parts through the native screen model', () => {
+    const store = useEditorStore.getState();
+
+    store.addM3eScreenPart('topAppBar');
+    expect(useEditorStore.getState().document.screens[0]?.toolbarItems).toEqual([
+      expect.objectContaining({ placement: 'topBarTrailing', systemName: 'ellipsis.circle' }),
+    ]);
+
+    store.undo();
+    store.addM3eScreenPart('bottomNav');
+    expect(useEditorStore.getState().document.screens[0]?.tabBarItems).toHaveLength(1);
+
+    store.undo();
+    store.addM3eScreenPart('navRail');
+    expect(useEditorStore.getState().document.screens[0]?.root.children[0]).toMatchObject({ kind: 'navigation-split-view', m3eKind: 'navRail' });
+  });
+
   it('keeps one screen when deleting the last remaining screen', () => {
     const store = useEditorStore.getState();
 

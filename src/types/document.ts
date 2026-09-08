@@ -71,7 +71,42 @@ export type ToolbarPlacement = 'topBarLeading' | 'topBarTrailing' | 'bottomBar';
 export type SwipeDirection = 'left' | 'right' | 'up' | 'down';
 export type PatternId = 'glass-card' | 'settings-section' | 'list-row' | 'empty-state';
 export type ImageSource = 'symbol' | 'asset' | 'remote';
-export type M3ePresentationKind = 'fab' | 'extendedFab' | 'chip' | 'splitButton' | 'checkbox' | 'radio' | 'badge' | 'fabMenu' | 'toolbar';
+export type M3ePresentationKind =
+  | 'box'
+  | 'button'
+  | 'iconButton'
+  | 'fab'
+  | 'extendedFab'
+  | 'chip'
+  | 'topAppBar'
+  | 'bottomNav'
+  | 'navRail'
+  | 'searchBar'
+  | 'card'
+  | 'listItem'
+  | 'dialog'
+  | 'snackbar'
+  | 'textField'
+  | 'select'
+  | 'switch'
+  | 'checkbox'
+  | 'slider'
+  | 'text'
+  | 'image'
+  | 'camera'
+  | 'map'
+  | 'divider'
+  | 'loadingIndicator'
+  | 'linearProgress'
+  | 'circularProgress'
+  | 'splitButton'
+  | 'fabMenu'
+  | 'toolbar'
+  | 'tabs'
+  | 'radio'
+  | 'badge';
+export type M3eInsertKind = Exclude<M3ePresentationKind, 'topAppBar' | 'bottomNav' | 'navRail'>;
+export type M3eScreenPartKind = Extract<M3ePresentationKind, 'topAppBar' | 'bottomNav' | 'navRail'>;
 export type M3eVariant = 'filled' | 'tonal' | 'elevated' | 'outlined' | 'text';
 
 export interface DocumentAppearance {

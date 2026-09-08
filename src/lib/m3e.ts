@@ -19,6 +19,7 @@ import type {
   TextStyle,
   ToolbarItem,
   NodeKind,
+  M3ePresentationKind,
   M3eVariant,
 } from '../types/document';
 
@@ -81,6 +82,8 @@ interface M3eExportItem {
   wavy?: boolean;
   trackThickness?: number;
   contained?: boolean;
+  switch?: boolean;
+  noCheck?: boolean;
   fill?: ScreenBackground;
   noImage?: boolean;
   imagePos?: CardImagePosition;
@@ -394,6 +397,15 @@ function appendNotes(node: CanvasNode, item: JsonObject, extra: string[] = []): 
     ...extra,
   ].filter(Boolean);
   if (notes.length > 0) node.notes = notes.join('\n');
+  const m3eKind = isOneOf(item.kind, [
+    'box', 'button', 'iconButton', 'fab', 'extendedFab', 'chip', 'topAppBar', 'bottomNav', 'navRail', 'searchBar',
+    'card', 'listItem', 'dialog', 'snackbar', 'textField', 'select', 'switch', 'checkbox', 'slider', 'text', 'image',
+    'camera', 'map', 'divider', 'loadingIndicator', 'linearProgress', 'circularProgress', 'splitButton', 'fabMenu',
+    'toolbar', 'tabs', 'radio', 'badge',
+  ] as const) ? item.kind : undefined;
+  const variant = isOneOf(item.variant, ['filled', 'tonal', 'elevated', 'outlined', 'text'] as const) ? item.variant : undefined;
+  if (m3eKind) node.m3eKind = m3eKind as M3ePresentationKind;
+  if (variant) node.m3eVariant = variant as M3eVariant;
   return node;
 }
 
@@ -1216,7 +1228,7 @@ function exportItem(node: CanvasNode, frameIds: Map<string, string>, inheritedNo
     case 'text':
       return base(node.m3eKind === 'badge' ? 'badge' : 'text', node.text, null, { size: node.fontSize, ...(node.weight === 'bold' || node.weight === 'semibold' ? { bold: true } : {}) });
     case 'button': {
-      const buttonKind = node.m3eKind === 'fab' || node.m3eKind === 'extendedFab' || node.m3eKind === 'chip' || node.m3eKind === 'splitButton'
+      const buttonKind = node.m3eKind === 'button' || node.m3eKind === 'iconButton' || node.m3eKind === 'fab' || node.m3eKind === 'extendedFab' || node.m3eKind === 'chip' || node.m3eKind === 'splitButton'
         ? node.m3eKind
         : node.label.trim() ? 'button' : node.systemName ? 'iconButton' : 'button';
       return base(buttonKind, node.label, node.systemName ?? null, {
@@ -1233,7 +1245,7 @@ function exportItem(node: CanvasNode, frameIds: Map<string, string>, inheritedNo
       });
     }
     case 'toggle':
-      return base(node.m3eKind === 'checkbox' || node.m3eKind === 'radio' ? node.m3eKind : 'switch', node.label, null, { checked: node.isOn ?? false });
+      return base(node.m3eKind === 'switch' || node.m3eKind === 'checkbox' || node.m3eKind === 'radio' ? node.m3eKind : 'switch', node.label, null, { checked: node.isOn ?? false });
     case 'textfield':
       return base('textField', node.label, null);
     case 'searchfield':
@@ -1261,7 +1273,9 @@ function exportItem(node: CanvasNode, frameIds: Map<string, string>, inheritedNo
     case 'menu':
       return base('button', node.label, null, { note: exportNote(node, `メニュー項目: ${node.options.join('、')}`) });
     case 'progress':
-      return base(node.indeterminate && node.style === 'circular' ? 'loadingIndicator' : node.style === 'circular' ? 'circularProgress' : 'linearProgress', node.label, null, {
+      return base(node.m3eKind === 'loadingIndicator' || node.m3eKind === 'linearProgress' || node.m3eKind === 'circularProgress'
+        ? node.m3eKind
+        : node.indeterminate && node.style === 'circular' ? 'loadingIndicator' : node.style === 'circular' ? 'circularProgress' : 'linearProgress', node.label, null, {
         ...(node.indeterminate ? {} : { value: Math.round(node.value * 100) }),
         ...(node.wavy ? { wavy: true } : {}),
         ...(node.trackThickness === undefined ? {} : { trackThickness: node.trackThickness }),
@@ -1318,7 +1332,7 @@ function exportTabsNode(node: ContainerNode, frameIds: Map<string, string>, inhe
   }));
   return {
     id: node.id,
-    kind: 'tabs',
+    kind: node.m3eKind === 'topAppBar' || node.m3eKind === 'bottomNav' || node.m3eKind === 'tabs' ? node.m3eKind : 'tabs',
     label: node.title || 'タブ',
     icon: null,
     variant: exportVariant(node),
@@ -1368,6 +1382,33 @@ function exportCardPresentation(node: ContainerNode): Pick<M3eExportItem, 'icon'
   };
 }
 
+function exportListItemNode(node: ContainerNode, inheritedNote: string): M3eExportItem {
+  const descendants: CanvasNode[] = [];
+  const visit = (current: CanvasNode): void => {
+    descendants.push(current);
+    if (Array.isArray(current.children)) current.children.forEach(visit);
+  };
+  node.children.forEach(visit);
+  const images = descendants.filter((child): child is Extract<CanvasNode, { kind: 'image' }> => child.kind === 'image');
+  const texts = descendants.filter((child): child is Extract<CanvasNode, { kind: 'text' }> => child.kind === 'text' && child.m3eKind !== 'badge');
+  const toggle = descendants.find((child): child is Extract<CanvasNode, { kind: 'toggle' }> => child.kind === 'toggle');
+  const label = node.label?.trim() || texts[0]?.text.trim() || '項目';
+  const supporting = texts.find((child) => child.text.trim() && child.text.trim() !== label)?.text.trim();
+  const leading = images[0];
+  const trailing = images[1];
+  return {
+    id: node.id,
+    kind: 'listItem',
+    label,
+    icon: leading?.source === 'remote' ? null : leading?.systemName ?? null,
+    variant: exportVariant(node),
+    ...(trailing?.source === 'remote' ? {} : trailing?.systemName ? { icon2: trailing.systemName } : {}),
+    ...(supporting ? { supporting } : {}),
+    ...(toggle ? { switch: true, checked: toggle.isOn ?? false } : {}),
+    ...(exportNote(node, inheritedNote) ? { note: exportNote(node, inheritedNote) } : {}),
+  };
+}
+
 function exportFabMenuNode(node: ContainerNode, frameIds: Map<string, string>, inheritedNote: string): M3eExportItem {
   const buttons = node.children.filter((child): child is Extract<CanvasNode, { kind: 'button' }> => child.kind === 'button');
   const actions = Object.fromEntries(buttons.flatMap((button, index) => {
@@ -1407,7 +1448,7 @@ function exportToolbarNode(node: ContainerNode, frameIds: Map<string, string>, i
 }
 
 function exportSnackbarNode(node: ContainerNode, inheritedNote: string): M3eExportItem | null {
-  if (node.kind !== 'hstack' || node.background !== 'material' || node.cornerRadius !== 12 || node.children.length < 1 || node.children.length > 2) return null;
+  if (node.kind !== 'hstack' || (node.m3eKind !== 'snackbar' && (node.background !== 'material' || node.cornerRadius !== 12)) || node.children.length < 1 || node.children.length > 2) return null;
   const message = node.children.find((child): child is Extract<CanvasNode, { kind: 'text' }> => child.kind === 'text');
   const action = node.children.find((child): child is Extract<CanvasNode, { kind: 'button' }> => child.kind === 'button');
   if (!message || node.children.some((child) => child !== message && child !== action)) return null;
@@ -1428,6 +1469,7 @@ function isExportContainer(node: CanvasNode): node is ContainerNode {
 
 function exportContainerItems(node: ContainerNode, frameIds: Map<string, string>, inheritedNote = ''): M3eExportItem[] {
   if (node.m3eKind === 'fabMenu') return [exportFabMenuNode(node, frameIds, inheritedNote)];
+  if (node.m3eKind === 'listItem') return [exportListItemNode(node, inheritedNote)];
   if (node.kind === 'tabview') return [exportTabsNode(node, frameIds, inheritedNote)];
   if (node.kind === 'navigation-split-view') {
     const detail = node.children[1];
@@ -1451,7 +1493,7 @@ function exportContainerItems(node: ContainerNode, frameIds: Map<string, string>
 
   const title = node.title || node.label || (node.kind === 'sheet' ? 'シート' : 'グループ');
   const isBottomSheet = node.isBottomSheet === true;
-  const isCard = node.kind === 'groupbox' && !isBottomSheet;
+  const isCard = node.kind === 'groupbox' && !isBottomSheet && node.m3eKind !== 'box';
   const card = isCard ? exportCardPresentation(node) : { icon: null };
   const containerItem: M3eExportItem = {
     id: `${node.id}-container`,
