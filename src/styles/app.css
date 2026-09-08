@@ -387,6 +387,7 @@ button.ios-navigation-link:hover { background: #f5f5f7; }
 .ios-progress-label span:last-child { color: #8e8e93; font-variant-numeric: tabular-nums; }
 .ios-progress-track { height: 4px; overflow: hidden; border-radius: 3px; background: #d1d1d6; }
 .ios-progress-track span { display: block; height: 100%; border-radius: inherit; background: var(--preview-accent); }
+.ios-progress-track.is-indeterminate span { width: 36%; }
 .ios-gauge { display: flex; align-items: center; gap: 12px; width: 100%; padding: 8px 4px; color: #3a3a3c; }
 .ios-gauge-dial { position: relative; width: 58px; height: 58px; flex: 0 0 58px; display: grid; place-items: center; border-radius: 50%; background: conic-gradient(var(--preview-accent) var(--gauge-progress), #d1d1d6 0); }
 .ios-gauge-dial::after { position: absolute; inset: 6px; border-radius: inherit; background: #fff; content: ''; }

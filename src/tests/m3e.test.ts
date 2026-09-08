@@ -121,4 +121,30 @@ describe('M3E compatibility importer', () => {
     if (!document) throw new Error('M3E document was not converted');
     expect(generateSwiftUI(document)).toContain('@State private var is_notifications: Bool = true');
   });
+
+  it('preserves selected options and indeterminate progress states', () => {
+    const document = convertM3eDocument({
+      frames: [{ id: 'home', name: 'ホーム', x: 0, y: 0 }],
+      groups: [{
+        id: 'controls',
+        x: 16,
+        y: 80,
+        axis: 'y',
+        items: [
+          { id: 'sort', kind: 'select', label: '並び順', icon: null, variant: 'filled', selected: 1, tabs: [{ label: '新しい順' }, { label: '古い順' }] },
+          { id: 'loading', kind: 'loadingIndicator', label: '読み込み中', icon: null, variant: 'filled' },
+          { id: 'custom-text', kind: 'text', label: '細かな見出し', size: 19, icon: null, variant: 'filled' },
+        ],
+      }],
+    });
+
+    const nodes = document?.screens[0]?.root.children ?? [];
+    expect(findNode(nodes, 'm3e-sort')).toMatchObject({ kind: 'picker', initialOption: '古い順' });
+    expect(findNode(nodes, 'm3e-loading')).toMatchObject({ kind: 'progress', indeterminate: true });
+    expect(findNode(nodes, 'm3e-custom-text')).toMatchObject({ kind: 'text', textStyle: 'custom', fontSize: 19 });
+    if (!document) throw new Error('M3E document was not converted');
+    const output = generateSwiftUI(document);
+    expect(output).toContain('@State private var selection_sort: String = "古い順"');
+    expect(output).toContain('ProgressView {');
+  });
 });

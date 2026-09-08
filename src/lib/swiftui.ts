@@ -418,7 +418,9 @@ function renderNodeContent(node: CanvasNode, depth: number, context: RenderConte
       return `${pad}Menu(${quoted(node.label)}) {\n${options}\n${pad}}\n${pad}.frame(minHeight: ${node.minHeight})`;
     }
     case 'progress':
-      return `${pad}ProgressView(value: ${node.value}) {\n${pad}    Text(${quoted(node.label)})\n${pad}}`;
+      return node.indeterminate
+        ? `${pad}ProgressView {\n${pad}    Text(${quoted(node.label)})\n${pad}}`
+        : `${pad}ProgressView(value: ${node.value}) {\n${pad}    Text(${quoted(node.label)})\n${pad}}`;
     case 'gauge':
       return `${pad}Gauge(value: ${node.value}, in: ${node.minimum}...${node.maximum}) {\n${pad}    Text(${quoted(node.label)})\n${pad}}\n${pad}.frame(minHeight: ${node.minHeight})`;
     case 'content-unavailable':
@@ -568,7 +570,7 @@ function collectBindings(
       const key = node.kind === 'datepicker' ? dateBindingKey(node) : bindingKey(node);
       if (!result.has(key)) {
         const type = node.kind === 'toggle' ? 'Bool' : node.kind === 'datepicker' ? 'Date' : node.kind === 'colorpicker' ? 'Color' : node.kind === 'slider' || node.kind === 'stepper' ? 'Double' : 'String';
-        const initial = node.kind === 'toggle' ? String(node.isOn ?? false) : node.kind === 'datepicker' ? 'Date()' : node.kind === 'colorpicker' ? swiftColorLiteral(node.color) : node.kind === 'picker' ? quoted(node.options[0] ?? '') : node.kind === 'slider' || node.kind === 'stepper' ? String(node.value) : '""';
+        const initial = node.kind === 'toggle' ? String(node.isOn ?? false) : node.kind === 'datepicker' ? 'Date()' : node.kind === 'colorpicker' ? swiftColorLiteral(node.color) : node.kind === 'picker' ? quoted(node.initialOption ?? node.options[0] ?? '') : node.kind === 'slider' || node.kind === 'stepper' ? String(node.value) : '""';
         const base = swiftIdentifier(node.binding, `value_${swiftIdentifier(node.id, 'node')}`);
         let name = base;
         let suffix = 2;

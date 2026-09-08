@@ -5,8 +5,10 @@ import type {
   CanvasNode,
   CanvasScreen,
   ContainerNode,
+  BackgroundStyle,
   ImageSource,
   SwipeDirection,
+  TextStyle,
   ToolbarItem,
 } from '../types/document';
 
@@ -151,6 +153,43 @@ function buttonStyle(variant: unknown): ButtonStyle | undefined {
     case 'elevated': return 'bordered';
     case 'text': return 'plain';
     default: return undefined;
+  }
+}
+
+function textStyleForSize(size: number): TextStyle {
+  const styles: Partial<Record<number, TextStyle>> = {
+    34: 'largeTitle',
+    28: 'title',
+    22: 'title2',
+    20: 'title3',
+    17: 'body',
+    16: 'callout',
+    15: 'subheadline',
+    13: 'footnote',
+    12: 'caption',
+    11: 'caption2',
+  };
+  return styles[size] ?? 'custom';
+}
+
+function backgroundStyle(item: JsonObject): BackgroundStyle | undefined {
+  switch (stringValue(item, 'fill')) {
+    case 'primary':
+    case 'primaryContainer':
+    case 'secondaryContainer':
+      return 'accent';
+    case 'tertiaryContainer':
+      return 'tertiary';
+    case 'surface':
+    case 'surfaceContainerLow':
+    case 'surfaceContainer':
+    case 'surfaceContainerHigh':
+    case 'surfaceContainerHighest':
+      return 'secondary';
+    case 'inverseSurface':
+      return 'material';
+    default:
+      return undefined;
   }
 }
 
@@ -385,7 +424,10 @@ function mapItem(item: JsonObject, context: ConversionContext): CanvasNode | nul
       return appendNotes({ id, kind: 'textfield', label: label || '入力', binding: `value_${sourceId}`, minHeight: 44 }, item);
     case 'select': {
       const options = tabEntries(item).map((tab, index) => labelOf(tab, `選択肢${index + 1}`));
-      return appendNotes({ id, kind: 'picker', label: label || '選択', binding: `selection_${sourceId}`, options: options.length > 0 ? options : ['選択肢'], minHeight: 44 }, item);
+      const safeOptions = options.length > 0 ? options : ['選択肢'];
+      const selected = numberValue(item, 'selected');
+      const initialOption = selected !== undefined && Number.isInteger(selected) && safeOptions[selected] !== undefined ? safeOptions[selected] : undefined;
+      return appendNotes({ id, kind: 'picker', label: label || '選択', binding: `selection_${sourceId}`, options: safeOptions, ...(initialOption === undefined ? {} : { initialOption }), minHeight: 44 }, item);
     }
     case 'switch':
     case 'checkbox':
@@ -399,7 +441,7 @@ function mapItem(item: JsonObject, context: ConversionContext): CanvasNode | nul
     }
     case 'text': {
       const fontSize = Math.max(11, numberValue(item, 'size') ?? 17);
-      return linkM3eNode({ id, kind: 'text', text: label || 'テキスト', fontSize, weight: booleanValue(item, 'bold') ? 'bold' : 'regular', textStyle: fontSize >= 28 ? 'title' : 'body' }, item, context, 'テキスト');
+      return linkM3eNode({ id, kind: 'text', text: label || 'テキスト', fontSize, weight: booleanValue(item, 'bold') ? 'bold' : 'regular', textStyle: textStyleForSize(fontSize) }, item, context, 'テキスト');
     }
     case 'image': {
       const src = stringValue(item, 'src');
@@ -413,23 +455,23 @@ function mapItem(item: JsonObject, context: ConversionContext): CanvasNode | nul
     case 'divider':
       return appendNotes({ id, kind: 'divider' }, item);
     case 'loadingIndicator':
-      return appendNotes({ id, kind: 'progress', label: label || '読み込み中', value: 0.5 }, item, ['M3Eの不確定ローディング表示です。']);
+      return appendNotes({ id, kind: 'progress', label: label || '読み込み中', value: 0.5, indeterminate: true }, item, ['M3Eの不確定ローディング表示です。']);
     case 'linearProgress':
     case 'circularProgress': {
       const value = numberValue(item, 'value');
-      return appendNotes({ id, kind: 'progress', label: label || '進捗', value: value === undefined ? 0.5 : Math.max(0, Math.min(1, value > 1 ? value / 100 : value)) }, item, value === undefined ? ['M3Eの不確定プログレス表示です。'] : []);
+      return appendNotes({ id, kind: 'progress', label: label || '進捗', value: value === undefined ? 0.5 : Math.max(0, Math.min(1, value > 1 ? value / 100 : value)), ...(value === undefined ? { indeterminate: true } : {}) }, item, value === undefined ? ['M3Eの不確定プログレス表示です。'] : []);
     }
     case 'badge':
       return appendNotes({ id, kind: 'text', text: label || 'バッジ', fontSize: 13, weight: 'semibold', textStyle: 'caption' }, item);
     case 'box':
-      return appendNotes({ id, kind: 'groupbox', title: label || 'ボックス', children: [] }, item);
+      return appendNotes({ id, kind: 'groupbox', title: label || 'ボックス', children: [], ...(backgroundStyle(item) ? { background: backgroundStyle(item) } : {}) }, item);
     case 'card': {
       const children: CanvasNode[] = [];
       if (icon) children.push(imageNode(stableId('m3e-card-icon', sourceId, context.usedIds), icon, 'symbol', label || 'カード'));
       if (label) children.push({ id: stableId('m3e-card-title', sourceId, context.usedIds), kind: 'text', text: label, fontSize: 20, weight: 'semibold', textStyle: 'headline' });
       const supporting = stringValue(item, 'supporting')?.trim();
       if (supporting) children.push({ id: stableId('m3e-card-body', sourceId, context.usedIds), kind: 'text', text: supporting, fontSize: 17, weight: 'regular', textStyle: 'body' });
-      return linkM3eNode({ id, kind: 'groupbox', title: label || 'カード', children }, item, context, 'カード');
+      return linkM3eNode({ id, kind: 'groupbox', title: label || 'カード', children, ...(backgroundStyle(item) ? { background: backgroundStyle(item) } : {}) }, item, context, 'カード');
     }
     case 'listItem':
       return listItemNode(item, context);

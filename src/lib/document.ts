@@ -232,8 +232,9 @@ function readNode(value: unknown, ids: Set<string>): CanvasNode | null {
         && Array.isArray(value.options)
         && value.options.length > 0
         && value.options.every(isString)
+        && (value.initialOption === undefined || (isString(value.initialOption) && value.options.includes(value.initialOption)))
         && isNonNegativeNumber(value.minHeight)
-        ? { id: value.id, kind: 'picker', label: value.label, binding: value.binding, options: value.options, minHeight: value.minHeight, ...nodeProperties }
+        ? { id: value.id, kind: 'picker', label: value.label, binding: value.binding, options: value.options, ...(value.initialOption === undefined ? {} : { initialOption: value.initialOption }), minHeight: value.minHeight, ...nodeProperties }
         : null;
     case 'colorpicker':
       return isString(value.label)
@@ -269,7 +270,8 @@ function readNode(value: unknown, ids: Set<string>): CanvasNode | null {
         : null;
     case 'progress':
       return isString(value.label) && isNumber(value.value) && value.value >= 0 && value.value <= 1
-        ? { id: value.id, kind: 'progress', label: value.label, value: value.value, ...nodeProperties }
+        && (value.indeterminate === undefined || typeof value.indeterminate === 'boolean')
+        ? { id: value.id, kind: 'progress', label: value.label, value: value.value, ...(value.indeterminate === undefined ? {} : { indeterminate: value.indeterminate }), ...nodeProperties }
         : null;
     case 'gauge':
       return isString(value.label)

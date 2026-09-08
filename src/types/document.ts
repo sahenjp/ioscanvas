@@ -183,6 +183,7 @@ export interface PickerNode extends BaseNode {
   label: string;
   binding: string;
   options: string[];
+  initialOption?: string;
   minHeight: number;
 }
 
@@ -227,6 +228,7 @@ export interface ProgressNode extends BaseNode {
   kind: 'progress';
   label: string;
   value: number;
+  indeterminate?: boolean;
 }
 
 export interface GaugeNode extends BaseNode {

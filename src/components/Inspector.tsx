@@ -586,8 +586,18 @@ export function Inspector() {
                 <DraftInput
                   key={`${node.id}-options-${node.options.join(',')}`}
                   value={node.options.join(', ')}
-                  onCommit={(value) => updateSelectedNode({ options: parseOptions(value, node.options) } as Partial<CanvasNode>)}
+                  onCommit={(value) => {
+                    const options = parseOptions(value, node.options);
+                    updateSelectedNode({ options, initialOption: options.includes(node.initialOption ?? '') ? node.initialOption : options[0] } as Partial<CanvasNode>);
+                  }}
                 />
+              </Field>
+            )}
+            {node.kind === 'picker' && (
+              <Field label="初期選択">
+                <select value={node.initialOption ?? node.options[0] ?? ''} onChange={(event) => updateSelectedNode({ initialOption: event.target.value } as Partial<CanvasNode>)}>
+                  {node.options.map((option) => <option key={option} value={option}>{option}</option>)}
+                </select>
               </Field>
             )}
             {node.kind === 'menu' && (
@@ -643,19 +653,24 @@ export function Inspector() {
               </>
             )}
             {node.kind === 'progress' && (
-              <Field label="進捗">
-                <div className="input-with-unit">
-                  <DraftInput
-                    key={`${node.id}-progress-${node.value}`}
-                    type="number"
-                    min="0"
-                    max="100"
-                    value={Math.round(node.value * 100)}
-                    onCommit={(value) => updateSelectedNode({ value: numericValue(value, node.value * 100, 0, 100) / 100 } as Partial<CanvasNode>)}
-                  />
-                  <span>%</span>
-                </div>
-              </Field>
+              <>
+                <Field label="不確定">
+                  <input className="toggle-input" type="checkbox" checked={node.indeterminate ?? false} onChange={(event) => updateSelectedNode({ indeterminate: event.target.checked } as Partial<CanvasNode>)} />
+                </Field>
+                <Field label="進捗">
+                  <div className="input-with-unit">
+                    <DraftInput
+                      key={`${node.id}-progress-${node.value}`}
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={Math.round(node.value * 100)}
+                      onCommit={(value) => updateSelectedNode({ value: numericValue(value, node.value * 100, 0, 100) / 100 } as Partial<CanvasNode>)}
+                    />
+                    <span>%</span>
+                  </div>
+                </Field>
+              </>
             )}
             {node.kind === 'gauge' && (
               <>

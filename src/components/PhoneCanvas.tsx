@@ -463,6 +463,14 @@ function renderNodeContent(
         </div>
       );
     case 'progress':
+      if (node.indeterminate) {
+        return (
+          <div className="ios-progress" aria-label={node.label || 'Progress'} aria-busy="true">
+            <div className="ios-progress-label"><span>{node.label || 'Progress'}</span><span>読み込み中</span></div>
+            <div className="ios-progress-track is-indeterminate"><span /></div>
+          </div>
+        );
+      }
       return (
         <div className="ios-progress" aria-label={node.label || 'Progress'}>
           <div className="ios-progress-label"><span>{node.label || 'Progress'}</span><span>{Math.round(node.value * 100)}%</span></div>
@@ -1314,7 +1322,7 @@ function initialPreviewValue(node: CanvasNode): PreviewValue {
     case 'toggle': return node.isOn ?? false;
     case 'tabview': return 0;
     case 'disclosure-group': return true;
-    case 'picker':
+    case 'picker': return node.initialOption ?? node.options[0] ?? '';
     case 'menu': return node.options[0] ?? '';
     case 'colorpicker': return node.color;
     case 'slider':
