@@ -489,17 +489,24 @@ function renderNodeContent(
         </div>
       );
     case 'navigation-link':
-      return onNavigate ? (
-        <button type="button" className="ios-row ios-navigation-link" style={{ minHeight: node.minHeight }} onClick={(event) => { event.stopPropagation(); onNavigate(); }}>
-          <span>{node.label || 'Open screen'}</span>
-          <span className="ios-link-indicator" aria-hidden="true">›</span>
-        </button>
-      ) : (
-        <div className="ios-row ios-navigation-link" style={{ minHeight: node.minHeight }}>
-          <span>{node.label || 'Open screen'}</span>
-          <span className="ios-link-indicator" aria-hidden="true">›</span>
-        </div>
-      );
+      {
+        const label = node.children && node.children.length > 0 ? (
+          <span className="ios-navigation-content">
+            {node.children.map((child) => <NodeView key={child.id} node={child} allNodes={allNodes} screenId={screenId} onOpenSheet={onOpenSheet} onNavigateScreen={onNavigateScreen} />)}
+          </span>
+        ) : <span>{node.label || 'Open screen'}</span>;
+        return onNavigate ? (
+          <button type="button" className="ios-row ios-navigation-link" style={{ minHeight: node.minHeight }} onClick={(event) => { event.stopPropagation(); onNavigate(); }}>
+            {label}
+            <span className="ios-link-indicator" aria-hidden="true">›</span>
+          </button>
+        ) : (
+          <div className="ios-row ios-navigation-link" style={{ minHeight: node.minHeight }}>
+            {label}
+            <span className="ios-link-indicator" aria-hidden="true">›</span>
+          </div>
+        );
+      }
     case 'label':
       return (
         <div className="ios-label" role="img" aria-label={node.accessibilityLabel || node.title}>

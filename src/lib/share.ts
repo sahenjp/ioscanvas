@@ -1,4 +1,5 @@
 import { parseCanvasDocument } from './document';
+import { convertM3eDocument } from './m3e';
 import type { CanvasDocument } from '../types/document';
 
 const SHARE_PARAM = 'docz';
@@ -40,6 +41,42 @@ export function createShareUrl(document: CanvasDocument, baseUrl: string): strin
 export function readShareHash(hash: string): CanvasDocument | null {
   const value = new URLSearchParams(hash.replace(/^#/, '')).get(SHARE_PARAM);
   return value ? decodeShareDocument(value) : null;
+}
+
+async function decodeCompressedShareDocument(value: string): Promise<CanvasDocument | null> {
+  if (typeof DecompressionStream === 'undefined') return null;
+  try {
+    const stream = new DecompressionStream('deflate-raw');
+    const writer = stream.writable.getWriter();
+    const bytes = base64UrlToBytes(value);
+    const buffer = new ArrayBuffer(bytes.byteLength);
+    new Uint8Array(buffer).set(bytes);
+    await writer.write(buffer);
+    await writer.close();
+    const json = new TextDecoder().decode(await new Response(stream.readable).arrayBuffer());
+    const raw: unknown = JSON.parse(json);
+    return parseCanvasDocument(raw) ?? convertM3eDocument(raw);
+  } catch {
+    return null;
+  }
+}
+
+/** Reads this editor's links and the compatible plain/deflated M3E link forms. */
+export async function readCompatibleShareHash(hash: string): Promise<CanvasDocument | null> {
+  const params = new URLSearchParams(hash.replace(/^#/, ''));
+  const plain = params.get('doc');
+  if (plain) {
+    try {
+      const raw: unknown = JSON.parse(plain);
+      return parseCanvasDocument(raw) ?? convertM3eDocument(raw);
+    } catch {
+      return null;
+    }
+  }
+
+  const packed = params.get(SHARE_PARAM);
+  if (!packed) return null;
+  return decodeShareDocument(packed) ?? decodeCompressedShareDocument(packed);
 }
 
 export async function copyText(value: string): Promise<void> {

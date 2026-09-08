@@ -5,7 +5,7 @@ import { Palette, PartsLibrary } from './components/Palette';
 import { PhoneCanvas } from './components/PhoneCanvas';
 import { useEditorStore } from './store/editor';
 import { TopBar } from './components/TopBar';
-import { readShareHash } from './lib/share';
+import { readCompatibleShareHash } from './lib/share';
 import './styles/app.css';
 
 export default function App() {
@@ -31,8 +31,11 @@ export default function App() {
   useEffect(() => {
     if (shareHashHandled.current || !window.location.hash) return;
     shareHashHandled.current = true;
-    const sharedDocument = readShareHash(window.location.hash);
-    if (sharedDocument) loadDocument(sharedDocument);
+    let cancelled = false;
+    void readCompatibleShareHash(window.location.hash).then((sharedDocument) => {
+      if (!cancelled && sharedDocument) loadDocument(sharedDocument);
+    });
+    return () => { cancelled = true; };
   }, [loadDocument]);
 
   useEffect(() => {

@@ -14,6 +14,7 @@
 - Duplicate selected elements with Cmd/Ctrl+D, including nested children.
 - Keep screen and element implementation notes alongside the semantic tree and include them in the exported brief.
 - Save and open validated `.ioscanvas.json` project files.
+- Open M3E Canvas JSON projects and convert their screens, bars, controls, links, palette, and font choices into a SwiftUI semantic tree without retaining absolute coordinates; actionable list rows become editable NavigationLinks.
 - Copy a local share link that reopens the validated document in another browser.
 - Save the active iPhone preview as a PNG for review or handoff.
 - Opt into iOS 26 Liquid Glass styles from the Inspector and export the corresponding SwiftUI modifiers.
@@ -149,4 +150,4 @@ See [`ACKNOWLEDGEMENTS.md`](./ACKNOWLEDGEMENTS.md) for attribution details.
 
 ## Status
 
-Version 1.16.0. The semantic editor, multi-screen flow workspace, nested drag-and-drop, precise element ordering, Navigator and Parts library with Favorites and semantic patterns, multi-selection style editing, inspector, NavigationStack and NavigationSplitView editing, Appearance controls with custom accent colors, interactive Preview mode with screen and swipe flow, TabView switching, Sheet, Alert, ConfirmationDialog, and SearchField presentation, GroupBox and LazyVGrid / LazyHGrid layouts, ColorPicker and other native controls, Gauge metrics, empty states, stateful toggle Buttons, VoiceOver labels for icon-only Buttons, history controls, semantic layout tidying, project files, share links, PNG preview export, SF Symbol images, Liquid Glass presets and shape preview, HIG checks, linked SwiftUI export, and an xtool SwiftUI target are present.
+Version 1.18.0. The semantic editor, multi-screen flow workspace, nested drag-and-drop, precise element ordering, Navigator and Parts library with Favorites and semantic patterns, multi-selection style editing, inspector, NavigationStack and NavigationSplitView editing, Appearance controls with custom accent colors, interactive Preview mode with screen and swipe flow, TabView switching, Sheet, Alert, ConfirmationDialog, and SearchField presentation, GroupBox and LazyVGrid / LazyHGrid layouts, M3E JSON and share-link import into a semantic SwiftUI tree, actionable imported list rows, palette and font conversion, ColorPicker and other native controls, Gauge metrics, empty states, stateful toggle Buttons, VoiceOver labels for icon-only Buttons, history controls, semantic layout tidying, project files, share links, PNG preview export, SF Symbol images, Liquid Glass presets and shape preview, HIG checks, linked SwiftUI export, and an xtool SwiftUI target are present.

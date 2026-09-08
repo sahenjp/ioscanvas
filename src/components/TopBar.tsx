@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { parseCanvasDocument } from '../lib/document';
+import { convertM3eDocument } from '../lib/m3e';
 import { lintDocument } from '../lib/hig';
 import { findNode } from '../lib/nodes';
 import { copyText, createShareUrl } from '../lib/share';
@@ -59,7 +60,7 @@ export function TopBar() {
 
     try {
       const raw: unknown = JSON.parse(await file.text());
-      const parsed = parseCanvasDocument(raw);
+      const parsed = parseCanvasDocument(raw) ?? convertM3eDocument(raw);
       if (!parsed) throw new Error('Invalid project file');
       loadDocument(parsed);
       setFileError(null);

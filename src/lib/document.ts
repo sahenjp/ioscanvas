@@ -286,10 +286,21 @@ function readNode(value: unknown, ids: Set<string>): CanvasNode | null {
       return isString(value.title) && isString(value.systemName) && isString(value.description)
         ? { id: value.id, kind: 'content-unavailable', title: value.title, systemName: value.systemName, description: value.description, ...nodeProperties }
         : null;
-    case 'navigation-link':
-      return isString(value.label) && isString(value.destinationScreenId) && isNonNegativeNumber(value.minHeight)
-        ? { id: value.id, kind: 'navigation-link', label: value.label, destinationScreenId: value.destinationScreenId, minHeight: value.minHeight, ...nodeProperties }
-        : null;
+    case 'navigation-link': {
+      if (!isString(value.label) || !isString(value.destinationScreenId) || !isNonNegativeNumber(value.minHeight)) return null;
+      if (value.children !== undefined && !Array.isArray(value.children)) return null;
+      const children = value.children === undefined ? undefined : value.children.map((child) => readNode(child, ids));
+      if (children?.some((child): child is null => child === null)) return null;
+      return {
+        id: value.id,
+        kind: 'navigation-link',
+        label: value.label,
+        destinationScreenId: value.destinationScreenId,
+        minHeight: value.minHeight,
+        ...(children === undefined ? {} : { children: children as CanvasNode[] }),
+        ...nodeProperties,
+      };
+    }
     case 'label':
       return isString(value.title) && isString(value.systemName) && isString(value.accessibilityLabel)
         ? { id: value.id, kind: 'label', title: value.title, systemName: value.systemName, accessibilityLabel: value.accessibilityLabel, ...nodeProperties }

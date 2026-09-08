@@ -427,6 +427,10 @@ function renderNodeContent(node: CanvasNode, depth: number, context: RenderConte
         : `${pad}ContentUnavailableView(${quoted(node.title)}, systemImage: ${quoted(node.systemName)})`;
     case 'navigation-link': {
       const destination = context.viewNames.get(node.destinationScreenId) ?? 'EmptyView';
+      if (node.children && node.children.length > 0) {
+        const children = node.children.map((child) => renderNode(child, depth + 2, context)).join('\n');
+        return `${pad}NavigationLink {\n${pad}    ${destination}()\n${pad}} label: {\n${children}\n${pad}}\n${pad}.frame(minHeight: ${node.minHeight})`;
+      }
       return `${pad}NavigationLink(${quoted(node.label)}) {\n${pad}    ${destination}()\n${pad}}\n${pad}.frame(minHeight: ${node.minHeight})`;
     }
     case 'image': {
