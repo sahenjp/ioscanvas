@@ -75,6 +75,7 @@ export function TopBar() {
           report.discardedItemCount > 0 ? `破棄した項目${report.discardedItemCount}件` : '',
           report.unresolvedDestinationCount > 0 ? `未解決の遷移${report.unresolvedDestinationCount}件` : '',
           report.unsupportedKinds.length > 0 ? `未対応パーツ: ${report.unsupportedKinds.join(', ')}` : '',
+          report.approximatedKinds.length > 0 ? `近似変換: ${report.approximatedKinds.join(', ')}` : '',
         ].filter(Boolean);
         setFileNotice(details.length > 0 ? `M3E互換確認: ${details.join(' / ')}` : null);
       } else {

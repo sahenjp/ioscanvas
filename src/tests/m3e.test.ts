@@ -269,6 +269,57 @@ describe('M3E compatibility importer', () => {
     ]);
   });
 
+  it('round-trips M3E toolbar actions as one semantic action group', () => {
+    const document = convertM3eDocument({
+      frames: [{ id: 'home', name: 'ホーム', x: 0, y: 0 }, { id: 'next', name: '次', x: 492, y: 0 }],
+      groups: [{
+        id: 'tools',
+        x: 16,
+        y: 80,
+        axis: 'x',
+        items: [{
+          id: 'tools',
+          kind: 'toolbar',
+          label: '操作',
+          icon: null,
+          variant: 'filled',
+          tabs: [{ label: '編集', icon: 'edit' }, { label: '次へ', icon: 'arrow_forward' }],
+          actions: { 'tab:1': { to: 'next', transition: 'slide' } },
+        }],
+      }],
+    });
+
+    expect(document).not.toBeNull();
+    if (!document) throw new Error('Toolbar fixture was not converted');
+    const items = exportM3eDocument(document).groups.flatMap((group) => group.items);
+    expect(items).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        kind: 'toolbar',
+        tabs: [{ label: '編集', icon: 'pencil' }, { label: '次へ', icon: 'chevron.right' }],
+        actions: { 'tab:1': { to: 'screen-next', transition: 'slide' } },
+      }),
+    ]));
+  });
+
+  it('exports icon-only semantic buttons as M3E icon buttons', () => {
+    const document = convertM3eDocument({
+      frames: [{ id: 'home', name: 'ホーム', x: 0, y: 0 }],
+      groups: [{
+        id: 'actions',
+        x: 16,
+        y: 80,
+        axis: 'y',
+        items: [{ id: 'favorite', kind: 'iconButton', label: '', icon: 'favorite', variant: 'tonal' }],
+      }],
+    });
+
+    expect(document).not.toBeNull();
+    if (!document) throw new Error('Icon button fixture was not converted');
+    expect(exportM3eDocument(document).groups.flatMap((group) => group.items)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: 'iconButton', label: '', icon: 'heart.fill' }),
+    ]));
+  });
+
   it('rejects values that are not M3E project documents', () => {
     expect(isM3eDocument({ screens: [] })).toBe(false);
     expect(convertM3eDocument({ frames: [], groups: [] })).toBeNull();
@@ -289,6 +340,7 @@ describe('M3E compatibility importer', () => {
           items: [
             { id: 'unknown', kind: 'unknownPart', label: '独自パーツ' },
             { id: 'bad-action', kind: 'button', label: '開く', action: { to: 'missing' } },
+            { id: 'fab', kind: 'fab', label: '', icon: 'add', variant: 'tonal' },
             null,
           ],
         },
@@ -303,6 +355,7 @@ describe('M3E compatibility importer', () => {
       discardedItemCount: 1,
       unresolvedDestinationCount: 2,
       unsupportedKinds: ['unknownPart'],
+      approximatedKinds: ['fab'],
     });
   });
 

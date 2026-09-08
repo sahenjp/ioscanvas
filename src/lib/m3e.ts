@@ -150,6 +150,7 @@ export interface M3eCompatibilityReport {
   discardedItemCount: number;
   unresolvedDestinationCount: number;
   unsupportedKinds: string[];
+  approximatedKinds: string[];
 }
 
 export interface M3eExportCompatibilityReport {
@@ -176,6 +177,11 @@ const supportedM3eKinds = new Set([
   'searchBar', 'card', 'listItem', 'dialog', 'snackbar', 'textField', 'select', 'switch', 'checkbox',
   'slider', 'text', 'image', 'camera', 'map', 'divider', 'loadingIndicator', 'linearProgress',
   'circularProgress', 'splitButton', 'fabMenu', 'toolbar', 'tabs', 'radio', 'badge',
+]);
+
+const approximatedM3eKinds = new Set([
+  'box', 'iconButton', 'fab', 'extendedFab', 'chip', 'topAppBar', 'bottomNav', 'navRail',
+  'card', 'listItem', 'snackbar', 'checkbox', 'radio', 'splitButton', 'fabMenu', 'toolbar', 'badge',
 ]);
 
 const symbolAliases: Record<string, string> = {
@@ -992,6 +998,7 @@ export function inspectM3eCompatibility(value: unknown): M3eCompatibilityReport 
   const frames = rawFrames.map(readFrame).filter((frame): frame is M3eFrame => frame !== null);
   const frameIds = new Set(frames.map((frame) => frame.id));
   const unsupportedKinds = new Set<string>();
+  const approximatedKinds = new Set<string>();
   let invalidGroupCount = 0;
   let orphanedGroupCount = 0;
   let discardedItemCount = 0;
@@ -1015,6 +1022,7 @@ export function inspectM3eCompatibility(value: unknown): M3eCompatibilityReport 
       }
       const kind = stringValue(rawItem, 'kind');
       if (!kind || !supportedM3eKinds.has(kind)) unsupportedKinds.add(kind || 'unknown');
+      if (kind && approximatedM3eKinds.has(kind)) approximatedKinds.add(kind);
       const actionTargets = [
         recordValue(rawItem, 'action'),
         ...Object.values(recordValue(rawItem, 'actions') ?? {}).filter(isRecord),
@@ -1039,6 +1047,7 @@ export function inspectM3eCompatibility(value: unknown): M3eCompatibilityReport 
     discardedItemCount,
     unresolvedDestinationCount,
     unsupportedKinds: [...unsupportedKinds].sort(),
+    approximatedKinds: [...approximatedKinds].sort(),
   };
 }
 
@@ -1192,7 +1201,7 @@ function exportItem(node: CanvasNode, frameIds: Map<string, string>, inheritedNo
     case 'text':
       return base('text', node.text, null, { size: node.fontSize, ...(node.weight === 'bold' || node.weight === 'semibold' ? { bold: true } : {}) });
     case 'button':
-      return base('button', node.label, node.systemName ?? null, {
+      return base(node.label.trim() ? 'button' : node.systemName ? 'iconButton' : 'button', node.label, node.systemName ?? null, {
         ...(node.toggle ? { checked: node.toggle.isOn } : {}),
         action: exportAction(node, frameIds),
       });
@@ -1277,6 +1286,7 @@ function exportTabItem(node: CanvasNode): M3eExportTab {
     || (node.kind === 'text' ? node.text : node.kind === 'button' || node.kind === 'navigation-link' ? node.label : '')
     || 'タブ';
   const icon = node.tabSystemName
+    || (node.kind === 'button' ? node.systemName : null)
     || (node.kind === 'image' ? node.systemName : null);
   return { label, icon: icon || null };
 }
@@ -1339,6 +1349,26 @@ function exportCardPresentation(node: ContainerNode): Pick<M3eExportItem, 'icon'
   };
 }
 
+function exportToolbarNode(node: ContainerNode, frameIds: Map<string, string>, inheritedNote: string): M3eExportItem | null {
+  if (node.kind !== 'hstack' || node.children.length === 0 || node.children.some((child) => child.kind !== 'button')) return null;
+  const buttons = node.children.filter((child): child is Extract<CanvasNode, { kind: 'button' }> => child.kind === 'button');
+  if (buttons.some((button) => button.toggle)) return null;
+  const actions = Object.fromEntries(buttons.flatMap((button, index) => {
+    const action = exportAction(button, frameIds);
+    return action ? [[`tab:${index}`, action]] : [];
+  }));
+  return {
+    id: node.id,
+    kind: 'toolbar',
+    label: 'ツールバー',
+    icon: null,
+    variant: 'filled',
+    tabs: buttons.map((button) => exportTabItem(button)),
+    ...(Object.keys(actions).length > 0 ? { actions } : {}),
+    ...(exportNote(node, inheritedNote) ? { note: exportNote(node, inheritedNote) } : {}),
+  };
+}
+
 function exportSnackbarNode(node: ContainerNode, inheritedNote: string): M3eExportItem | null {
   if (node.kind !== 'hstack' || node.background !== 'material' || node.cornerRadius !== 12 || node.children.length < 1 || node.children.length > 2) return null;
   const message = node.children.find((child): child is Extract<CanvasNode, { kind: 'text' }> => child.kind === 'text');
@@ -1369,6 +1399,8 @@ function exportContainerItems(node: ContainerNode, frameIds: Map<string, string>
 
   const snackbar = exportSnackbarNode(node, inheritedNote);
   if (snackbar) return [snackbar];
+  const toolbar = exportToolbarNode(node, frameIds, inheritedNote);
+  if (toolbar) return [toolbar];
 
   const containerNote = node.kind === 'zstack'
     ? [inheritedNote, 'SwiftUI ZStackの重なりを含みます。'].filter(Boolean).join('\n')
