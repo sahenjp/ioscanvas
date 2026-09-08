@@ -568,7 +568,7 @@ function collectBindings(
       const key = node.kind === 'datepicker' ? dateBindingKey(node) : bindingKey(node);
       if (!result.has(key)) {
         const type = node.kind === 'toggle' ? 'Bool' : node.kind === 'datepicker' ? 'Date' : node.kind === 'colorpicker' ? 'Color' : node.kind === 'slider' || node.kind === 'stepper' ? 'Double' : 'String';
-        const initial = node.kind === 'toggle' ? 'false' : node.kind === 'datepicker' ? 'Date()' : node.kind === 'colorpicker' ? swiftColorLiteral(node.color) : node.kind === 'picker' ? quoted(node.options[0] ?? '') : node.kind === 'slider' || node.kind === 'stepper' ? String(node.value) : '""';
+        const initial = node.kind === 'toggle' ? String(node.isOn ?? false) : node.kind === 'datepicker' ? 'Date()' : node.kind === 'colorpicker' ? swiftColorLiteral(node.color) : node.kind === 'picker' ? quoted(node.options[0] ?? '') : node.kind === 'slider' || node.kind === 'stepper' ? String(node.value) : '""';
         const base = swiftIdentifier(node.binding, `value_${swiftIdentifier(node.id, 'node')}`);
         let name = base;
         let suffix = 2;

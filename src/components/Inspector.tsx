@@ -571,6 +571,11 @@ export function Inspector() {
                 <DraftInput key={`${node.id}-binding-${node.binding}`} value={node.binding} onCommit={(value) => updateSelectedNode({ binding: value.replace(/\s+/g, '') } as Partial<CanvasNode>)} />
               </Field>
             )}
+            {node.kind === 'toggle' && (
+              <Field label="初期状態">
+                <input className="toggle-input" type="checkbox" checked={node.isOn ?? false} onChange={(event) => updateSelectedNode({ isOn: event.target.checked } as Partial<CanvasNode>)} />
+              </Field>
+            )}
             {node.kind === 'searchfield' && (
               <Field label="プレースホルダー">
                 <DraftInput key={`${node.id}-prompt-${node.prompt}`} value={node.prompt} onCommit={(value) => updateSelectedNode({ prompt: value } as Partial<CanvasNode>)} />

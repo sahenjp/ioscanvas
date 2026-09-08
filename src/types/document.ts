@@ -145,6 +145,7 @@ export interface ToggleNode extends BaseNode {
   kind: 'toggle';
   label: string;
   binding: string;
+  isOn?: boolean;
   minHeight: number;
 }
 

@@ -33,6 +33,21 @@ const m3eDocument = {
       axis: 'y',
       items: [{ id: 'detail-text', kind: 'text', label: '材料', size: 28, bold: true, icon: null, variant: 'filled' }],
     },
+    {
+      id: 'home-nav',
+      x: 0,
+      y: 788,
+      axis: 'x',
+      items: [{
+        id: 'nav',
+        kind: 'bottomNav',
+        label: '',
+        icon: null,
+        variant: 'filled',
+        tabs: [{ icon: 'home', label: 'ホーム' }, { icon: 'arrow_forward', label: '詳細' }],
+        actions: { 'tab:1': { to: 'detail', transition: 'fade' } },
+      }],
+    },
   ],
 };
 
@@ -49,13 +64,14 @@ describe('M3E compatibility importer', () => {
       appearance: { colorScheme: 'dark', accentColor: 'custom', accentHex: '#14b8a6', fontDesign: 'serif' },
     });
     const home = document?.screens[0];
+    const detail = document?.screens[1];
     expect(home).toMatchObject({ name: 'ホーム', navigationTitle: 'ホーム', notes: '一覧画面' });
     expect(home?.toolbarItems).toEqual(expect.arrayContaining([
       expect.objectContaining({ placement: 'topBarLeading', systemName: 'line.3.horizontal' }),
       expect.objectContaining({ placement: 'topBarTrailing', systemName: 'gearshape.fill' }),
+      expect.objectContaining({ placement: 'bottomBar', title: '詳細', destinationScreenId: detail?.id }),
     ]));
 
-    const detail = document?.screens[1];
     const recipeRow = home ? findNode(home.root.children, 'm3e-row-recipe') : undefined;
     expect(recipeRow).toMatchObject({
       kind: 'navigation-link',
@@ -71,5 +87,38 @@ describe('M3E compatibility importer', () => {
   it('rejects values that are not M3E project documents', () => {
     expect(isM3eDocument({ screens: [] })).toBe(false);
     expect(convertM3eDocument({ frames: [], groups: [] })).toBeNull();
+  });
+
+  it('keeps a toggle button valid when its M3E action also names a destination', () => {
+    const document = convertM3eDocument({
+      frames: [{ id: 'home', name: 'ホーム', x: 0, y: 0 }, { id: 'next', name: '次', x: 492, y: 0 }],
+      groups: [{
+        id: 'controls',
+        x: 16,
+        y: 80,
+        axis: 'y',
+        items: [{ id: 'favorite', kind: 'button', label: 'お気に入り', icon: 'favorite', variant: 'filled', checked: false, action: { to: 'next', transition: 'slide' } }],
+      }],
+    });
+
+    expect(document).not.toBeNull();
+    expect(document?.screens[0]?.root.children[0]).toMatchObject({ kind: 'button', toggle: { isOn: false } });
+  });
+
+  it('preserves checked state for native toggle controls', () => {
+    const document = convertM3eDocument({
+      frames: [{ id: 'home', name: 'ホーム', x: 0, y: 0 }],
+      groups: [{
+        id: 'settings',
+        x: 16,
+        y: 80,
+        axis: 'y',
+        items: [{ id: 'notifications', kind: 'switch', label: '通知', icon: null, variant: 'filled', checked: true }],
+      }],
+    });
+
+    expect(document?.screens[0]?.root.children[0]).toMatchObject({ kind: 'toggle', isOn: true });
+    if (!document) throw new Error('M3E document was not converted');
+    expect(generateSwiftUI(document)).toContain('@State private var is_notifications: Bool = true');
   });
 });

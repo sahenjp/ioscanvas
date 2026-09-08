@@ -1311,7 +1311,7 @@ function symbolGlyph(systemName: string): string {
 function initialPreviewValue(node: CanvasNode): PreviewValue {
   switch (node.kind) {
     case 'button': return node.toggle?.isOn ?? false;
-    case 'toggle': return false;
+    case 'toggle': return node.isOn ?? false;
     case 'tabview': return 0;
     case 'disclosure-group': return true;
     case 'picker':

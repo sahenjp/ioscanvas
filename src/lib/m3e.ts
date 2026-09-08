@@ -191,8 +191,34 @@ function appendNotes(node: CanvasNode, item: JsonObject, extra: string[] = []): 
 
 function setButtonAction(node: Extract<CanvasNode, { kind: 'button' }>, item: JsonObject, context: ConversionContext): void {
   const action = actionTarget(item, context);
-  if (action.destination) node.destinationScreenId = action.destination;
+  if (action.destination) {
+    if (node.toggle) {
+      node.notes = [node.notes, 'M3Eのトグル状態を優先しました。遷移先は実装時に組み合わせてください。'].filter(Boolean).join('\n');
+    } else {
+      node.destinationScreenId = action.destination;
+    }
+  }
   if (action.back) node.notes = [node.notes, 'タップで前の画面へ戻る'].filter(Boolean).join('\n');
+}
+
+function linkM3eNode(node: CanvasNode, item: JsonObject, context: ConversionContext, fallbackLabel: string): CanvasNode {
+  const annotated = appendNotes(node, item);
+  const action = actionTarget(item, context);
+  if (action.back) {
+    annotated.notes = [annotated.notes, 'タップで前の画面へ戻る'].filter(Boolean).join('\n');
+    return annotated;
+  }
+  if (!action.destination) return annotated;
+
+  return {
+    id: stableId('m3e-link', node.id, context.usedIds),
+    kind: 'navigation-link',
+    label: labelOf(item, fallbackLabel),
+    destinationScreenId: action.destination,
+    minHeight: 44,
+    children: [annotated],
+    notes: 'タップで画面へ遷移',
+  };
 }
 
 function imageNode(id: string, icon: string | undefined, source: ImageSource, label: string): Extract<CanvasNode, { kind: 'image' }> {
@@ -209,23 +235,32 @@ function tabViewNode(item: JsonObject, context: ConversionContext): CanvasNode {
   const id = stableId('m3e-tabview', stringValue(item, 'id') ?? 'tabs', context.usedIds);
   const children = tabEntries(item).map((tab, index) => {
     const title = labelOf(tab, `タブ${index + 1}`);
-    return {
-      id: stableId('m3e-tab', `${stringValue(item, 'id') ?? 'tabs'}-${index}`, context.usedIds),
-      kind: 'text' as const,
-      text: title,
-      fontSize: 17,
-      weight: 'regular' as const,
-      tabTitle: title,
-      tabSystemName: iconOf(tab) ?? 'square',
-      notes: (() => {
-        const action = recordValue(item, 'actions');
-        const tabAction = action && recordValue(action, `tab:${index}`);
-        const target = tabAction && stringValue(tabAction, 'to');
-        return target && target !== 'back' && context.frameIds.has(target)
-          ? `M3Eのタブ遷移先: ${target}`
-          : undefined;
-      })(),
-    };
+    const tabId = stableId('m3e-tab', `${stringValue(item, 'id') ?? 'tabs'}-${index}`, context.usedIds);
+    const actions = recordValue(item, 'actions');
+    const tabAction = actions && recordValue(actions, `tab:${index}`);
+    const target = tabAction && stringValue(tabAction, 'to');
+    const destination = target && target !== 'back' ? context.frameIds.get(target) : undefined;
+    return destination
+      ? {
+          id: tabId,
+          kind: 'navigation-link' as const,
+          label: title,
+          destinationScreenId: destination,
+          minHeight: 44,
+          tabTitle: title,
+          tabSystemName: iconOf(tab) ?? 'square',
+          notes: 'M3Eのタブ操作をNavigationLinkへ変換しました。',
+        }
+      : {
+          id: tabId,
+          kind: 'text' as const,
+          text: title,
+          fontSize: 17,
+          weight: 'regular' as const,
+          tabTitle: title,
+          tabSystemName: iconOf(tab) ?? 'square',
+          notes: target === 'back' ? 'M3Eのタブ操作は前の画面へ戻る動作です。' : undefined,
+        };
   });
   return appendNotes({ id, kind: 'tabview', children }, item);
 }
@@ -271,6 +306,7 @@ function listItemNode(item: JsonObject, context: ConversionContext): CanvasNode 
       kind: 'toggle',
       label,
       binding: `is_${stringValue(item, 'id') ?? 'Enabled'}`,
+      ...(booleanValue(item, 'checked') === undefined ? {} : { isOn: booleanValue(item, 'checked') }),
       minHeight: 44,
     });
   } else if (iconOf(item, 'icon2')) {
@@ -324,6 +360,9 @@ function mapItem(item: JsonObject, context: ConversionContext): CanvasNode | nul
         label: label || (item.kind === 'iconButton' || item.kind === 'fab' ? '' : 'アクション'),
         role: 'normal',
         minHeight: item.kind === 'chip' ? 44 : 44,
+        ...(item.kind === 'iconButton' || item.kind === 'fab'
+          ? { accessibilityLabel: label || (item.kind === 'fab' ? '追加' : '操作') }
+          : {}),
         ...(icon ? { systemName: icon } : {}),
         ...(style ? { buttonStyle: style } : {}),
       };
@@ -350,20 +389,22 @@ function mapItem(item: JsonObject, context: ConversionContext): CanvasNode | nul
     }
     case 'switch':
     case 'checkbox':
-    case 'radio':
-      return appendNotes({ id, kind: 'toggle', label: label || '設定', binding: `is_${sourceId}`, minHeight: 44 }, item);
+    case 'radio': {
+      const checked = booleanValue(item, 'checked');
+      return appendNotes({ id, kind: 'toggle', label: label || '設定', binding: `is_${sourceId}`, ...(checked === undefined ? {} : { isOn: checked }), minHeight: 44 }, item);
+    }
     case 'slider': {
       const value = Math.max(0, Math.min(100, numberValue(item, 'value') ?? 50));
       return appendNotes({ id, kind: 'slider', label: label || '値', binding: `value_${sourceId}`, value, minimum: 0, maximum: 100, step: 1, minHeight: 44 }, item);
     }
     case 'text': {
       const fontSize = Math.max(11, numberValue(item, 'size') ?? 17);
-      return appendNotes({ id, kind: 'text', text: label || 'テキスト', fontSize, weight: booleanValue(item, 'bold') ? 'bold' : 'regular', textStyle: fontSize >= 28 ? 'title' : 'body' }, item);
+      return linkM3eNode({ id, kind: 'text', text: label || 'テキスト', fontSize, weight: booleanValue(item, 'bold') ? 'bold' : 'regular', textStyle: fontSize >= 28 ? 'title' : 'body' }, item, context, 'テキスト');
     }
     case 'image': {
       const src = stringValue(item, 'src');
       const node = imageNode(id, imageSource === 'remote' ? src : icon, imageSource, label || '画像');
-      return appendNotes(node, item);
+      return linkM3eNode(node, item, context, '画像');
     }
     case 'camera':
       return appendNotes(imageNode(id, 'camera.fill', 'symbol', label || 'カメラ'), item, ['M3EのカメラプレースホルダーをImageとして読み込みました。']);
@@ -388,7 +429,7 @@ function mapItem(item: JsonObject, context: ConversionContext): CanvasNode | nul
       if (label) children.push({ id: stableId('m3e-card-title', sourceId, context.usedIds), kind: 'text', text: label, fontSize: 20, weight: 'semibold', textStyle: 'headline' });
       const supporting = stringValue(item, 'supporting')?.trim();
       if (supporting) children.push({ id: stableId('m3e-card-body', sourceId, context.usedIds), kind: 'text', text: supporting, fontSize: 17, weight: 'regular', textStyle: 'body' });
-      return appendNotes({ id, kind: 'groupbox', title: label || 'カード', children }, item);
+      return linkM3eNode({ id, kind: 'groupbox', title: label || 'カード', children }, item, context, 'カード');
     }
     case 'listItem':
       return listItemNode(item, context);
@@ -398,7 +439,18 @@ function mapItem(item: JsonObject, context: ConversionContext): CanvasNode | nul
       return appendNotes({ id, kind: 'text', text: label || '通知', fontSize: 15, weight: 'regular', textStyle: 'callout' }, item, ['M3EのSnackbarです。実装時はToastまたは独自の表示状態へ置き換えてください。']);
     case 'fabMenu':
     case 'toolbar': {
-      const children = tabEntries(item).map((tab, index) => mapItem({ ...tab, id: `${sourceId}-${index}`, kind: 'iconButton', label: labelOf(tab, 'アクション'), icon: iconOf(tab) ?? 'ellipsis' }, context)).filter((node): node is CanvasNode => node !== null);
+      const actions = recordValue(item, 'actions');
+      const children = tabEntries(item).map((tab, index) => {
+        const action = actions && recordValue(actions, `tab:${index}`);
+        return mapItem({
+          ...tab,
+          id: `${sourceId}-${index}`,
+          kind: 'iconButton',
+          label: labelOf(tab, 'アクション'),
+          icon: iconOf(tab) ?? 'ellipsis',
+          ...(action ? { action } : {}),
+        }, context);
+      }).filter((node): node is CanvasNode => node !== null);
       return appendNotes({ id, kind: 'hstack', spacing: 8, alignment: 'center', children }, item);
     }
     case 'navRail': {
@@ -447,6 +499,23 @@ function toolbarItem(item: JsonObject, icon: string | undefined, placement: Tool
   };
 }
 
+function bottomNavigationItems(item: JsonObject, context: ConversionContext): ToolbarItem[] {
+  const sourceId = stringValue(item, 'id') ?? 'bottom-nav';
+  const actions = recordValue(item, 'actions');
+  return tabEntries(item).map((tab, index) => {
+    const action = actions && recordValue(actions, `tab:${index}`);
+    const target = action && stringValue(action, 'to');
+    const destination = target && target !== 'back' ? context.frameIds.get(target) : undefined;
+    return {
+      id: stableId('m3e-bottom-nav', `${sourceId}-${index}`, context.usedIds),
+      title: labelOf(tab, `タブ${index + 1}`),
+      ...(iconOf(tab) ? { systemName: iconOf(tab) } : {}),
+      placement: 'bottomBar' as const,
+      ...(destination ? { destinationScreenId: destination } : {}),
+    };
+  });
+}
+
 function groupsForScreen(groups: M3eGroup[], frame: M3eFrame, frames: M3eFrame[]): M3eGroup[] {
   return groups
     .filter((group) => frameForGroup(group, frames)?.id === frame.id)
@@ -468,6 +537,10 @@ function convertScreen(frame: M3eFrame, groups: M3eGroup[], frames: M3eFrame[], 
         const trailing = toolbarItem(item, iconOf(item, 'icon2'), 'topBarTrailing', 'icon2', context);
         if (leading) toolbarItems.push(leading);
         if (trailing) toolbarItems.push(trailing);
+        continue;
+      }
+      if (item.kind === 'bottomNav') {
+        toolbarItems.push(...bottomNavigationItems(item, context));
         continue;
       }
       if (item.kind === 'navRail') {

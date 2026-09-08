@@ -207,8 +207,8 @@ function readNode(value: unknown, ids: Set<string>): CanvasNode | null {
           }
         : null;
     case 'toggle':
-      return isString(value.label) && isString(value.binding) && isNonNegativeNumber(value.minHeight)
-        ? { id: value.id, kind: 'toggle', label: value.label, binding: value.binding, minHeight: value.minHeight, ...nodeProperties }
+      return isString(value.label) && isString(value.binding) && (value.isOn === undefined || typeof value.isOn === 'boolean') && isNonNegativeNumber(value.minHeight)
+        ? { id: value.id, kind: 'toggle', label: value.label, binding: value.binding, ...(value.isOn === undefined ? {} : { isOn: value.isOn }), minHeight: value.minHeight, ...nodeProperties }
         : null;
     case 'textfield':
       return isString(value.label) && isString(value.binding) && isNonNegativeNumber(value.minHeight)
