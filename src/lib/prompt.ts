@@ -3,51 +3,123 @@ import type { CanvasDocument, CanvasNode } from '../types/document';
 
 function describe(node: CanvasNode, depth = 0): string[] {
   const pad = '  '.repeat(depth);
-  const common = `${pad}- ${node.kind}${node.glass ? ` / glass=${node.glass}` : ''}`;
+  const common = `${pad}- ${node.kind}${node.glass ? ` / glass=${node.glass}` : ''}${node.glassInteractive ? ' / interactive' : ''}${node.glassTint ? ` / tint=${node.glassTint}` : ''}${node.glassShape && node.glassShape !== 'automatic' ? ` / glassShape=${node.glassShape}` : ''}${node.padding ? ` / padding=${node.padding}pt` : ''}${node.frameWidth === 'max' ? ' / frame=max' : ''}${node.background && node.background !== 'none' ? ` / background=${node.background}` : ''}${node.cornerRadius ? ` / cornerRadius=${node.cornerRadius}` : ''}${node.overlay ? ' / overlay' : ''}${node.shadow && node.shadow !== 'none' ? ` / shadow=${node.shadow}` : ''}${node.notes?.trim() ? ` / memo=${node.notes.trim()}` : ''}`;
   switch (node.kind) {
     case 'text':
-      return [`${common}: ${node.text} / ${node.fontSize}pt / ${node.weight}`];
+      return [`${common}: ${node.text} / ${node.textStyle && node.textStyle !== 'custom' ? node.textStyle : `${node.fontSize}pt`} / ${node.weight}${node.fontDesign && node.fontDesign !== 'default' ? ` / design=${node.fontDesign}` : ''}${node.textAlignment && node.textAlignment !== 'leading' ? ` / alignment=${node.textAlignment}` : ''}${node.lineLimit ? ` / lineLimit=${node.lineLimit}` : ''}`];
     case 'button':
-      return [`${common}: ${node.label} / role=${node.role}`];
+      return [`${common}: ${node.label} / role=${node.role}${node.buttonStyle && node.buttonStyle !== 'automatic' ? ` / style=${node.buttonStyle}` : ''}${node.systemName ? ` / symbol=${node.systemName}` : ''}${node.accessibilityLabel ? ` / accessibility=${node.accessibilityLabel}` : ''}${node.toggle ? ` / toggle=${node.toggle.isOn ? 'on' : 'off'} / onLabel=${node.toggle.onLabel}${node.toggle.onSystemName ? ` / onSymbol=${node.toggle.onSystemName}` : ''}` : ''}${node.destinationScreenId ? ` / destination=${node.destinationScreenId}` : ''}`];
+    case 'alert':
+      return [`${common}: ${node.label} / title=${node.title} / message=${node.message} / primary=${node.primaryButton}${node.secondaryButton ? ` / secondary=${node.secondaryButton}` : ''}`];
+    case 'confirmation-dialog':
+      return [`${common}: ${node.label} / title=${node.title} / message=${node.message} / options=${node.options.join(', ')}${node.cancelButton ? ` / cancel=${node.cancelButton}` : ''}`];
     case 'toggle':
       return [`${common}: ${node.label} / binding=${node.binding}`];
     case 'textfield':
       return [`${common}: ${node.label} / binding=${node.binding}`];
+    case 'searchfield':
+      return [`${common}: ${node.label} / binding=${node.binding} / prompt=${node.prompt}`];
+    case 'securefield':
+      return [`${common}: ${node.label} / binding=${node.binding}`];
+    case 'texteditor':
+      return [`${common}: ${node.label} / binding=${node.binding}`];
     case 'picker':
       return [`${common}: ${node.label} / binding=${node.binding} / options=${node.options.join(', ')}`];
+    case 'colorpicker':
+      return [`${common}: ${node.label} / binding=${node.binding} / color=${node.color}`];
+    case 'slider':
+    case 'stepper':
+      return [`${common}: ${node.label} / binding=${node.binding} / value=${node.value} / range=${node.minimum}...${node.maximum} / step=${node.step}`];
+    case 'menu':
+      return [`${common}: ${node.label} / options=${node.options.join(', ')}`];
     case 'progress':
       return [`${common}: ${node.label} / value=${Math.round(node.value * 100)}%`];
+    case 'gauge':
+      return [`${common}: ${node.label} / value=${node.value} / range=${node.minimum}...${node.maximum}`];
+    case 'content-unavailable':
+      return [`${common}: ${node.title} / symbol=${node.systemName}${node.description ? ` / description=${node.description}` : ''}`];
     case 'navigation-link':
       return [`${common}: ${node.label} / destination=${node.destinationScreenId || 'unset'}`];
+    case 'label':
+      return [`${common}: ${node.title} / symbol=${node.systemName} / accessibility=${node.accessibilityLabel || 'decorative'}`];
+    case 'link':
+      return [`${common}: ${node.label} / url=${node.url}`];
+    case 'datepicker':
+      return [`${common}: ${node.label} / binding=${node.binding}`];
     case 'image':
-      return [`${common}: ${node.systemName} / accessibility=${node.accessibilityLabel || 'decorative'}`];
+      return [`${common}: ${node.systemName} / source=${node.source ?? 'symbol'} / accessibility=${node.accessibilityLabel || 'decorative'}`];
     case 'section':
       return [`${common}: ${node.title ?? 'Section'}`, ...node.children.flatMap((child) => describe(child, depth + 1))];
     case 'vstack':
     case 'hstack':
+    case 'lazyvstack':
+    case 'lazyhstack':
+    case 'zstack':
+    case 'navigation-split-view':
+    case 'glass-container':
+    case 'group':
+    case 'tabview':
+    case 'disclosure-group':
+    case 'sheet':
+    case 'groupbox':
+      return [`${common}${node.title ? `: ${node.title}` : ''}`, ...node.children.flatMap((child) => describe(child, depth + 1))];
+    case 'lazyvgrid':
+    case 'lazyhgrid':
+    case 'scrollview':
     case 'list':
     case 'form':
-      return [common, ...node.children.flatMap((child) => describe(child, depth + 1))];
+      return [`${common}${node.kind === 'lazyvgrid' ? ` / columns=${node.columns ?? 2}` : node.kind === 'lazyhgrid' ? ` / rows=${node.rows ?? 2}` : ''}`, ...node.children.flatMap((child) => describe(child, depth + 1))];
     default:
       return [common];
   }
 }
 
-export function generateImplementationPrompt(document: CanvasDocument): string {
+export type PromptScope = 'active' | 'all';
+
+function screenDetails(screen: CanvasDocument['screens'][number], document: CanvasDocument): string[] {
+  const toolbar = (screen.toolbarItems ?? []).map((item) => `${item.placement}: ${item.title}${item.systemName ? ` / symbol=${item.systemName}` : ''}${item.destinationScreenId ? ` / destination=${document.screens.find((candidate) => candidate.id === item.destinationScreenId)?.name ?? '未設定'}` : ''}`).join(', ') || 'なし';
+  const navigation = navigationLinks(screen.root.children)
+    .map((node) => `${node.label}=${document.screens.find((candidate) => candidate.id === node.destinationScreenId)?.name ?? '未設定'}`)
+    .join(', ') || 'なし';
+  const swipe = Object.entries(screen.swipe ?? {}).map(([direction, destination]) => `${direction}=${document.screens.find((candidate) => candidate.id === destination)?.name ?? destination}`).join(', ') || 'なし';
+
+  return [
+    `画面: ${screen.name}`,
+    `ナビゲーションタイトル: ${screen.navigationTitle}`,
+    ...(screen.notes?.trim() ? [`画面メモ: ${screen.notes.trim()}`] : []),
+    `タイトル表示: ${screen.navigationTitleDisplayMode ?? 'automatic'}`,
+    `ツールバー: ${toolbar}`,
+    `NavigationLink遷移: ${navigation}`,
+    `スワイプ遷移: ${swipe}`,
+    '構造:',
+    ...screen.root.children.flatMap((node) => describe(node)),
+  ];
+}
+
+function navigationLinks(nodes: CanvasNode[]): Extract<CanvasNode, { kind: 'navigation-link' | 'button' }>[] {
+  return nodes.flatMap((node) => [
+    ...(node.kind === 'navigation-link' || node.kind === 'button' ? (node.destinationScreenId ? [node] : []) : []),
+    ...(node.children ? navigationLinks(node.children) : []),
+  ]);
+}
+
+export function generateImplementationPrompt(document: CanvasDocument, scope: PromptScope = 'active'): string {
   const screen = document.screens.find((candidate) => candidate.id === document.activeScreenId) ?? document.screens[0];
   if (!screen) return '';
+  const screens = scope === 'all' ? document.screens : [screen];
   const issues = lintDocument(document);
 
   return [
-    'SwiftUIでこの画面を実装してください。',
+    `SwiftUIで${scope === 'all' ? 'この設計全体' : 'この画面'}を実装してください。`,
     '',
+    `プロジェクト: ${document.name}`,
     `対象: iOS ${document.minimumOS}以降 / SwiftUI`,
-    `画面: ${screen.name}`,
-    `ナビゲーションタイトル: ${screen.navigationTitle}`,
-    `外観: ${document.appearance.colorScheme} / tint=${document.appearance.accentColor}`,
+    `外観: ${document.appearance.colorScheme} / tint=${document.appearance.accentColor === 'custom' ? document.appearance.accentHex ?? '#007AFF' : document.appearance.accentColor} / fontDesign=${document.appearance.fontDesign ?? 'default'}`,
     '',
-    '構造:',
-    ...screen.root.children.flatMap((node) => describe(node)),
+    ...screens.flatMap((candidate, index) => [
+      ...(scope === 'all' && index > 0 ? [''] : []),
+      ...screenDetails(candidate, document),
+    ]),
     '',
     '実装ルール:',
     '- SwiftUI標準コンポーネントを優先し、iOS標準UIをCSS的に再現しない。',

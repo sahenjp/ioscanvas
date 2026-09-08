@@ -2,15 +2,13 @@ import { useRef, useState } from 'react';
 import { parseCanvasDocument } from '../lib/document';
 import { lintDocument } from '../lib/hig';
 import { findNode } from '../lib/nodes';
+import { copyText, createShareUrl } from '../lib/share';
 import { useEditorStore } from '../store/editor';
 
 export function TopBar() {
   const document = useEditorStore((state) => state.document);
   const selectScreen = useEditorStore((state) => state.selectScreen);
   const selectNode = useEditorStore((state) => state.selectNode);
-  const addScreen = useEditorStore((state) => state.addScreen);
-  const duplicateActiveScreen = useEditorStore((state) => state.duplicateActiveScreen);
-  const deleteActiveScreen = useEditorStore((state) => state.deleteActiveScreen);
   const previewMode = useEditorStore((state) => state.previewMode);
   const setPreviewMode = useEditorStore((state) => state.setPreviewMode);
   const loadDocument = useEditorStore((state) => state.loadDocument);
@@ -20,8 +18,13 @@ export function TopBar() {
   const redo = useEditorStore((state) => state.redo);
   const canUndo = useEditorStore((state) => state.past.length > 0);
   const canRedo = useEditorStore((state) => state.future.length > 0);
+  const selectedNodeId = useEditorStore((state) => state.selectedNodeId);
+  const clipboard = useEditorStore((state) => state.clipboard);
+  const copySelectedNode = useEditorStore((state) => state.copySelectedNode);
+  const pasteNode = useEditorStore((state) => state.pasteNode);
   const fileInput = useRef<HTMLInputElement>(null);
   const [fileError, setFileError] = useState<string | null>(null);
+  const [shareState, setShareState] = useState<'idle' | 'copied' | 'error'>('idle');
   const issues = lintDocument(document);
   const warnings = issues.filter((issue) => issue.severity === 'warning').length;
   const notes = issues.length - warnings;
@@ -61,49 +64,72 @@ export function TopBar() {
       loadDocument(parsed);
       setFileError(null);
     } catch {
-      setFileError('Could not open that project file.');
+      setFileError('プロジェクトファイルを開けませんでした。');
     }
+  };
+
+  const shareProject = async () => {
+    try {
+      await copyText(createShareUrl(document, window.location.href));
+      setShareState('copied');
+      window.setTimeout(() => setShareState('idle'), 1600);
+    } catch {
+      setShareState('error');
+    }
+  };
+
+  const resetProject = () => {
+    if (window.confirm('現在のプロジェクトを初期状態に戻します。変更内容はUndoで戻せます。続けますか？')) resetDocument();
   };
 
   return (
     <header className="topbar">
       <div className="topbar-brand">
-        <div className="brand-mark" aria-label="S3E Canvas"><span className="brand-square" />S3E Canvas</div>
+        <div className="brand-mark" aria-label="S3E Canvas">S3E Canvas</div>
+        <span className="brand-divider" aria-hidden="true" />
         <div className="topbar-document">
-          <span className="topbar-eyebrow">Design file</span>
-          <span className="document-name">{document.name}</span>
+          <span className="topbar-eyebrow">プロジェクト</span>
+          <strong className="document-name">{document.name}</strong>
         </div>
       </div>
-      <div className="topbar-context">
-        <span>Screen</span>
-        <select value={document.activeScreenId} onChange={(event) => selectScreen(event.target.value)} aria-label="Active screen">
-          {document.screens.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.name}</option>)}
-        </select>
-      </div>
-      <div className="screen-actions">
-        <button className="compact-toolbar-button" type="button" onClick={addScreen} aria-label="Add screen" title="Add screen">+</button>
-        <button className="compact-toolbar-button" type="button" onClick={duplicateActiveScreen} aria-label="Duplicate screen" title="Duplicate screen">⧉</button>
-        <button className="compact-toolbar-button" type="button" onClick={deleteActiveScreen} disabled={document.screens.length <= 1} aria-label="Delete screen" title="Delete screen">−</button>
-      </div>
+
+      <nav className="topbar-edit-actions" aria-label="編集操作">
+        <button className="toolbar-button history-button" type="button" onClick={undo} disabled={!canUndo} aria-label="元に戻す" title="元に戻す">
+          <span aria-hidden="true">↶</span><span>元に戻す</span>
+        </button>
+        <button className="toolbar-button history-button" type="button" onClick={redo} disabled={!canRedo} aria-label="やり直す" title="やり直す">
+          <span aria-hidden="true">↷</span><span>やり直す</span>
+        </button>
+        <span className="toolbar-divider" aria-hidden="true" />
+        <button className="toolbar-button clipboard-button" type="button" onClick={copySelectedNode} disabled={!selectedNodeId} title="選択した要素をコピー（⌘C / Ctrl+C）">コピー</button>
+        <button className="toolbar-button clipboard-button" type="button" onClick={pasteNode} disabled={!clipboard} title="コピーした要素を貼り付け（⌘V / Ctrl+V）">貼り付け</button>
+        <span className="toolbar-divider" aria-hidden="true" />
+        <button className={`toolbar-button preview-button ${previewMode ? 'is-active' : ''}`} type="button" onClick={() => setPreviewMode(!previewMode)} aria-pressed={previewMode}>
+          {previewMode ? '編集に戻る' : 'プレビュー'}
+        </button>
+      </nav>
+
       <div className="topbar-spacer" />
+
       <div className="topbar-status">
-        <button className={`lint-status ${warnings > 0 ? 'has-issues' : ''}`} type="button" onClick={focusFirstIssue} disabled={issues.length === 0} aria-label="Show first HIG issue">
-          <span className="status-dot" aria-hidden="true" />
-          <span>{warnings === 0 ? 'HIG clean' : `${warnings} warning${warnings === 1 ? '' : 's'}`}</span>
-          {notes > 0 && <span className="status-notes">{notes} note{notes === 1 ? '' : 's'}</span>}
+        <button className={`lint-status ${warnings > 0 ? 'has-issues' : ''}`} type="button" onClick={focusFirstIssue} disabled={issues.length === 0} aria-label="HIGチェックを表示">
+          <span className="status-label">HIG</span>
+          <span>{warnings === 0 ? '問題なし' : `${warnings}件の警告`}</span>
+          {notes > 0 && <span className="status-notes">補足 {notes}</span>}
         </button>
         {fileError && <span className="project-error" role="status">{fileError}</span>}
       </div>
+
       <div className="topbar-actions">
         <input ref={fileInput} className="visually-hidden" type="file" accept=".json,.ioscanvas,application/json" onChange={openProject} />
-        <button className="toolbar-button" type="button" onClick={() => fileInput.current?.click()}>Open</button>
-        <button className="toolbar-button" type="button" onClick={saveProject}>Save</button>
+        <button className="toolbar-button" type="button" onClick={() => fileInput.current?.click()}>開く</button>
+        <button className="toolbar-button" type="button" onClick={saveProject}>保存</button>
+        <button className="toolbar-button" type="button" onClick={shareProject} aria-label="共有リンクをコピー">
+          {shareState === 'copied' ? 'リンクをコピーしました' : shareState === 'error' ? '共有できません' : '共有'}
+        </button>
         <span className="toolbar-divider" aria-hidden="true" />
-        <button className="toolbar-button history-button" type="button" onClick={undo} disabled={!canUndo} aria-label="Undo">↶</button>
-        <button className="toolbar-button history-button" type="button" onClick={redo} disabled={!canRedo} aria-label="Redo">↷</button>
-        <button className="toolbar-button" type="button" onClick={resetDocument}>Reset</button>
-        <button className={`toolbar-button preview-button ${previewMode ? 'is-active' : ''}`} type="button" onClick={() => setPreviewMode(!previewMode)} aria-pressed={previewMode}>{previewMode ? 'Edit' : 'Preview'}</button>
-        <button className="primary-toolbar-button" type="button" onClick={() => setExportOpen(true)}>Export code</button>
+        <button className="toolbar-button" type="button" onClick={resetProject}>リセット</button>
+        <button className="primary-toolbar-button" type="button" onClick={() => setExportOpen(true)}>SwiftUIを書き出す</button>
       </div>
     </header>
   );

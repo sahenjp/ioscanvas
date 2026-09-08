@@ -1,5 +1,5 @@
 import { isContainerNode } from './nodes';
-import type { AccentColor, CanvasDocument, CanvasNode, CanvasScreen, ColorScheme, GlassStyle, NodeKind } from '../types/document';
+import type { AccentColor, AppearanceAccentColor, BackgroundStyle, ButtonStyle, ButtonToggle, CanvasDocument, CanvasNode, CanvasScreen, ColorScheme, FontDesign, FrameWidth, GlassShape, GlassStyle, ImageSource, NavigationTitleDisplayMode, NodeKind, ShadowStyle, StackAlignment, SwipeDirection, TextAlignment, TextStyle, ToolbarItem, ToolbarPlacement } from '../types/document';
 
 type RecordValue = Record<string, unknown>;
 
@@ -15,38 +15,216 @@ function isNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value);
 }
 
+function isNonNegativeNumber(value: unknown): value is number {
+  return isNumber(value) && value >= 0;
+}
+
+function isHexColor(value: unknown): value is string {
+  return isString(value) && /^#[0-9a-f]{6}$/i.test(value);
+}
+
 function isOneOf<T extends string>(value: unknown, values: readonly T[]): value is T {
   return typeof value === 'string' && values.includes(value as T);
 }
 
 function readGlass(value: unknown): GlassStyle | null | undefined {
   if (value === undefined) return undefined;
-  return isOneOf(value, ['regular', 'clear']) ? value : null;
+  return isOneOf(value, ['regular', 'clear', 'prominent']) ? value : null;
+}
+
+function readButtonToggle(value: unknown): ButtonToggle | null | undefined {
+  if (value === undefined) return undefined;
+  if (!isRecord(value) || typeof value.isOn !== 'boolean' || !isString(value.onLabel)) return null;
+  if (value.onSystemName !== undefined && !isString(value.onSystemName)) return null;
+  if (value.onButtonStyle !== undefined && !isOneOf(value.onButtonStyle, ['automatic', 'plain', 'bordered', 'borderedProminent'])) return null;
+  return {
+    isOn: value.isOn,
+    onLabel: value.onLabel,
+    ...(value.onSystemName === undefined ? {} : { onSystemName: value.onSystemName }),
+    ...(value.onButtonStyle === undefined ? {} : { onButtonStyle: value.onButtonStyle as ButtonStyle }),
+  };
+}
+
+function readNodeProperties(value: RecordValue): {
+  tabTitle?: string;
+  tabSystemName?: string;
+  notes?: string;
+  glass?: GlassStyle;
+  glassInteractive?: boolean;
+  glassTint?: AccentColor;
+  glassShape?: GlassShape;
+  padding?: number;
+  frameWidth?: FrameWidth;
+  background?: BackgroundStyle;
+  cornerRadius?: number;
+  overlay?: boolean;
+  shadow?: ShadowStyle;
+} | null {
+  const glass = readGlass(value.glass);
+  if (glass === null) return null;
+  if (value.tabTitle !== undefined && !isString(value.tabTitle)) return null;
+  if (value.tabSystemName !== undefined && !isString(value.tabSystemName)) return null;
+  if (value.notes !== undefined && !isString(value.notes)) return null;
+  if (value.glassInteractive !== undefined && typeof value.glassInteractive !== 'boolean') return null;
+  if (value.glassTint !== undefined && !isOneOf(value.glassTint, ['blue', 'purple', 'pink', 'orange', 'green'])) return null;
+  if (value.glassShape !== undefined && !isOneOf(value.glassShape, ['automatic', 'capsule', 'rounded', 'circle'])) return null;
+  if (value.padding !== undefined && (!isNumber(value.padding) || value.padding < 0 || value.padding > 128)) return null;
+  if (value.frameWidth !== undefined && !isOneOf(value.frameWidth, ['fit', 'max'])) return null;
+  if (value.background !== undefined && !isOneOf(value.background, ['none', 'secondary', 'tertiary', 'accent', 'material'])) return null;
+  if (value.cornerRadius !== undefined && (!isNumber(value.cornerRadius) || value.cornerRadius < 0 || value.cornerRadius > 64)) return null;
+  if (value.overlay !== undefined && typeof value.overlay !== 'boolean') return null;
+  if (value.shadow !== undefined && !isOneOf(value.shadow, ['none', 'subtle', 'medium'])) return null;
+
+  return {
+    ...(value.tabTitle === undefined ? {} : { tabTitle: value.tabTitle }),
+    ...(value.tabSystemName === undefined ? {} : { tabSystemName: value.tabSystemName }),
+    ...(value.notes === undefined ? {} : { notes: value.notes }),
+    ...(glass === undefined ? {} : { glass }),
+    ...(value.glassInteractive === undefined ? {} : { glassInteractive: value.glassInteractive }),
+    ...(value.glassTint === undefined ? {} : { glassTint: value.glassTint as AccentColor }),
+    ...(value.glassShape === undefined ? {} : { glassShape: value.glassShape as GlassShape }),
+    ...(value.padding === undefined ? {} : { padding: value.padding }),
+    ...(value.frameWidth === undefined ? {} : { frameWidth: value.frameWidth as FrameWidth }),
+    ...(value.background === undefined ? {} : { background: value.background as BackgroundStyle }),
+    ...(value.cornerRadius === undefined ? {} : { cornerRadius: value.cornerRadius }),
+    ...(value.overlay === undefined ? {} : { overlay: value.overlay }),
+    ...(value.shadow === undefined ? {} : { shadow: value.shadow as ShadowStyle }),
+  };
+}
+
+function readToolbarItems(value: unknown, ids: Set<string>): ToolbarItem[] | null | undefined {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value)) return null;
+
+  const items: ToolbarItem[] = [];
+  for (const item of value) {
+    if (!isRecord(item) || !isString(item.id) || !isString(item.title) || !isOneOf(item.placement, ['topBarLeading', 'topBarTrailing', 'bottomBar'])) return null;
+    if (ids.has(item.id)) return null;
+    if (item.systemName !== undefined && !isString(item.systemName)) return null;
+    if (item.role !== undefined && !isOneOf(item.role, ['normal', 'destructive', 'cancel'])) return null;
+    if (item.destinationScreenId !== undefined && !isString(item.destinationScreenId)) return null;
+    ids.add(item.id);
+    items.push({
+      id: item.id,
+      title: item.title,
+      placement: item.placement as ToolbarPlacement,
+      ...(item.systemName === undefined ? {} : { systemName: item.systemName }),
+      ...(item.role === undefined ? {} : { role: item.role }),
+      ...(item.destinationScreenId === undefined ? {} : { destinationScreenId: item.destinationScreenId }),
+    });
+  }
+  return items;
+}
+
+function readSwipe(value: unknown): Partial<Record<SwipeDirection, string>> | null | undefined {
+  if (value === undefined) return undefined;
+  if (!isRecord(value)) return null;
+  const swipe: Partial<Record<SwipeDirection, string>> = {};
+  for (const direction of ['left', 'right', 'up', 'down'] as SwipeDirection[]) {
+    const destination = value[direction];
+    if (destination !== undefined && !isString(destination)) return null;
+    if (destination !== undefined) swipe[direction] = destination;
+  }
+  return swipe;
 }
 
 function readNode(value: unknown, ids: Set<string>): CanvasNode | null {
   if (!isRecord(value) || !isString(value.id) || !isString(value.kind) || ids.has(value.id)) return null;
   ids.add(value.id);
-  const glass = readGlass(value.glass);
-  if (glass === null) return null;
-  const glassProperties = glass === undefined ? {} : { glass };
+  const nodeProperties = readNodeProperties(value);
+  if (!nodeProperties) return null;
 
   switch (value.kind as NodeKind) {
     case 'text':
-      return isString(value.text) && isNumber(value.fontSize) && isOneOf(value.weight, ['regular', 'medium', 'semibold', 'bold'])
-        ? { id: value.id, kind: 'text', text: value.text, fontSize: value.fontSize, weight: value.weight, ...glassProperties }
+      return isString(value.text)
+        && isNumber(value.fontSize)
+        && value.fontSize > 0
+        && isOneOf(value.weight, ['regular', 'medium', 'semibold', 'bold'])
+        && (value.textStyle === undefined || isOneOf(value.textStyle, ['custom', 'largeTitle', 'title', 'title2', 'title3', 'headline', 'body', 'callout', 'subheadline', 'footnote', 'caption', 'caption2']))
+        && (value.fontDesign === undefined || isOneOf(value.fontDesign, ['default', 'rounded', 'serif', 'monospaced']))
+        && (value.textAlignment === undefined || isOneOf(value.textAlignment, ['leading', 'center', 'trailing']))
+        && (value.lineLimit === undefined || (isNumber(value.lineLimit) && Number.isInteger(value.lineLimit) && value.lineLimit >= 1 && value.lineLimit <= 20))
+        ? { id: value.id, kind: 'text', text: value.text, fontSize: value.fontSize, weight: value.weight, ...(value.textStyle === undefined ? {} : { textStyle: value.textStyle as TextStyle }), ...(value.fontDesign === undefined ? {} : { fontDesign: value.fontDesign as FontDesign }), ...(value.textAlignment === undefined ? {} : { textAlignment: value.textAlignment as TextAlignment }), ...(value.lineLimit === undefined ? {} : { lineLimit: value.lineLimit }), ...nodeProperties }
         : null;
-    case 'button':
-      return isString(value.label) && isOneOf(value.role, ['normal', 'destructive', 'cancel']) && isNumber(value.minHeight)
-        ? { id: value.id, kind: 'button', label: value.label, role: value.role, minHeight: value.minHeight, ...glassProperties }
+    case 'button': {
+      const toggle = readButtonToggle(value.toggle);
+      const hasDestination = isString(value.destinationScreenId) && value.destinationScreenId.trim().length > 0;
+      return isString(value.label)
+        && (value.accessibilityLabel === undefined || isString(value.accessibilityLabel))
+        && (value.systemName === undefined || isString(value.systemName))
+        && (value.destinationScreenId === undefined || isString(value.destinationScreenId))
+        && isOneOf(value.role, ['normal', 'destructive', 'cancel'])
+        && (value.buttonStyle === undefined || isOneOf(value.buttonStyle, ['automatic', 'plain', 'bordered', 'borderedProminent']))
+        && toggle !== null
+        && !(hasDestination && toggle !== undefined)
+        && isNonNegativeNumber(value.minHeight)
+        ? { id: value.id, kind: 'button', label: value.label, role: value.role, minHeight: value.minHeight, ...(value.accessibilityLabel === undefined ? {} : { accessibilityLabel: value.accessibilityLabel }), ...(value.systemName === undefined ? {} : { systemName: value.systemName }), ...(value.destinationScreenId === undefined ? {} : { destinationScreenId: value.destinationScreenId }), ...(value.buttonStyle === undefined ? {} : { buttonStyle: value.buttonStyle as ButtonStyle }), ...(toggle === undefined ? {} : { toggle }), ...nodeProperties }
+        : null;
+    }
+    case 'alert':
+      return isString(value.label)
+        && isString(value.title)
+        && isString(value.message)
+        && isString(value.primaryButton)
+        && isOneOf(value.primaryRole, ['normal', 'destructive', 'cancel'])
+        && (value.secondaryButton === undefined || isString(value.secondaryButton))
+        && (value.secondaryRole === undefined || isOneOf(value.secondaryRole, ['normal', 'destructive', 'cancel']))
+        && (value.secondaryButton !== undefined || value.secondaryRole === undefined)
+        && isNonNegativeNumber(value.minHeight)
+        ? {
+            id: value.id,
+            kind: 'alert',
+            label: value.label,
+            title: value.title,
+            message: value.message,
+            primaryButton: value.primaryButton,
+            primaryRole: value.primaryRole,
+            minHeight: value.minHeight,
+            ...(value.secondaryButton === undefined ? {} : { secondaryButton: value.secondaryButton }),
+            ...(value.secondaryRole === undefined ? {} : { secondaryRole: value.secondaryRole }),
+            ...nodeProperties,
+          }
+        : null;
+    case 'confirmation-dialog':
+      return isString(value.label)
+        && isString(value.title)
+        && isString(value.message)
+        && Array.isArray(value.options)
+        && value.options.length > 0
+        && value.options.every(isString)
+        && (value.cancelButton === undefined || isString(value.cancelButton))
+        && isNonNegativeNumber(value.minHeight)
+        ? {
+            id: value.id,
+            kind: 'confirmation-dialog',
+            label: value.label,
+            title: value.title,
+            message: value.message,
+            options: value.options,
+            ...(value.cancelButton === undefined ? {} : { cancelButton: value.cancelButton }),
+            minHeight: value.minHeight,
+            ...nodeProperties,
+          }
         : null;
     case 'toggle':
-      return isString(value.label) && isString(value.binding) && isNumber(value.minHeight)
-        ? { id: value.id, kind: 'toggle', label: value.label, binding: value.binding, minHeight: value.minHeight, ...glassProperties }
+      return isString(value.label) && isString(value.binding) && isNonNegativeNumber(value.minHeight)
+        ? { id: value.id, kind: 'toggle', label: value.label, binding: value.binding, minHeight: value.minHeight, ...nodeProperties }
         : null;
     case 'textfield':
-      return isString(value.label) && isString(value.binding) && isNumber(value.minHeight)
-        ? { id: value.id, kind: 'textfield', label: value.label, binding: value.binding, minHeight: value.minHeight, ...glassProperties }
+      return isString(value.label) && isString(value.binding) && isNonNegativeNumber(value.minHeight)
+        ? { id: value.id, kind: 'textfield', label: value.label, binding: value.binding, minHeight: value.minHeight, ...nodeProperties }
+        : null;
+    case 'searchfield':
+      return isString(value.label) && isString(value.binding) && isString(value.prompt) && isNonNegativeNumber(value.minHeight)
+        ? { id: value.id, kind: 'searchfield', label: value.label, binding: value.binding, prompt: value.prompt, minHeight: value.minHeight, ...nodeProperties }
+        : null;
+    case 'securefield':
+      return isString(value.label) && isString(value.binding) && isNonNegativeNumber(value.minHeight)
+        ? { id: value.id, kind: 'securefield', label: value.label, binding: value.binding, minHeight: value.minHeight, ...nodeProperties }
+        : null;
+    case 'texteditor':
+      return isString(value.label) && isString(value.binding) && isNonNegativeNumber(value.minHeight)
+        ? { id: value.id, kind: 'texteditor', label: value.label, binding: value.binding, minHeight: value.minHeight, ...nodeProperties }
         : null;
     case 'picker':
       return isString(value.label)
@@ -54,41 +232,131 @@ function readNode(value: unknown, ids: Set<string>): CanvasNode | null {
         && Array.isArray(value.options)
         && value.options.length > 0
         && value.options.every(isString)
-        && isNumber(value.minHeight)
-        ? { id: value.id, kind: 'picker', label: value.label, binding: value.binding, options: value.options, minHeight: value.minHeight, ...glassProperties }
+        && isNonNegativeNumber(value.minHeight)
+        ? { id: value.id, kind: 'picker', label: value.label, binding: value.binding, options: value.options, minHeight: value.minHeight, ...nodeProperties }
+        : null;
+    case 'colorpicker':
+      return isString(value.label)
+        && isString(value.binding)
+        && isString(value.color)
+        && /^#[0-9a-f]{6}$/i.test(value.color)
+        && isNonNegativeNumber(value.minHeight)
+        ? { id: value.id, kind: 'colorpicker', label: value.label, binding: value.binding, color: value.color, minHeight: value.minHeight, ...nodeProperties }
+        : null;
+    case 'slider':
+    case 'stepper':
+      return isString(value.label)
+        && isString(value.binding)
+        && isNumber(value.value)
+        && isNumber(value.minimum)
+        && isNumber(value.maximum)
+        && isNumber(value.step)
+        && value.minimum < value.maximum
+        && value.step > 0
+        && value.step <= value.maximum - value.minimum
+        && value.value >= value.minimum
+        && value.value <= value.maximum
+        && isNonNegativeNumber(value.minHeight)
+        ? { id: value.id, kind: value.kind, label: value.label, binding: value.binding, value: value.value, minimum: value.minimum, maximum: value.maximum, step: value.step, minHeight: value.minHeight, ...nodeProperties } as CanvasNode
+        : null;
+    case 'menu':
+      return isString(value.label)
+        && Array.isArray(value.options)
+        && value.options.length > 0
+        && value.options.every(isString)
+        && isNonNegativeNumber(value.minHeight)
+        ? { id: value.id, kind: 'menu', label: value.label, options: value.options, minHeight: value.minHeight, ...nodeProperties }
         : null;
     case 'progress':
       return isString(value.label) && isNumber(value.value) && value.value >= 0 && value.value <= 1
-        ? { id: value.id, kind: 'progress', label: value.label, value: value.value, ...glassProperties }
+        ? { id: value.id, kind: 'progress', label: value.label, value: value.value, ...nodeProperties }
+        : null;
+    case 'gauge':
+      return isString(value.label)
+        && isNumber(value.value)
+        && isNumber(value.minimum)
+        && isNumber(value.maximum)
+        && value.minimum < value.maximum
+        && value.value >= value.minimum
+        && value.value <= value.maximum
+        && isNonNegativeNumber(value.minHeight)
+        ? { id: value.id, kind: 'gauge', label: value.label, value: value.value, minimum: value.minimum, maximum: value.maximum, minHeight: value.minHeight, ...nodeProperties }
+        : null;
+    case 'content-unavailable':
+      return isString(value.title) && isString(value.systemName) && isString(value.description)
+        ? { id: value.id, kind: 'content-unavailable', title: value.title, systemName: value.systemName, description: value.description, ...nodeProperties }
         : null;
     case 'navigation-link':
-      return isString(value.label) && isString(value.destinationScreenId) && isNumber(value.minHeight)
-        ? { id: value.id, kind: 'navigation-link', label: value.label, destinationScreenId: value.destinationScreenId, minHeight: value.minHeight, ...glassProperties }
+      return isString(value.label) && isString(value.destinationScreenId) && isNonNegativeNumber(value.minHeight)
+        ? { id: value.id, kind: 'navigation-link', label: value.label, destinationScreenId: value.destinationScreenId, minHeight: value.minHeight, ...nodeProperties }
+        : null;
+    case 'label':
+      return isString(value.title) && isString(value.systemName) && isString(value.accessibilityLabel)
+        ? { id: value.id, kind: 'label', title: value.title, systemName: value.systemName, accessibilityLabel: value.accessibilityLabel, ...nodeProperties }
+        : null;
+    case 'link':
+      return isString(value.label) && isString(value.url) && isNonNegativeNumber(value.minHeight)
+        ? { id: value.id, kind: 'link', label: value.label, url: value.url, minHeight: value.minHeight, ...nodeProperties }
+        : null;
+    case 'datepicker':
+      return isString(value.label) && isString(value.binding) && isNonNegativeNumber(value.minHeight)
+        ? { id: value.id, kind: 'datepicker', label: value.label, binding: value.binding, minHeight: value.minHeight, ...nodeProperties }
         : null;
     case 'image':
-      return isString(value.systemName) && isString(value.accessibilityLabel)
-        ? { id: value.id, kind: 'image', systemName: value.systemName, accessibilityLabel: value.accessibilityLabel, ...glassProperties }
+      return isString(value.systemName)
+        && isString(value.accessibilityLabel)
+        && (value.source === undefined || isOneOf(value.source, ['symbol', 'asset', 'remote']))
+        ? { id: value.id, kind: 'image', systemName: value.systemName, accessibilityLabel: value.accessibilityLabel, ...(value.source === undefined ? {} : { source: value.source as ImageSource }), ...nodeProperties }
         : null;
     case 'divider':
-      return { id: value.id, kind: 'divider', ...glassProperties };
+      return { id: value.id, kind: 'divider', ...nodeProperties };
     case 'spacer':
-      return { id: value.id, kind: 'spacer', ...glassProperties };
+      return { id: value.id, kind: 'spacer', ...nodeProperties };
     case 'vstack':
     case 'hstack':
+    case 'lazyvstack':
+    case 'lazyhstack':
+    case 'zstack':
+    case 'navigation-split-view':
+    case 'glass-container':
+    case 'group':
+    case 'tabview':
+    case 'disclosure-group':
+    case 'sheet':
+    case 'groupbox':
+    case 'lazyvgrid':
+    case 'lazyhgrid':
+    case 'scrollview':
     case 'list':
     case 'form':
     case 'section': {
       if (!Array.isArray(value.children)) return null;
       if (value.spacing !== undefined && (!isNumber(value.spacing) || value.spacing < 0)) return null;
       if (value.title !== undefined && !isString(value.title)) return null;
+      if (value.label !== undefined && !isString(value.label)) return null;
+      if (value.columns !== undefined && (!isNumber(value.columns) || !Number.isInteger(value.columns) || value.columns < 1 || value.columns > 8)) return null;
+      if (value.kind === 'lazyvgrid' && value.columns === undefined) return null;
+      if (value.rows !== undefined && (!isNumber(value.rows) || !Number.isInteger(value.rows) || value.rows < 1 || value.rows > 8)) return null;
+      if (value.kind === 'lazyhgrid' && value.rows === undefined) return null;
+      if (value.alignment !== undefined && !isString(value.alignment)) return null;
+      const validAlignment = value.kind === 'vstack' || value.kind === 'lazyvstack'
+        ? value.alignment === undefined || isOneOf(value.alignment, ['leading', 'center', 'trailing'])
+        : value.kind === 'hstack' || value.kind === 'lazyhstack'
+          ? value.alignment === undefined || isOneOf(value.alignment, ['top', 'center', 'bottom'])
+          : value.alignment === undefined;
+      if (!validAlignment) return null;
       const children = value.children.map((child) => readNode(child, ids));
       if (children.some((child): child is null => child === null)) return null;
       return {
         id: value.id,
         kind: value.kind,
-        ...glassProperties,
+        ...nodeProperties,
+        ...(value.label === undefined ? {} : { label: value.label }),
         ...(value.spacing === undefined ? {} : { spacing: value.spacing }),
+        ...(value.alignment === undefined ? {} : { alignment: value.alignment as StackAlignment }),
         ...(value.title === undefined ? {} : { title: value.title }),
+        ...(value.columns === undefined ? {} : { columns: value.columns }),
+        ...(value.rows === undefined ? {} : { rows: value.rows }),
         children: children as CanvasNode[],
       } as CanvasNode;
     }
@@ -101,9 +369,24 @@ function readScreen(value: unknown, ids: Set<string>): CanvasScreen | null {
   if (!isRecord(value) || !isString(value.id) || !isString(value.name) || !isString(value.navigationTitle)) return null;
   if (ids.has(value.id)) return null;
   ids.add(value.id);
+  if (value.notes !== undefined && !isString(value.notes)) return null;
+  if (value.navigationTitleDisplayMode !== undefined && !isOneOf(value.navigationTitleDisplayMode, ['automatic', 'inline', 'large'])) return null;
+  const toolbarItems = readToolbarItems(value.toolbarItems, ids);
+  if (toolbarItems === null) return null;
+  const swipe = readSwipe(value.swipe);
+  if (swipe === null) return null;
   const root = readNode(value.root, ids);
   return root && isContainerNode(root)
-    ? { id: value.id, name: value.name, navigationTitle: value.navigationTitle, root }
+    ? {
+        id: value.id,
+        name: value.name,
+        navigationTitle: value.navigationTitle,
+        ...(value.notes === undefined ? {} : { notes: value.notes }),
+        ...(value.navigationTitleDisplayMode === undefined ? {} : { navigationTitleDisplayMode: value.navigationTitleDisplayMode as NavigationTitleDisplayMode }),
+        ...(toolbarItems === undefined ? {} : { toolbarItems }),
+        ...(swipe === undefined ? {} : { swipe }),
+        root,
+      }
     : null;
 }
 
@@ -122,14 +405,20 @@ export function parseCanvasDocument(value: unknown): CanvasDocument | null {
   const appearance = value.appearance;
   if (appearance !== undefined && (!isRecord(appearance)
     || !isOneOf(appearance.colorScheme, ['system', 'light', 'dark'])
-    || !isOneOf(appearance.accentColor, ['blue', 'purple', 'pink', 'orange', 'green']))) {
+    || !isOneOf(appearance.accentColor, ['blue', 'purple', 'pink', 'orange', 'green', 'custom'])
+    || (appearance.accentHex !== undefined && !isHexColor(appearance.accentHex))
+    || (appearance.accentColor === 'custom' && !isHexColor(appearance.accentHex))
+    || (appearance.fontDesign !== undefined && !isOneOf(appearance.fontDesign, ['default', 'rounded', 'serif', 'monospaced'])))) {
     return null;
   }
 
   const ids = new Set<string>();
   const screens = value.screens.map((screen) => readScreen(screen, ids));
   if (screens.some((screen): screen is null => screen === null)) return null;
-  if (!screens.some((screen) => screen?.id === value.activeScreenId)) return null;
+  const parsedScreens = screens as CanvasScreen[];
+  const screenIds = new Set(parsedScreens.map((screen) => screen.id));
+  if (parsedScreens.some((screen) => Object.values(screen.swipe ?? {}).some((destination) => !screenIds.has(destination)))) return null;
+  if (!parsedScreens.some((screen) => screen.id === value.activeScreenId)) return null;
 
   return {
     version: 1,
@@ -140,9 +429,11 @@ export function parseCanvasDocument(value: unknown): CanvasDocument | null {
       ? { colorScheme: 'system', accentColor: 'blue' }
       : {
           colorScheme: appearance.colorScheme as ColorScheme,
-          accentColor: appearance.accentColor as AccentColor,
+          accentColor: appearance.accentColor as AppearanceAccentColor,
+          ...(appearance.accentHex === undefined ? {} : { accentHex: appearance.accentHex as string }),
+          ...(appearance.fontDesign === undefined ? {} : { fontDesign: appearance.fontDesign as FontDesign }),
         },
     activeScreenId: value.activeScreenId,
-    screens: screens as CanvasScreen[],
+    screens: parsedScreens,
   };
 }

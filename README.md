@@ -10,19 +10,46 @@
 - Drag components into the screen or into layout containers, then reorder or reparent them.
 - Move the selected element up or down precisely from the Inspector when drag-and-drop is not convenient.
 - Inspect the generated structure tree and use Undo/Redo or Delete/Backspace while editing.
+- Group同士のまとまりを作成・解除し、Cmd/Ctrl+Shift+Gで元の階層へ戻す。
 - Duplicate selected elements with Cmd/Ctrl+D, including nested children.
+- Keep screen and element implementation notes alongside the semantic tree and include them in the exported brief.
 - Save and open validated `.ioscanvas.json` project files.
+- Copy a local share link that reopens the validated document in another browser.
+- Save the active iPhone preview as a PNG for review or handoff.
 - Opt into iOS 26 Liquid Glass styles from the Inspector and export the corresponding SwiftUI modifiers.
+- Choose native Button styles such as Plain, Bordered, and Bordered Prominent from the Inspector.
+- Configure a Button as an on/off toggle with separate active label, SF Symbol, style, and initial state, then export the stateful SwiftUI implementation.
+- Give icon-only Buttons a separate VoiceOver label while keeping the visual label empty.
+- Apply Regular, Clear, Prominent, or Interactive Glass presets from the Parts library, then choose a capsule, rounded rectangle, or circle shape.
+- Choose a system, rounded, serif, or monospaced text design and keep that choice in the generated SwiftUI.
+- Edit Text alignment and maximum line count while keeping Dynamic Type warnings visible.
+- Compose GroupBox and LazyVGrid layouts, Gauge metrics, and ContentUnavailableView empty states as semantic nodes.
 - Set the app color scheme and tint once, then keep Preview, SwiftUI output, and the implementation brief aligned.
+- Use one of the Apple-oriented accent presets or choose a custom accent color; the preview, generated SwiftUI, and implementation brief stay in sync.
+- Choose a global system, rounded, serif, or monospaced text design; individual Text nodes can override it.
 - See a material backdrop in the canvas when Liquid Glass is present, while keeping the exported view native SwiftUI.
-- Add, duplicate, switch, and remove screens, then inspect them in a read-only Preview mode.
+- Add, duplicate, switch, and remove screens, then use Preview mode to try local control states without changing the document.
+- Preview native Alert confirmation dialogs with primary and secondary actions, then export the corresponding `.alert` modifier.
+- Preview multi-action ConfirmationDialog menus with an explicit cancel action, then export the native `.confirmationDialog` modifier.
 - Follow outgoing NavigationLink relationships from the screen flow rail without leaving the canvas.
 - Follow NavigationLink transitions directly in Preview to check the screen flow.
-- Use a Layers / Parts library with filtering, canvas zoom, and grid visibility controls.
+- Configure left, right, up, and down swipe destinations per screen and try them in Preview.
+- Configure TabView item names and SF Symbols from the Inspector, then switch tabs in Preview and export `.tabItem` code.
+- Use a Navigator and Parts library with filtering, canvas zoom, and guide visibility controls.
+- Switch the preview between iPhone SE, iPhone 16, iPad mini, and iPad Pro 11-inch sizes without changing the semantic tree.
+- Preview standard, large, and accessibility text sizes to catch Dynamic Type layout pressure before implementation.
+- Compose an iPad-oriented NavigationSplitView with a sidebar and detail hierarchy, then preview and export it without an extra NavigationStack wrapper.
+- Collapse the generated-code shelf when you need more vertical space for editing.
+- Pin frequently used SwiftUI parts to a local Favorites row and inspect each screen's outgoing flow above its canvas.
+- Use `+`, `-`, `0`, or Cmd/Ctrl+wheel to adjust or fit the canvas zoom without leaving the editor.
+- Press Cmd/Ctrl+K to focus the SwiftUI parts search while composing.
+- Normalize semantic stack spacing and minimum interaction heights with the `整える` action; it remains fully undoable.
 - Compose native `List`, `Form`, and `NavigationLink` patterns across screens, then export the linked SwiftUI views together.
+- Insert semantic SwiftUI patterns such as Glass Card, Settings Section, List Row, and Empty State in one step.
 - Run lightweight HIG checks such as minimum tap-target sizing.
 - Export SwiftUI code from the document tree.
 - Export a structured implementation prompt when needed.
+- Choose the active screen or the whole screen flow when exporting the implementation brief.
 - Persist the current document locally in the browser.
 
 ## Current component set
@@ -30,20 +57,45 @@
 The first prototype includes a small set of primitives such as:
 
 - Text
-- Image (SF Symbol)
-- Button
+- Image（SF Symbol・アセット・リモート画像）
+- Button（SF Symbol付きラベル、状態切替にも対応）
+- Alert（確認ダイアログ）
+- ConfirmationDialog（選択肢ダイアログ）
 - Toggle
 - TextField
+- SearchField（検索入力）
+- SecureField
+- TextEditor
 - Picker
+- ColorPicker
+- Slider
+- Stepper
+- Menu
 - ProgressView
+- Gauge
+- ContentUnavailableView
 - VStack
 - HStack
+- LazyVStack / LazyHStack
+- ZStack
+- NavigationSplitView
+- ScrollView
 - Section
 - List
 - Form
+- GroupBox
+- LazyHGrid
+- LazyVGrid
 - NavigationLink
+- Label
+- Link
+- DatePicker
+- DisclosureGroup
+- TabView
+- Sheet
+- GlassEffectContainer
 
-The intent is to keep the model close to SwiftUI rather than reproduce a generic absolute-position design tool. Screens use a `NavigationStack` scaffold, while direct `List` and `Form` roots keep their native scrolling behavior; the editable document tree starts at the screen's content `VStack`.
+The intent is to keep the model close to SwiftUI rather than reproduce a generic absolute-position design tool. Screens use a `NavigationStack` scaffold, while direct `List` and `Form` roots keep their native scrolling behavior; the editable document tree starts at the screen's content `VStack`. The generated-code shelf can be collapsed while composing a screen.
 
 ## Architecture
 
@@ -97,4 +149,4 @@ See [`ACKNOWLEDGEMENTS.md`](./ACKNOWLEDGEMENTS.md) for attribution details.
 
 ## Status
 
-Version 1.1.0. The semantic editor, multi-screen flow workspace, nested drag-and-drop, precise element ordering, structure tree, expanded Parts library, inspector, Appearance controls, Preview mode with screen flow, history controls, project files, SF Symbol images, Liquid Glass material preview, native SwiftUI patterns, HIG checks, linked SwiftUI export, and an xtool SwiftUI target are present.
+Version 1.16.0. The semantic editor, multi-screen flow workspace, nested drag-and-drop, precise element ordering, Navigator and Parts library with Favorites and semantic patterns, multi-selection style editing, inspector, NavigationStack and NavigationSplitView editing, Appearance controls with custom accent colors, interactive Preview mode with screen and swipe flow, TabView switching, Sheet, Alert, ConfirmationDialog, and SearchField presentation, GroupBox and LazyVGrid / LazyHGrid layouts, ColorPicker and other native controls, Gauge metrics, empty states, stateful toggle Buttons, VoiceOver labels for icon-only Buttons, history controls, semantic layout tidying, project files, share links, PNG preview export, SF Symbol images, Liquid Glass presets and shape preview, HIG checks, linked SwiftUI export, and an xtool SwiftUI target are present.
