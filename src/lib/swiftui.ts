@@ -1,4 +1,4 @@
-import type { CanvasDocument, CanvasNode, CanvasScreen, ContainerNode, ScreenBackground, SwipeDirection, ToolbarItem } from '../types/document';
+import type { CanvasDocument, CanvasNode, CanvasScreen, ContainerNode, M3eItemMetadata, M3eTextColor, ScreenBackground, SwipeDirection, ToolbarItem } from '../types/document';
 
 const indent = (depth: number) => '    '.repeat(depth);
 const indentBlock = (value: string, depth: number) => value
@@ -136,6 +136,7 @@ function renderNode(node: CanvasNode, depth: number, context: RenderContext): st
     const shadow = node.shadow === 'medium' ? 'radius: 10, y: 4' : 'radius: 4, y: 2';
     modifiers.push(`${pad}.shadow(color: .black.opacity(0.14), ${shadow})`);
   }
+  modifiers.push(...m3eModifiers(node, depth));
   if (node.glass) modifiers.push(glassModifier(node, depth));
   if (node.kind === 'button' && node.accessibilityLabel?.trim()) {
     modifiers.push(`${pad}.accessibilityLabel(${quoted(node.accessibilityLabel)})`);
@@ -143,6 +144,94 @@ function renderNode(node: CanvasNode, depth: number, context: RenderContext): st
   modifiers.push(...(context.nodeModifiers?.get(node.id) ?? []).map((modifier) => `${pad}${modifier}`));
   const output = modifiers.length > 0 ? `${rendered}\n${modifiers.join('\n')}` : rendered;
   return transitionNote + output;
+}
+
+function m3eFillLiteral(fill: ScreenBackground): string {
+  switch (fill) {
+    case 'surface': return 'Color.clear';
+    case 'surfaceContainerLow': return 'Color.secondary.opacity(0.06)';
+    case 'surfaceContainer': return 'Color.secondary.opacity(0.12)';
+    case 'surfaceContainerHigh': return 'Color.secondary.opacity(0.18)';
+    case 'surfaceContainerHighest': return 'Color.secondary.opacity(0.24)';
+    case 'primaryContainer': return 'Color.accentColor.opacity(0.16)';
+    case 'secondaryContainer': return 'Color.accentColor.opacity(0.10)';
+    case 'tertiaryContainer': return 'Color.orange.opacity(0.10)';
+    case 'primary': return 'Color.accentColor';
+    case 'inverseSurface': return 'Color.primary';
+  }
+}
+
+function m3eTextColorLiteral(color: M3eTextColor): string {
+  switch (color) {
+    case 'primary': return 'Color.accentColor';
+    case 'secondary':
+    case 'onSurfaceVariant': return 'Color.secondary';
+    case 'onSurface':
+    case 'onPrimaryContainer':
+    case 'onSecondaryContainer':
+    case 'onTertiaryContainer': return 'Color.primary';
+    case 'inverseOnSurface': return 'Color.primary';
+  }
+}
+
+function m3eCornerShape(metadata: M3eItemMetadata): string | undefined {
+  if (metadata.corners) {
+    const { tl, tr, bl, br } = metadata.corners;
+    return `.clipShape(UnevenRoundedRectangle(cornerRadii: .init(topLeading: ${tl}, bottomLeading: ${bl}, bottomTrailing: ${br}, topTrailing: ${tr})))`;
+  }
+  if (metadata.radiusTop !== undefined || metadata.radiusBottom !== undefined) {
+    const top = metadata.radiusTop ?? 0;
+    const bottom = metadata.radiusBottom ?? 0;
+    return `.clipShape(UnevenRoundedRectangle(cornerRadii: .init(topLeading: ${top}, bottomLeading: ${bottom}, bottomTrailing: ${bottom}, topTrailing: ${top})))`;
+  }
+  return undefined;
+}
+
+function m3eModifiers(node: CanvasNode, depth: number): string[] {
+  const metadata = node.m3eMetadata;
+  if (!metadata) return [];
+  const pad = indent(depth);
+  const modifiers: string[] = [];
+  const hasBackground = node.background !== undefined && node.background !== 'none';
+  if (!hasBackground && metadata.fill && metadata.fill !== 'surface') {
+    modifiers.push(`${pad}.background(${m3eFillLiteral(metadata.fill)})`);
+  }
+  if (metadata.textColor) modifiers.push(`${pad}.foregroundStyle(${m3eTextColorLiteral(metadata.textColor)})`);
+  if (metadata.size !== undefined && (node.kind === 'button' || node.kind === 'image' || node.kind === 'groupbox')) {
+    modifiers.push(`${pad}.frame(width: ${metadata.size})`);
+  }
+  if (metadata.size2 !== undefined && (node.kind === 'button' || node.kind === 'image' || node.kind === 'groupbox')) {
+    modifiers.push(`${pad}.frame(minHeight: ${metadata.size2})`);
+  }
+  if (node.cornerRadius === undefined) {
+    const cornerShape = m3eCornerShape(metadata);
+    if (cornerShape) modifiers.push(`${pad}${cornerShape}`);
+  }
+  if (metadata.contained && !hasBackground && !node.glass && !metadata.fill) {
+    modifiers.push(`${pad}.background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12))`);
+  }
+  if (metadata.iconFill && node.kind === 'image' && node.source === 'symbol' && metadata.iconFill !== 'none') {
+    modifiers.push(`${pad}.padding(6)`);
+    modifiers.push(`${pad}.background(${m3eFillLiteral(metadata.iconFill)}, in: RoundedRectangle(cornerRadius: 8))`);
+  }
+  return modifiers;
+}
+
+function m3eButtonLabel(
+  node: Extract<CanvasNode, { kind: 'button' }>,
+  titleExpression = quoted(node.label),
+  symbolExpression = node.systemName?.trim() ? quoted(node.systemName) : undefined,
+): string {
+  if (!symbolExpression) return `Text(${titleExpression})`;
+  const iconFill = node.m3eMetadata?.iconFill;
+  if (!iconFill || iconFill === 'none') return `Label(${titleExpression}, systemImage: ${symbolExpression})`;
+  return `Label {
+    Text(${titleExpression})
+} icon: {
+    Image(systemName: ${symbolExpression})
+        .padding(6)
+        .background(${m3eFillLiteral(iconFill)}, in: RoundedRectangle(cornerRadius: 8))
+}`;
 }
 
 function cardRenderContext(
@@ -372,14 +461,13 @@ function renderM3eSplitButton(
   const innerPad = indent(depth + 1);
   const contentPad = indent(depth + 2);
   const destination = node.destinationScreenId ? context.viewNames.get(node.destinationScreenId) : undefined;
-  const label = node.systemName?.trim()
-    ? `Label(${quoted(node.label)}, systemImage: ${quoted(node.systemName)})`
-    : `Text(${quoted(node.label)})`;
+  const label = m3eButtonLabel(node);
+  const labelBlock = indentBlock(label, depth + 2);
   const primary = node.navigationAction === 'back'
-    ? `${innerPad}Button {\n${contentPad}dismiss()\n${innerPad}} label: {\n${contentPad}${label}\n${innerPad}}`
+    ? `${innerPad}Button {\n${contentPad}dismiss()\n${innerPad}} label: {\n${labelBlock}\n${innerPad}}`
     : destination
-      ? `${innerPad}NavigationLink {\n${contentPad}${destination}()\n${innerPad}} label: {\n${contentPad}${label}\n${innerPad}}`
-      : `${innerPad}Button {\n${contentPad}// Action\n${innerPad}} label: {\n${contentPad}${label}\n${innerPad}}`;
+      ? `${innerPad}NavigationLink {\n${contentPad}${destination}()\n${innerPad}} label: {\n${labelBlock}\n${innerPad}}`
+      : `${innerPad}Button {\n${contentPad}// Action\n${innerPad}} label: {\n${labelBlock}\n${innerPad}}`;
   return `${pad}HStack(spacing: 2) {\n${primary}\n${innerPad}Menu {\n${contentPad}Button("メニュー") {\n${contentPad}    // M3E SplitButtonのメニュー項目\n${contentPad}}\n${innerPad}} label: {\n${contentPad}Image(systemName: "chevron.down")\n${innerPad}}\n${pad}}\n${pad}.frame(minHeight: ${node.minHeight})`;
 }
 
@@ -405,11 +493,14 @@ function renderToggleButtonBody(
   const offSymbol = node.systemName?.trim();
   const onSymbol = node.toggle?.onSystemName?.trim() || offSymbol;
   const symbol = offSymbol || onSymbol;
-  const label = symbol
-    ? `Label(${stateName} ? ${quoted(onLabel)} : ${quoted(node.label)}, systemImage: ${stateName} ? ${quoted(onSymbol || symbol)} : ${quoted(offSymbol || symbol)})`
-    : `Text(${stateName} ? ${quoted(onLabel)} : ${quoted(node.label)})`;
+  const label = m3eButtonLabel(
+    node,
+    `${stateName} ? ${quoted(onLabel)} : ${quoted(node.label)}`,
+    symbol ? `${stateName} ? ${quoted(onSymbol || symbol)} : ${quoted(offSymbol || symbol)}` : undefined,
+  );
+  const labelBlock = indentBlock(label, depth + 1);
   const role = node.role === 'normal' ? '' : `(role: .${node.role})`;
-  return `${pad}Button${role} {\n${labelPad}${stateName}.toggle()\n${pad}} label: {\n${labelPad}${label}\n${pad}}`;
+  return `${pad}Button${role} {\n${labelPad}${stateName}.toggle()\n${pad}} label: {\n${labelBlock}\n${pad}}`;
 }
 
 function renderToggleButton(
@@ -456,22 +547,20 @@ function renderNodeContent(node: CanvasNode, depth: number, context: RenderConte
       if (node.m3eKind === 'splitButton') return renderM3eSplitButton(node, depth, context);
       const destination = node.destinationScreenId ? context.viewNames.get(node.destinationScreenId) : undefined;
       if (node.navigationAction === 'back') {
-        const label = node.systemName?.trim()
-          ? `Label(${quoted(node.label)}, systemImage: ${quoted(node.systemName)})`
-          : `Text(${quoted(node.label)})`;
+        const label = m3eButtonLabel(node);
+        const labelBlock = indentBlock(label, depth + 1);
         const style = !node.glass && node.buttonStyle && node.buttonStyle !== 'automatic'
           ? `\n${pad}.buttonStyle(.${node.buttonStyle})`
           : '';
-        return `${pad}Button {\n${pad}    dismiss()\n${pad}} label: {\n${pad}    ${label}\n${pad}}\n${pad}.frame(minHeight: ${node.minHeight})${style}`;
+        return `${pad}Button {\n${pad}    dismiss()\n${pad}} label: {\n${labelBlock}\n${pad}}\n${pad}.frame(minHeight: ${node.minHeight})${style}`;
       }
       if (destination) {
-        const label = node.systemName?.trim()
-          ? `Label(${quoted(node.label)}, systemImage: ${quoted(node.systemName)})`
-          : `Text(${quoted(node.label)})`;
+        const label = m3eButtonLabel(node);
+        const labelBlock = indentBlock(label, depth + 1);
         const style = !node.glass && node.buttonStyle && node.buttonStyle !== 'automatic'
           ? `\n${pad}.buttonStyle(.${node.buttonStyle})`
           : '';
-        return `${pad}NavigationLink {\n${pad}    ${destination}()\n${pad}} label: {\n${pad}    ${label}\n${pad}}\n${pad}.frame(minHeight: ${node.minHeight})${style}`;
+        return `${pad}NavigationLink {\n${pad}    ${destination}()\n${pad}} label: {\n${labelBlock}\n${pad}}\n${pad}.frame(minHeight: ${node.minHeight})${style}`;
       }
       if (node.toggle) {
         const stateName = context.bindings.get(buttonToggleKey(node))?.name ?? swiftIdentifier(`is_${node.id}`, 'isOn');
@@ -479,9 +568,7 @@ function renderNodeContent(node: CanvasNode, depth: number, context: RenderConte
       }
       const role = node.role === 'normal' ? '' : `, role: .${node.role}`;
       const body = node.systemName?.trim()
-        ? node.role === 'normal'
-          ? `${pad}Button {\n${pad}    // Action\n${pad}} label: {\n${pad}    Label(${quoted(node.label)}, systemImage: ${quoted(node.systemName)})\n${pad}}`
-          : `${pad}Button(role: .${node.role}) {\n${pad}    // Action\n${pad}} label: {\n${pad}    Label(${quoted(node.label)}, systemImage: ${quoted(node.systemName)})\n${pad}}`
+        ? `${node.role === 'normal' ? `${pad}Button` : `${pad}Button(role: .${node.role})`} {\n${pad}    // Action\n${pad}} label: {\n${indentBlock(m3eButtonLabel(node), depth + 1)}\n${pad}}`
         : `${pad}Button(${quoted(node.label)}${role}) {\n${pad}    // Action\n${pad}}`;
       const style = !node.glass && node.buttonStyle && node.buttonStyle !== 'automatic'
         ? `\n${pad}.buttonStyle(.${node.buttonStyle})`

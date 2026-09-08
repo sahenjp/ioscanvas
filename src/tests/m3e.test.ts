@@ -795,6 +795,20 @@ describe('M3E compatibility importer', () => {
     });
     expect(parseCanvasDocument(document)).toEqual(document);
 
+    const swiftui = generateSwiftUI(document);
+    expect(swiftui).toContain('.background(Color.accentColor.opacity(0.16))');
+    expect(swiftui).toContain('.foregroundStyle(Color.primary)');
+    expect(swiftui).toContain('.frame(width: 140)');
+    expect(swiftui).toContain('.frame(minHeight: 52)');
+    expect(swiftui).toContain('.clipShape(UnevenRoundedRectangle(cornerRadii: .init(topLeading: 10, bottomLeading: 14, bottomTrailing: 16, topTrailing: 12)))');
+    expect(swiftui).toContain('.background(Color.accentColor.opacity(0.10), in: RoundedRectangle(cornerRadius: 8))');
+
+    const explicitNone = structuredClone(document);
+    const noneFavorite = findNode(explicitNone.screens[0]?.root.children ?? [], 'm3e-favorite');
+    if (!noneFavorite) throw new Error('M3E button fixture is missing from the cloned document');
+    noneFavorite.background = 'none';
+    expect(generateSwiftUI(explicitNone)).toContain('.background(Color.accentColor.opacity(0.16))');
+
     const exported = exportM3eDocument(document);
     const items = exported.groups.flatMap((group) => group.items);
     expect(items).toEqual(expect.arrayContaining([
