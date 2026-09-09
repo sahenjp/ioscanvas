@@ -705,21 +705,26 @@ function readM3eMetadata(item: JsonObject): M3eItemMetadata | undefined {
   }
 
   if (Array.isArray(item.tabs)) {
-    const tabs = item.tabs.filter(isRecord).map((tab) => ({
-      label: stringValue(tab, 'label') ?? '',
-      icon: tab.icon === null ? null : stringValue(tab, 'icon') ?? null,
-    }));
-    metadata.tabs = tabs;
+    const validTabs = item.tabs.every((tab) => isRecord(tab)
+      && typeof tab.label === 'string'
+      && (tab.icon === undefined || tab.icon === null || typeof tab.icon === 'string'));
+    if (validTabs) {
+      metadata.tabs = item.tabs.map((tab) => {
+        const entry = tab as JsonObject;
+        return { label: stringValue(entry, 'label') as string, icon: entry.icon === null ? null : stringValue(entry, 'icon') ?? null };
+      });
+    }
   }
   const action = m3eAction(item.action);
   if (action) metadata.action = action;
   const rawActions = recordValue(item, 'actions');
   if (rawActions) {
-    const actions = Object.fromEntries(Object.entries(rawActions).flatMap(([slot, value]) => {
+    const entries = Object.entries(rawActions);
+    const actions = Object.fromEntries(entries.flatMap(([slot, value]) => {
       const parsed = m3eAction(value);
       return parsed ? [[slot, parsed]] : [];
     }));
-    if (Object.keys(actions).length > 0) metadata.actions = actions;
+    if (entries.every(([, value]) => m3eAction(value) !== undefined)) metadata.actions = actions;
   }
 
   const toggle = recordValue(item, 'toggle');
@@ -1142,9 +1147,9 @@ function mapItem(item: JsonObject, context: ConversionContext): CanvasNode | nul
     case 'map':
       return linkM3eNode({ id, kind: 'map', label: label || '地図' }, item, context, '地図', ['M3Eの地図をMapKitのMapへ変換しました。位置情報や注釈は実装側で追加してください。']);
     case 'divider':
-      return appendNotes({ id, kind: 'divider' }, item);
+      return linkM3eNode({ id, kind: 'divider' }, item, context, '区切り線');
     case 'loadingIndicator':
-      return appendNotes({ id, kind: 'progress', label: label || '読み込み中', value: 0.5, style: 'circular', indeterminate: true }, item, ['M3Eの不確定ローディング表示です。標準SwiftUIでは円形ProgressViewへ変換しました。']);
+      return linkM3eNode({ id, kind: 'progress', label: label || '読み込み中', value: 0.5, style: 'circular', indeterminate: true }, item, context, '読み込み中', ['M3Eの不確定ローディング表示です。標準SwiftUIでは円形ProgressViewへ変換しました。']);
     case 'linearProgress':
     case 'circularProgress': {
       const value = numberValue(item, 'value');
@@ -1270,14 +1275,16 @@ function mapItem(item: JsonObject, context: ConversionContext): CanvasNode | nul
         },
       ];
       if (actionLabel) {
-        children.push({
+        const actionNode: Extract<CanvasNode, { kind: 'button' }> = {
           id: stableId('m3e-snackbar-action', sourceId, context.usedIds),
           kind: 'button',
           label: actionLabel,
           role: 'normal',
           buttonStyle: 'plain',
           minHeight: 44,
-        });
+        };
+        setButtonAction(actionNode, item, context);
+        children.push(actionNode);
       }
       return appendNotes({
         id,
@@ -1908,7 +1915,7 @@ function exportItem(node: CanvasNode, frameIds: Map<string, string>, inheritedNo
         const action = exportAction(node, frameIds);
         const selected = linkedPicker.initialOption ? linkedPicker.options.indexOf(linkedPicker.initialOption) : -1;
         return base('select', linkedPicker.label, null, {
-          tabs: linkedPicker.options.map((label) => ({ label, icon: null })),
+          tabs: linkedPicker.options.map((label, index) => ({ label, icon: node.m3eMetadata?.tabs?.[index]?.icon ?? null })),
           ...(selected < 0 ? {} : { selected }),
           ...(action ? { action } : {}),
         });
@@ -1928,6 +1935,11 @@ function exportItem(node: CanvasNode, frameIds: Map<string, string>, inheritedNo
           step: linkedSlider.step,
           ...(action ? { action } : {}),
         });
+      }
+      const linkedDivider = node.children?.find((child): child is Extract<CanvasNode, { kind: 'divider' }> => child.kind === 'divider');
+      if (node.m3eKind === 'divider' && linkedDivider) {
+        const action = exportAction(node, frameIds);
+        return base('divider', '区切り線', null, action ? { action } : {});
       }
       const linkedCamera = node.children?.find((child): child is Extract<CanvasNode, { kind: 'camera' }> => child.kind === 'camera');
       if (node.m3eKind === 'camera' && linkedCamera) {
@@ -2003,7 +2015,7 @@ function exportItem(node: CanvasNode, frameIds: Map<string, string>, inheritedNo
     case 'picker': {
       const selected = node.initialOption ? Math.max(0, node.options.indexOf(node.initialOption)) : undefined;
       return base('select', node.label, null, {
-        tabs: node.options.map((label) => ({ label, icon: null })),
+        tabs: node.options.map((label, index) => ({ label, icon: node.m3eMetadata?.tabs?.[index]?.icon ?? null })),
         ...(selected === undefined || selected < 0 ? {} : { selected }),
       });
     }
@@ -2224,11 +2236,12 @@ function exportToolbarNode(node: ContainerNode, frameIds: Map<string, string>, i
   }, node.m3eMetadata);
 }
 
-function exportSnackbarNode(node: ContainerNode, inheritedNote: string): M3eExportItem | null {
+function exportSnackbarNode(node: ContainerNode, frameIds: Map<string, string>, inheritedNote: string): M3eExportItem | null {
   if (node.kind !== 'hstack' || (node.m3eKind !== 'snackbar' && (node.background !== 'material' || node.cornerRadius !== 12)) || node.children.length < 1 || node.children.length > 2) return null;
   const message = node.children.find((child): child is Extract<CanvasNode, { kind: 'text' }> => child.kind === 'text');
   const action = node.children.find((child): child is Extract<CanvasNode, { kind: 'button' }> => child.kind === 'button');
   if (!message || node.children.some((child) => child !== message && child !== action)) return null;
+  const exportedAction = action ? exportAction(action, frameIds) : undefined;
   return withM3eMetadata({
     id: node.id,
     kind: 'snackbar',
@@ -2236,6 +2249,7 @@ function exportSnackbarNode(node: ContainerNode, inheritedNote: string): M3eExpo
     icon: null,
     variant: exportVariant(node),
     ...(action ? { supporting: action.label } : {}),
+    ...(exportedAction ? { action: exportedAction } : {}),
     ...(exportNote(node, inheritedNote) ? { note: exportNote(node, inheritedNote) } : {}),
   }, node.m3eMetadata);
 }
@@ -2254,7 +2268,7 @@ function exportContainerItems(node: ContainerNode, frameIds: Map<string, string>
     return [exportNavigationSplitNode(node, frameIds, inheritedNote), ...detailItems];
   }
 
-  const snackbar = exportSnackbarNode(node, inheritedNote);
+  const snackbar = exportSnackbarNode(node, frameIds, inheritedNote);
   if (snackbar) return [snackbar];
   const toolbar = exportToolbarNode(node, frameIds, inheritedNote);
   if (toolbar) return [toolbar];

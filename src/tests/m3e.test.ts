@@ -381,6 +381,7 @@ describe('M3E compatibility importer', () => {
           { id: 'camera', kind: 'camera', label: '撮影', icon: null, variant: 'filled', action: { to: 'detail', transition: 'slide' } },
           { id: 'map', kind: 'map', label: '地図', icon: 'map', variant: 'filled', action: { to: 'detail', transition: 'fade' } },
           { id: 'progress', kind: 'linearProgress', label: '同期', icon: null, variant: 'filled', value: 40, action: { to: 'detail', transition: 'slideUp' } },
+          { id: 'loading', kind: 'loadingIndicator', label: '待機', icon: null, variant: 'filled', action: { to: 'detail', transition: 'none' } },
         ],
       }],
     });
@@ -391,6 +392,7 @@ describe('M3E compatibility importer', () => {
       expect.objectContaining({ kind: 'camera', label: '撮影', action: { to: 'screen-detail', transition: 'slide' } }),
       expect.objectContaining({ kind: 'map', label: '地図', action: { to: 'screen-detail', transition: 'fade' } }),
       expect.objectContaining({ kind: 'linearProgress', label: '同期', value: 40, action: { to: 'screen-detail', transition: 'slideUp' } }),
+      expect.objectContaining({ kind: 'loadingIndicator', label: '待機', action: { to: 'screen-detail', transition: 'none' } }),
     ]));
   });
 
@@ -555,6 +557,59 @@ describe('M3E compatibility importer', () => {
     expect(swiftui).toContain('Circle()');
   });
 
+  it('round-trips every supported M3E presentation kind', () => {
+    const items = [
+      { id: 'box', kind: 'box', label: 'ボックス', icon: null, variant: 'outlined' },
+      { id: 'button', kind: 'button', label: '実行', icon: 'play_arrow', variant: 'filled' },
+      { id: 'icon-button', kind: 'iconButton', label: '', icon: 'settings', variant: 'tonal' },
+      { id: 'fab', kind: 'fab', label: '', icon: 'add', variant: 'tonal' },
+      { id: 'extended-fab', kind: 'extendedFab', label: '作成', icon: 'add', variant: 'tonal' },
+      { id: 'chip', kind: 'chip', label: 'タグ', icon: null, variant: 'outlined' },
+      { id: 'search', kind: 'searchBar', label: '検索', icon: 'search', variant: 'filled' },
+      { id: 'card', kind: 'card', label: 'カード', icon: 'photo', variant: 'tonal' },
+      { id: 'list-item', kind: 'listItem', label: '項目', icon: 'star', variant: 'filled' },
+      { id: 'dialog', kind: 'dialog', label: '確認', icon: null, variant: 'filled' },
+      { id: 'snackbar', kind: 'snackbar', label: '保存しました', supporting: '元に戻す', icon: null, variant: 'filled' },
+      { id: 'text-field', kind: 'textField', label: '名前', icon: null, variant: 'outlined' },
+      { id: 'select', kind: 'select', label: '選択', icon: null, variant: 'outlined', tabs: [{ label: 'A' }, { label: 'B' }] },
+      { id: 'switch', kind: 'switch', label: '通知', icon: null, variant: 'filled' },
+      { id: 'checkbox', kind: 'checkbox', label: '同意', icon: null, variant: 'filled' },
+      { id: 'slider', kind: 'slider', label: '音量', icon: null, variant: 'filled' },
+      { id: 'text', kind: 'text', label: '本文', icon: null, variant: 'filled' },
+      { id: 'image', kind: 'image', label: '画像', icon: 'photo', variant: 'filled' },
+      { id: 'camera', kind: 'camera', label: '撮影', icon: null, variant: 'filled' },
+      { id: 'map', kind: 'map', label: '地図', icon: 'map', variant: 'filled' },
+      { id: 'divider', kind: 'divider', label: '', icon: null, variant: 'filled' },
+      { id: 'loading', kind: 'loadingIndicator', label: '読み込み中', icon: null, variant: 'filled' },
+      { id: 'linear', kind: 'linearProgress', label: '進捗', icon: null, variant: 'filled', value: 40 },
+      { id: 'circular', kind: 'circularProgress', label: '処理', icon: null, variant: 'filled', value: 0.4 },
+      { id: 'split', kind: 'splitButton', label: '送信', icon: 'send', variant: 'filled' },
+      { id: 'fab-menu', kind: 'fabMenu', label: 'メニュー', icon: 'add', variant: 'tonal', tabs: [{ label: '写真', icon: 'photo' }] },
+      { id: 'toolbar', kind: 'toolbar', label: '操作', icon: null, variant: 'filled', tabs: [{ label: '設定', icon: 'settings' }] },
+      { id: 'tabs', kind: 'tabs', label: 'タブ', icon: null, variant: 'filled', tabs: [{ label: '概要', icon: 'home' }] },
+      { id: 'radio', kind: 'radio', label: '選択肢', icon: null, variant: 'filled' },
+      { id: 'badge', kind: 'badge', label: '1', icon: null, variant: 'filled' },
+    ];
+    const document = convertM3eDocument({
+      title: '全種別',
+      frames: [{ id: 'home', name: 'ホーム', x: 0, y: 0, w: 412, h: 892 }],
+      groups: [
+        { id: 'top', x: 0, y: 0, axis: 'x', items: [{ id: 'top-bar', kind: 'topAppBar', label: 'ホーム', icon: 'menu', variant: 'filled' }] },
+        { id: 'body', x: 0, y: 80, axis: 'y', items: [{ id: 'rail', kind: 'navRail', label: 'レール', icon: null, variant: 'filled', tabs: [{ label: 'ホーム', icon: 'home' }] }, ...items] },
+        { id: 'bottom', x: 0, y: 820, axis: 'x', items: [{ id: 'bottom-nav', kind: 'bottomNav', label: '', icon: null, variant: 'filled', tabs: [{ label: 'ホーム', icon: 'home' }] }] },
+      ],
+    });
+
+    expect(document).not.toBeNull();
+    if (!document) throw new Error('Presentation kind fixture was not converted');
+    const exportedKinds = new Set(exportM3eDocument(document).groups.flatMap((group) => group.items).map((item) => item.kind));
+    expect([...exportedKinds]).toEqual(expect.arrayContaining([
+      'box', 'button', 'iconButton', 'fab', 'extendedFab', 'chip', 'searchBar', 'card', 'listItem', 'dialog', 'snackbar',
+      'textField', 'select', 'switch', 'checkbox', 'slider', 'text', 'image', 'camera', 'map', 'divider', 'loadingIndicator',
+      'linearProgress', 'circularProgress', 'splitButton', 'fabMenu', 'toolbar', 'tabs', 'radio', 'badge', 'topAppBar', 'bottomNav', 'navRail',
+    ]));
+  });
+
   it('keeps non-action M3E kinds when the semantic tree is edited and exported', () => {
     const document = convertM3eDocument({
       frames: [{ id: 'home', name: 'ホーム', x: 0, y: 0 }],
@@ -676,6 +731,12 @@ describe('M3E compatibility importer', () => {
     expect(getM3eCompatibilityAnomalies(report!)).toEqual(expect.arrayContaining([
       expect.objectContaining({ code: 'UNKNOWN_FIELD', status: 'lost' }),
     ]));
+
+    const invalid = inspectM3eCompatibility({
+      frames: [{ id: 'home', name: 'ホーム', x: 0, y: 0 }],
+      groups: [{ id: 'invalid', x: 0, y: 0, axis: 'y', items: [{ id: 'bad', kind: 'select', tabs: [{ label: 12 }], actions: { 'tab:0': null } }] }],
+    });
+    expect(invalid?.lostFields).toEqual(expect.arrayContaining(['actions', 'tabs']));
   });
 
   it('reports and drops groups that are outside every valid frame', () => {
@@ -754,7 +815,7 @@ describe('M3E compatibility importer', () => {
         y: 80,
         axis: 'y',
         items: [
-          { id: 'sort', kind: 'select', label: '並び順', icon: null, variant: 'filled', selected: 1, tabs: [{ label: '新しい順' }, { label: '古い順' }] },
+          { id: 'sort', kind: 'select', label: '並び順', icon: null, variant: 'filled', selected: 1, tabs: [{ label: '新しい順', icon: 'arrow_up' }, { label: '古い順', icon: 'arrow_down' }] },
           { id: 'loading', kind: 'loadingIndicator', label: '読み込み中', icon: null, variant: 'filled' },
           { id: 'wave', kind: 'linearProgress', label: '同期', icon: null, variant: 'filled', value: 72, wavy: true, trackThickness: 8 },
           { id: 'ring', kind: 'circularProgress', label: '処理', icon: null, variant: 'filled', value: 0.25, trackThickness: 6 },
@@ -776,6 +837,9 @@ describe('M3E compatibility importer', () => {
     expect(output).toContain('.progressViewStyle(.circular)');
     expect(output).toContain('M3EWavyProgressView(value: 0.72, label: "同期", trackThickness: 8)');
     expect(output).toContain('M3ECircularProgressView(value: 0.25, label: "処理", lineWidth: 6)');
+    expect(exportM3eDocument(document).groups.flatMap((group) => group.items)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: 'select', tabs: [{ label: '新しい順', icon: 'arrow_up' }, { label: '古い順', icon: 'arrow_down' }] }),
+    ]));
   });
 
   it('preserves the initial selected tab in Preview and generated SwiftUI', () => {
@@ -923,7 +987,7 @@ describe('M3E compatibility importer', () => {
           axis: 'y',
           items: [
             { id: 'map', kind: 'map', label: '現在地', icon: null, variant: 'filled' },
-            { id: 'snackbar', kind: 'snackbar', label: '保存しました', supporting: '元に戻す', icon: null, variant: 'filled' },
+            { id: 'snackbar', kind: 'snackbar', label: '保存しました', supporting: '元に戻す', icon: null, variant: 'filled', action: { to: 'detail', transition: 'fade' } },
           ],
         },
         {
@@ -950,7 +1014,7 @@ describe('M3E compatibility importer', () => {
     expect(findNode(nodes, 'm3e-map')).toMatchObject({ kind: 'map', label: '現在地' });
     expect(findNode(nodes, 'm3e-snackbar')).toMatchObject({
       kind: 'hstack',
-      children: [expect.objectContaining({ kind: 'text' }), expect.objectContaining({ kind: 'button', label: '元に戻す' })],
+      children: [expect.objectContaining({ kind: 'text' }), expect.objectContaining({ kind: 'button', label: '元に戻す', destinationScreenId: 'screen-detail', navigationTransition: 'fade' })],
     });
     expect(findNode(nodes, 'm3e-rail')).toMatchObject({ kind: 'navigation-split-view', selectedIndex: 1, railExpanded: true, railModal: true });
     expect(document.screens[0]?.tabBarItems).toEqual(expect.arrayContaining([
@@ -959,14 +1023,15 @@ describe('M3E compatibility importer', () => {
     const output = generateSwiftUI(document);
     expect(output).toContain('import MapKit');
     expect(output).toContain('Map()');
-    expect(output).toContain('Button("元に戻す")');
+    expect(output).toContain('NavigationLink {');
+    expect(output).toContain('Text("元に戻す")');
     expect(output).toContain('.accessibilityElement(children: .contain)');
     expect(output).toContain('List(selection: $selected_m3e_rail)');
     const exportedItems = exportM3eDocument(document).groups.flatMap((group) => group.items);
     expect(exportedItems).toEqual(expect.arrayContaining([
       expect.objectContaining({ kind: 'navRail' }),
       expect.objectContaining({ kind: 'map', label: '現在地' }),
-      expect.objectContaining({ kind: 'snackbar', label: '保存しました', supporting: '元に戻す' }),
+      expect.objectContaining({ kind: 'snackbar', label: '保存しました', supporting: '元に戻す', action: { to: 'screen-detail', transition: 'fade' } }),
     ]));
   });
 
