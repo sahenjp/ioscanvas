@@ -1752,6 +1752,8 @@ function mapItem(item: JsonObject, context: ConversionContext): CanvasNode | nul
     case 'navRail': {
       const links = tabEntries(item).map((tab, index) => {
         const tabLabel = labelOf(tab, `項目${index + 1}`);
+        const tabIcon = iconOf(tab);
+        const tabMetadata = readM3eMetadata(tab);
         const rawActions = recordValue(item, 'actions');
         const action = rawActions && recordValue(rawActions, `tab:${index}`);
         const target = action && stringValue(action, 'to');
@@ -1766,6 +1768,9 @@ function mapItem(item: JsonObject, context: ConversionContext): CanvasNode | nul
             label: tabLabel,
             role: 'normal' as const,
             minHeight: 44,
+            tabTitle: tabLabel,
+            ...(tabIcon ? { tabSystemName: tabIcon } : {}),
+            ...(tabMetadata ? { m3eMetadata: tabMetadata } : {}),
             navigationAction: 'back' as const,
             ...(transition === undefined ? {} : { navigationTransition: transition }),
           };
@@ -1778,16 +1783,22 @@ function mapItem(item: JsonObject, context: ConversionContext): CanvasNode | nul
               label: tabLabel,
               destinationScreenId: destination,
               minHeight: 44,
+              tabTitle: tabLabel,
+              ...(tabIcon ? { tabSystemName: tabIcon } : {}),
+              ...(tabMetadata ? { m3eMetadata: tabMetadata } : {}),
               ...(transition === undefined ? {} : { navigationTransition: transition }),
             }
           : {
               id,
               kind: 'button' as const,
-              label: tabLabel,
-              role: 'normal' as const,
-              minHeight: 44,
-              ...(target ? { notes: 'M3Eの遷移先を解決できませんでした。' } : {}),
-            };
+            label: tabLabel,
+            role: 'normal' as const,
+            minHeight: 44,
+            tabTitle: tabLabel,
+            ...(tabIcon ? { tabSystemName: tabIcon } : {}),
+            ...(tabMetadata ? { m3eMetadata: tabMetadata } : {}),
+            ...(target ? { notes: 'M3Eの遷移先を解決できませんでした。' } : {}),
+          };
       });
       const selectedIndex = numberValue(item, 'selected');
       const normalizedSelectedIndex = selectedIndex !== undefined && Number.isInteger(selectedIndex) && links.length > 0

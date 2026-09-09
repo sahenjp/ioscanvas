@@ -1682,6 +1682,10 @@ describe('M3E compatibility importer', () => {
       children: [expect.objectContaining({ kind: 'text' }), expect.objectContaining({ kind: 'button', label: '元に戻す', destinationScreenId: 'screen-detail', navigationTransition: 'fade' })],
     });
     expect(findNode(nodes, 'm3e-rail')).toMatchObject({ kind: 'navigation-split-view', selectedIndex: 1, railExpanded: true, railModal: true });
+    expect(findNode(nodes, 'm3e-rail')?.children?.[0]?.children).toEqual(expect.arrayContaining([
+      expect.objectContaining({ label: 'ホーム', tabTitle: 'ホーム', tabSystemName: 'house', m3eMetadata: { icon: 'house' } }),
+      expect.objectContaining({ label: '詳細', tabTitle: '詳細', tabSystemName: 'info.circle', m3eMetadata: { icon: 'info' } }),
+    ]));
     expect(document.screens[0]?.tabBarItems).toEqual(expect.arrayContaining([
       expect.objectContaining({ title: '詳細', placement: 'bottomBar', selected: true }),
     ]));
@@ -1694,7 +1698,12 @@ describe('M3E compatibility importer', () => {
     expect(output).toContain('List(selection: $selected_m3e_rail)');
     const exportedItems = exportM3eDocument(document).groups.flatMap((group) => group.items);
     expect(exportedItems).toEqual(expect.arrayContaining([
-      expect.objectContaining({ kind: 'navRail', railExpanded: true, railModal: true }),
+      expect.objectContaining({
+        kind: 'navRail',
+        railExpanded: true,
+        railModal: true,
+        tabs: [{ label: 'ホーム', icon: 'house' }, { label: '詳細', icon: 'info' }],
+      }),
       expect.objectContaining({ kind: 'map', label: '現在地' }),
       expect.objectContaining({ kind: 'snackbar', label: '保存しました', supporting: '元に戻す', action: { to: 'screen-detail', transition: 'fade' } }),
     ]));
