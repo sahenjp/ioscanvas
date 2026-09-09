@@ -2146,6 +2146,8 @@ function exportNavigationSplitNode(node: ContainerNode, frameIds: Map<string, st
     variant: exportVariant(node),
     tabs,
     ...(node.selectedIndex === undefined ? {} : { selected: node.selectedIndex }),
+    ...(node.railExpanded === undefined ? {} : { railExpanded: node.railExpanded }),
+    ...(node.railModal === undefined ? {} : { railModal: node.railModal }),
     ...(Object.keys(actions).length > 0 ? { actions } : {}),
     ...(exportNote(node, inheritedNote) ? { note: exportNote(node, inheritedNote) } : {}),
   }, node.m3eMetadata);

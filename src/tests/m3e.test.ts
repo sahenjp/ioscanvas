@@ -1029,7 +1029,7 @@ describe('M3E compatibility importer', () => {
     expect(output).toContain('List(selection: $selected_m3e_rail)');
     const exportedItems = exportM3eDocument(document).groups.flatMap((group) => group.items);
     expect(exportedItems).toEqual(expect.arrayContaining([
-      expect.objectContaining({ kind: 'navRail' }),
+      expect.objectContaining({ kind: 'navRail', railExpanded: true, railModal: true }),
       expect.objectContaining({ kind: 'map', label: '現在地' }),
       expect.objectContaining({ kind: 'snackbar', label: '保存しました', supporting: '元に戻す', action: { to: 'screen-detail', transition: 'fade' } }),
     ]));
