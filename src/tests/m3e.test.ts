@@ -1011,10 +1011,12 @@ describe('M3E compatibility importer', () => {
 
     const invalid = inspectM3eCompatibility({
       frames: [{ id: 'home', name: 'ホーム', x: 0, y: 0 }],
-      groups: [{ id: 'invalid', x: 0, y: 0, axis: 'y', items: [{ id: 'bad', kind: 'select', tabs: [{ label: 12 }], actions: { 'tab:0': null } }] }],
+      groups: [{ id: 'invalid', x: 0, y: 0, axis: 'y', items: [{ id: 'bad', kind: 'select', label: 12, noteHistory: ['有効', 2], tabs: [{ label: 12 }], actions: { 'tab:0': null } }] }],
     });
     expect(invalid?.lostFields).toEqual(expect.arrayContaining(['actions', 'tabs']));
     expect(invalid?.invalidFields).toEqual(expect.arrayContaining([
+      'groups[0].items[0].label',
+      'groups[0].items[0].noteHistory',
       'groups[0].items[0].tabs[0].label',
       'groups[0].items[0].actions.tab:0',
     ]));

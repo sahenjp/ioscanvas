@@ -931,6 +931,7 @@ function collectM3eInvalidFields(value: unknown): string[] {
     if (typeof frame.name !== 'string' || !frame.name.trim()) invalidFields.add(`${framePath}.name`);
     numericField(frame, 'x', `${framePath}.x`);
     numericField(frame, 'y', `${framePath}.y`);
+    if (hasField(frame, 'note') && typeof frame.note !== 'string') invalidFields.add(`${framePath}.note`);
     if (Object.prototype.hasOwnProperty.call(frame, 'place') && !isOneOf(frame.place, ['top', 'center', 'bottom', 'spread'])) invalidFields.add(`${framePath}.place`);
     if (Object.prototype.hasOwnProperty.call(frame, 'bg') && !isOneOf(frame.bg, ['surface', 'surfaceContainerLow', 'surfaceContainer', 'surfaceContainerHigh', 'surfaceContainerHighest', 'primaryContainer', 'secondaryContainer', 'tertiaryContainer', 'primary', 'inverseSurface'])) invalidFields.add(`${framePath}.bg`);
     positiveDimension(frame, 'w', `${framePath}.w`);
@@ -957,6 +958,9 @@ function collectM3eInvalidFields(value: unknown): string[] {
     if (typeof group.id !== 'string' || !group.id.trim()) invalidFields.add(`${groupPath}.id`);
     numericField(group, 'x', `${groupPath}.x`);
     numericField(group, 'y', `${groupPath}.y`);
+    for (const key of ['free', 'locked'] as const) {
+      if (hasField(group, key) && typeof group[key] !== 'boolean') invalidFields.add(`${groupPath}.${key}`);
+    }
     position(group, `${groupPath}.pos`);
     if (!isOneOf(group.axis, ['x', 'y'])) invalidFields.add(`${groupPath}.axis`);
     if (!Array.isArray(group.items)) {
@@ -972,6 +976,7 @@ function collectM3eInvalidFields(value: unknown): string[] {
       }
       if (typeof item.id !== 'string' || !item.id.trim()) invalidFields.add(`${itemPath}.id`);
       if (typeof item.kind !== 'string' || !item.kind.trim()) invalidFields.add(`${itemPath}.kind`);
+      if (hasField(item, 'label') && typeof item.label !== 'string') invalidFields.add(`${itemPath}.label`);
       position(item, `${itemPath}.pos`);
       for (const key of ['size', 'size2', 'minimum', 'maximum', 'step', 'value', 'radiusTop', 'radiusBottom', 'imageSize'] as const) {
         const field = numericField(item, key, `${itemPath}.${key}`);
@@ -981,9 +986,10 @@ function collectM3eInvalidFields(value: unknown): string[] {
         const trackThickness = numericField(item, 'trackThickness', `${itemPath}.trackThickness`);
         if (trackThickness !== undefined && (!Number.isInteger(trackThickness) || trackThickness < 2 || trackThickness > 16)) invalidFields.add(`${itemPath}.trackThickness`);
       }
-      for (const key of ['bold', 'checked', 'switch', 'noCheck', 'noImage', 'wavy', 'contained', 'railExpanded', 'railModal'] as const) {
+      for (const key of ['bold', 'checked', 'switch', 'noCheck', 'noImage', 'wavy', 'contained', 'railExpanded', 'railModal', 'locked'] as const) {
         if (Object.prototype.hasOwnProperty.call(item, key) && typeof item[key] !== 'boolean') invalidFields.add(`${itemPath}.${key}`);
       }
+      if (hasField(item, 'noteHistory') && (!Array.isArray(item.noteHistory) || !item.noteHistory.every((entry) => typeof entry === 'string'))) invalidFields.add(`${itemPath}.noteHistory`);
       for (const key of ['supporting', 'note', 'src'] as const) {
         if (Object.prototype.hasOwnProperty.call(item, key) && typeof item[key] !== 'string') invalidFields.add(`${itemPath}.${key}`);
       }
