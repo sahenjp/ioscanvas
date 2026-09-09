@@ -194,6 +194,46 @@ describe('M3E compatibility importer', () => {
     ]));
   });
 
+  it('reports unresolved actions retained in M3E metadata during export', () => {
+    const document: CanvasDocument = {
+      version: 1,
+      name: '未解決metadata操作',
+      platform: 'iOS',
+      minimumOS: '26.0',
+      appearance: { colorScheme: 'system', accentColor: 'blue' },
+      activeScreenId: 'home',
+      screens: [{
+        id: 'home',
+        name: 'ホーム',
+        navigationTitle: 'ホーム',
+        previewDevice: 'iphone-se',
+        m3eTopAppBar: { actions: { icon: { to: 'missing', transition: 'slide' } } },
+        root: {
+          id: 'root',
+          kind: 'vstack',
+          children: [{
+            id: 'action',
+            kind: 'button',
+            label: '開く',
+            role: 'normal',
+            minHeight: 44,
+            m3eMetadata: {
+              action: { to: 'missing', transition: 'fade' },
+              actions: { icon2: { to: 'missing', transition: 'slideLeft' } },
+            },
+          }],
+        },
+      }],
+    };
+
+    const report = inspectM3eExportCompatibility(document);
+    expect(report.unresolvedDestinationCount).toBe(3);
+    expect(report.unresolvedActionCount).toBe(3);
+    expect(getM3eCompatibilityAnomalies(report)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'UNRESOLVED_NAVIGATION', status: 'unresolved' }),
+    ]));
+  });
+
   it('reports invalid values in the exported M3E projection', () => {
     const document: CanvasDocument = {
       version: 1,

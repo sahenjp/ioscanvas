@@ -2762,11 +2762,23 @@ export function inspectM3eExportCompatibility(document: CanvasDocument): M3eExpo
   const collectExportedFields = (item: M3eExportItem): void => {
     Object.keys(item).forEach((field) => exportedFields.add(field));
   };
+  const collectUnresolvedMetadataActions = (metadata: M3eItemMetadata | undefined): void => {
+    if (!metadata) return;
+    const actions = [metadata.action, ...Object.values(metadata.actions ?? {})].filter((action): action is M3eAction => action !== undefined);
+    for (const action of actions) {
+      if (action.to !== 'back' && !frameIds.has(action.to)) {
+        unresolvedDestinationCount += 1;
+        unresolvedActionCount += 1;
+      }
+    }
+  };
   exported.groups.forEach((group) => group.items.forEach(collectExportedFields));
 
   for (const screen of document.screens) {
     collectExportCompatibilityKinds(screen.root, flattenedNodeKinds, approximatedKinds, unsupportedNodeKinds, frameIds);
     collectMetadataFields(screen.root);
+    collectUnresolvedMetadataActions(screen.m3eTopAppBar);
+    collectUnresolvedMetadataActions(screen.m3eBottomNav);
     Object.keys(screen.m3eTopAppBar ?? {}).forEach((field) => sourceFields.add(field));
     Object.keys(screen.m3eBottomNav ?? {}).forEach((field) => sourceFields.add(field));
     for (const node of screen.root.children) {
@@ -2783,6 +2795,7 @@ export function inspectM3eExportCompatibility(document: CanvasDocument): M3eExpo
             unresolvedActionCount += 1;
           }
         }
+        collectUnresolvedMetadataActions(current.m3eMetadata);
         if (Array.isArray(current.children)) {
           for (const child of current.children) visit(child);
         }
