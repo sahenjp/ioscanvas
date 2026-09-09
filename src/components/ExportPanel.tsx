@@ -92,6 +92,7 @@ export function ExportPanel() {
             {m3eReport.preservedFields.length > 0 && <span>保持フィールド: {m3eReport.preservedFields.join(', ')}</span>}
             {m3eReport.approximatedFields.length > 0 && <span>近似フィールド: {describeM3eCompatibilityFields(m3eReport.approximatedFields)}</span>}
             {m3eReport.lostFields.length > 0 && <span>出力できないフィールド: {m3eReport.lostFields.join(', ')}</span>}
+            {m3eReport.invalidFields.length > 0 && <span>不正な値: {m3eReport.invalidFields.join(', ')}</span>}
             {m3eReport.unknownFields.length > 0 && <span>未知のフィールド: {m3eReport.unknownFields.join(', ')}</span>}
             {m3eAnomalies.length > 0 && (
               <details className="m3e-anomaly-details">

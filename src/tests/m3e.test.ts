@@ -119,6 +119,7 @@ describe('M3E compatibility importer', () => {
       preservedFields: [],
       approximatedFields: [],
       lostFields: [],
+      invalidFields: [],
       unknownFields: [],
       normalizedScreenCount: 1,
       roundTripValid: true,
@@ -689,6 +690,7 @@ describe('M3E compatibility importer', () => {
       preservedFields: ['action', 'icon'],
       approximatedFields: [],
       lostFields: [],
+      invalidFields: [],
       unknownFields: [],
       flattenedLayoutCount: 0,
     });
@@ -739,6 +741,50 @@ describe('M3E compatibility importer', () => {
       groups: [{ id: 'invalid', x: 0, y: 0, axis: 'y', items: [{ id: 'bad', kind: 'select', tabs: [{ label: 12 }], actions: { 'tab:0': null } }] }],
     });
     expect(invalid?.lostFields).toEqual(expect.arrayContaining(['actions', 'tabs']));
+  });
+
+  it('reports values that the importer would normalize instead of preserving them', () => {
+    const report = inspectM3eCompatibility({
+      frames: [{
+        id: 'home',
+        name: 'ホーム',
+        x: 0,
+        y: 0,
+        w: 0,
+        h: '892',
+        swipe: { left: 12, right: '', up: null, down: 'missing' },
+      }],
+      groups: [{
+        id: 'controls',
+        x: 0,
+        y: 0,
+        axis: 'y',
+        items: [
+          { id: 'range', kind: 'slider', minimum: 10, maximum: 5, step: 0, value: 120 },
+          { id: 'select', kind: 'select', tabs: [{ label: '一' }, { label: '二' }], selected: 2 },
+          { id: 'tabs', kind: 'tabs', tabs: [{ label: '一' }], selected: -1 },
+          { id: 'rail', kind: 'navRail', tabs: [{ label: '一' }], selected: '0' },
+        ],
+      }],
+    });
+
+    expect(report?.invalidFields).toEqual(expect.arrayContaining([
+      'frames[0].w',
+      'frames[0].h',
+      'frames[0].swipe.left',
+      'frames[0].swipe.right',
+      'frames[0].swipe.up',
+      'groups[0].items[0].minimum',
+      'groups[0].items[0].maximum',
+      'groups[0].items[0].step',
+      'groups[0].items[0].value',
+      'groups[0].items[1].selected',
+      'groups[0].items[2].selected',
+      'groups[0].items[3].selected',
+    ]));
+    expect(getM3eCompatibilityAnomalies(report!)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'INVALID_FIELD', status: 'lost' }),
+    ]));
   });
 
   it('reports and drops groups that are outside every valid frame', () => {

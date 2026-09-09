@@ -180,6 +180,7 @@ export interface M3eCompatibilityReport {
   preservedFields: string[];
   approximatedFields: string[];
   lostFields: string[];
+  invalidFields: string[];
   unknownFields: string[];
 }
 
@@ -195,6 +196,7 @@ export type M3eCompatibilityAnomalyCode =
   | 'APPROXIMATED_FIELD'
   | 'UNRESOLVED_NAVIGATION'
   | 'LOST_FIELD'
+  | 'INVALID_FIELD'
   | 'UNKNOWN_FIELD'
   | 'ROUND_TRIP';
 
@@ -215,6 +217,7 @@ export interface M3eExportCompatibilityReport {
   preservedFields: string[];
   approximatedFields: string[];
   lostFields: string[];
+  invalidFields: string[];
   unknownFields: string[];
   normalizedScreenCount: number;
   roundTripValid: boolean;
@@ -301,6 +304,7 @@ function importCompatibilityAnomalies(report: M3eCompatibilityReport): M3eCompat
   if (report.approximatedKinds.length > 0) anomalies.push(compatibilityAnomaly('approximated', 'APPROXIMATED_KIND', '近似変換', describeM3eCompatibilityKinds(report.approximatedKinds)));
   if (report.approximatedFields.length > 0) anomalies.push(compatibilityAnomaly('approximated', 'APPROXIMATED_FIELD', '近似フィールド', describeM3eCompatibilityFields(report.approximatedFields)));
   if (report.lostFields.length > 0) anomalies.push(compatibilityAnomaly('lost', 'LOST_FIELD', '失われたフィールド', report.lostFields.join(', ')));
+  if (report.invalidFields.length > 0) anomalies.push(compatibilityAnomaly('lost', 'INVALID_FIELD', '不正な値', report.invalidFields.join(', ')));
   if (report.unknownFields.length > 0) anomalies.push(compatibilityAnomaly('lost', 'UNKNOWN_FIELD', '未知のフィールド', report.unknownFields.join(', ')));
   return anomalies;
 }
@@ -320,6 +324,7 @@ function exportCompatibilityAnomalies(report: M3eExportCompatibilityReport): M3e
   }
   if (report.approximatedFields.length > 0) anomalies.push(compatibilityAnomaly('approximated', 'APPROXIMATED_FIELD', '近似フィールド', describeM3eCompatibilityFields(report.approximatedFields)));
   if (report.lostFields.length > 0) anomalies.push(compatibilityAnomaly('lost', 'LOST_FIELD', '出力できないフィールド', report.lostFields.join(', ')));
+  if (report.invalidFields.length > 0) anomalies.push(compatibilityAnomaly('lost', 'INVALID_FIELD', '不正な値', report.invalidFields.join(', ')));
   if (report.unknownFields.length > 0) anomalies.push(compatibilityAnomaly('lost', 'UNKNOWN_FIELD', '未知のフィールド', report.unknownFields.join(', ')));
   if (!report.roundTripValid) anomalies.push(compatibilityAnomaly('lost', 'ROUND_TRIP', '再読込検証', '書き出したM3E JSONを再読込できませんでした。'));
   return anomalies;
@@ -826,6 +831,78 @@ function collectM3eUnknownFields(value: unknown): string[] {
   });
 
   return [...unknownFields].sort();
+}
+
+function collectM3eInvalidFields(value: unknown): string[] {
+  if (!isRecord(value)) return [];
+  const invalidFields = new Set<string>();
+  const hasField = (record: JsonObject, key: string): boolean => Object.prototype.hasOwnProperty.call(record, key);
+  const numericField = (record: JsonObject, key: string, path: string): number | undefined => {
+    if (!hasField(record, key)) return undefined;
+    const field = record[key];
+    if (typeof field !== 'number' || !Number.isFinite(field)) {
+      invalidFields.add(path);
+      return undefined;
+    }
+    return field;
+  };
+  const positiveDimension = (record: JsonObject, key: 'w' | 'h', path: string): void => {
+    const field = numericField(record, key, path);
+    if (field !== undefined && field <= 0) invalidFields.add(path);
+  };
+  const selectionKinds = new Set(['select', 'tabs', 'bottomNav', 'navRail']);
+
+  const frames = Array.isArray(value.frames) ? value.frames : [];
+  frames.forEach((frame, frameIndex) => {
+    if (!isRecord(frame)) return;
+    const framePath = `frames[${frameIndex}]`;
+    positiveDimension(frame, 'w', `${framePath}.w`);
+    positiveDimension(frame, 'h', `${framePath}.h`);
+    if (!hasField(frame, 'swipe')) return;
+    const swipe = frame.swipe;
+    if (!isRecord(swipe)) {
+      invalidFields.add(`${framePath}.swipe`);
+      return;
+    }
+    for (const direction of ['left', 'right', 'up', 'down'] as const) {
+      if (!hasField(swipe, direction)) continue;
+      if (typeof swipe[direction] !== 'string' || !swipe[direction].trim()) invalidFields.add(`${framePath}.swipe.${direction}`);
+    }
+  });
+
+  const groups = Array.isArray(value.groups) ? value.groups : [];
+  groups.forEach((group, groupIndex) => {
+    if (!isRecord(group) || !Array.isArray(group.items)) return;
+    group.items.forEach((item, itemIndex) => {
+      if (!isRecord(item)) return;
+      const itemPath = `groups[${groupIndex}].items[${itemIndex}]`;
+      if (item.kind === 'slider') {
+        const minimum = numericField(item, 'minimum', `${itemPath}.minimum`);
+        const maximum = numericField(item, 'maximum', `${itemPath}.maximum`);
+        const step = numericField(item, 'step', `${itemPath}.step`);
+        const value = numericField(item, 'value', `${itemPath}.value`);
+        if (minimum !== undefined && maximum !== undefined && minimum >= maximum) {
+          invalidFields.add(`${itemPath}.minimum`);
+          invalidFields.add(`${itemPath}.maximum`);
+        }
+        if (step !== undefined && step <= 0) invalidFields.add(`${itemPath}.step`);
+        if (step !== undefined && minimum !== undefined && maximum !== undefined && minimum < maximum && step > maximum - minimum) {
+          invalidFields.add(`${itemPath}.step`);
+        }
+        if (value !== undefined && (value < 0 || value > 100)) invalidFields.add(`${itemPath}.value`);
+      }
+      if (!selectionKinds.has(String(item.kind)) || !hasField(item, 'selected')) return;
+      const selected = numericField(item, 'selected', `${itemPath}.selected`);
+      if (selected === undefined || !Number.isInteger(selected) || selected < 0) {
+        invalidFields.add(`${itemPath}.selected`);
+        return;
+      }
+      const optionCount = Array.isArray(item.tabs) ? item.tabs.filter(isRecord).length : 0;
+      if (selected >= optionCount) invalidFields.add(`${itemPath}.selected`);
+    });
+  });
+
+  return [...invalidFields].sort();
 }
 
 function appendNotes(node: CanvasNode, item: JsonObject, extra: string[] = []): CanvasNode {
@@ -1610,6 +1687,7 @@ export function inspectM3eCompatibility(value: unknown): M3eCompatibilityReport 
     preservedFields: [...preservedFields].sort(),
     approximatedFields: [...approximatedFields].sort(),
     lostFields: [...lostFields].sort(),
+    invalidFields: collectM3eInvalidFields(value),
     unknownFields: collectM3eUnknownFields(value),
   };
 }
@@ -2551,6 +2629,7 @@ export function inspectM3eExportCompatibility(document: CanvasDocument): M3eExpo
     preservedFields,
     approximatedFields,
     lostFields,
+    invalidFields: collectM3eInvalidFields(exported),
     unknownFields: [],
     normalizedScreenCount: exported.frames.length,
     roundTripValid: roundTripped !== null
