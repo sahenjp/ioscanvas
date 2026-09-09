@@ -1,6 +1,13 @@
 import { lintDocument } from './hig';
 import type { CanvasDocument, CanvasNode, ScreenDevice } from '../types/document';
 
+function promptSource(value: string): string {
+  const trimmed = value.trim();
+  if (!/^data:/i.test(trimmed)) return trimmed;
+  const headerEnd = trimmed.indexOf(',');
+  return headerEnd >= 0 ? `${trimmed.slice(0, headerEnd)},…` : 'data:…';
+}
+
 function m3eMetadataDetails(metadata: CanvasNode['m3eMetadata']): string {
   if (!metadata) return '';
   const parts = [
@@ -19,7 +26,7 @@ function m3eMetadataDetails(metadata: CanvasNode['m3eMetadata']): string {
     metadata.textColor ? `textColor=${metadata.textColor}` : '',
     metadata.fill ? `fill=${metadata.fill}` : '',
     metadata.iconFill ? `iconFill=${metadata.iconFill}` : '',
-    metadata.src ? `source=${metadata.src}` : '',
+    metadata.src?.trim() ? `source=${promptSource(metadata.src)}` : '',
     metadata.contained ? 'contained' : '',
     metadata.noCheck ? 'noCheck' : '',
     metadata.noImage ? 'noImage' : '',

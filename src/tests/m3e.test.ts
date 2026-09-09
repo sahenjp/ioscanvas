@@ -869,6 +869,24 @@ describe('M3E compatibility importer', () => {
     expect(slider).toMatchObject({ value: 25, minimum: 10, maximum: 30, step: 5 });
   });
 
+  it('carries list item icon fills onto generated SwiftUI row icons', () => {
+    const document = convertM3eDocument({
+      frames: [{ id: 'home', name: 'ホーム', x: 0, y: 0 }],
+      groups: [{
+        id: 'list',
+        x: 0,
+        y: 0,
+        axis: 'y',
+        items: [{ id: 'settings', kind: 'listItem', label: '設定', icon: 'gearshape', icon2: 'chevron.right', iconFill: 'primaryContainer', variant: 'filled' }],
+      }],
+    });
+
+    expect(document).not.toBeNull();
+    if (!document) throw new Error('List item icon fixture was not converted');
+    expect(document.screens[0]?.root.children[0]?.m3eMetadata).toMatchObject({ iconFill: 'primaryContainer' });
+    expect(generateSwiftUI(document)).toContain('.background(Color.accentColor.opacity(0.16), in: RoundedRectangle(cornerRadius: 8))');
+  });
+
   it('retains original M3E icon names and source fields after semantic editing', () => {
     const source = {
       title: '原典保持',

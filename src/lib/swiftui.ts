@@ -108,7 +108,7 @@ function accentColorLiteral(appearance: CanvasDocument['appearance']): string {
 }
 
 function renderNode(node: CanvasNode, depth: number, context: RenderContext): string {
-  const rendered = renderNodeContent(node, depth, context);
+  const rendered = renderNodeContent(node, depth, m3eChildIconContext(node, context));
   const pad = indent(depth);
   const transitionNote = node.navigationTransition
     ? `${pad}// iOSCanvas navigation transition: ${node.navigationTransition}. NavigationStack keeps the native transition; use a custom route if this exact motion is required.\n`
@@ -210,7 +210,7 @@ function m3eModifiers(node: CanvasNode, depth: number): string[] {
   if (metadata.contained && !hasBackground && !node.glass && !metadata.fill) {
     modifiers.push(`${pad}.background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12))`);
   }
-  if (metadata.iconFill && node.kind === 'image' && node.source === 'symbol' && metadata.iconFill !== 'none') {
+  if (metadata.iconFill && node.kind === 'image' && (!node.source || node.source === 'symbol') && metadata.iconFill !== 'none') {
     modifiers.push(`${pad}.padding(6)`);
     modifiers.push(`${pad}.background(${m3eFillLiteral(metadata.iconFill)}, in: RoundedRectangle(cornerRadius: 8))`);
   }
@@ -232,6 +232,24 @@ function m3eButtonLabel(
         .padding(6)
         .background(${m3eFillLiteral(iconFill)}, in: RoundedRectangle(cornerRadius: 8))
 }`;
+}
+
+function m3eChildIconContext(node: CanvasNode, context: RenderContext): RenderContext {
+  const fill = node.m3eMetadata?.iconFill;
+  if (!fill || fill === 'none' || !node.children) return context;
+  const nodeModifiers = new Map(context.nodeModifiers ?? []);
+  const addToImages = (current: CanvasNode): void => {
+    if (current.kind === 'image' && (!current.source || current.source === 'symbol')) {
+      nodeModifiers.set(current.id, [
+        ...(nodeModifiers.get(current.id) ?? []),
+        '.padding(6)',
+        `.background(${m3eFillLiteral(fill)}, in: RoundedRectangle(cornerRadius: 8))`,
+      ]);
+    }
+    current.children?.forEach(addToImages);
+  };
+  node.children.forEach(addToImages);
+  return { ...context, nodeModifiers };
 }
 
 function m3eToolbarBackground(metadata: M3eItemMetadata | undefined): string | undefined {

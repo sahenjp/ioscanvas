@@ -100,6 +100,18 @@ describe('implementation prompt generator', () => {
     expect(output).toContain('M3E Top App Bar: / M3E size=56dp / fill=surfaceContainerHigh');
   });
 
+  it('does not expand M3E data image payloads into the implementation brief', () => {
+    const document = structuredClone(defaultDocument);
+    const image = document.screens[0]?.root.children.find((node) => node.kind === 'image');
+    if (!image) throw new Error('Image prompt fixture missing');
+    image.m3eMetadata = { src: 'data:image/png;base64,very-long-fixture' };
+
+    const output = generateImplementationPrompt(document);
+
+    expect(output).toContain('source=data:image/png;base64,…');
+    expect(output).not.toContain('very-long-fixture');
+  });
+
   it('includes SearchField binding and prompt in the implementation brief', () => {
     const document = structuredClone(defaultDocument);
     document.screens[0]?.root.children.push({
