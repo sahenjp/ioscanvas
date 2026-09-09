@@ -976,11 +976,16 @@ describe('M3E compatibility importer', () => {
       flattenedLayoutCount: 0,
     });
     if (!report) throw new Error('Compatibility report was not generated');
-    expect(getM3eCompatibilityAnomalies(report)).toEqual(expect.arrayContaining([
+    const anomalies = getM3eCompatibilityAnomalies(report);
+    expect(anomalies).toEqual(expect.arrayContaining([
       expect.objectContaining({ code: 'UNSUPPORTED_KIND', status: 'lost' }),
       expect.objectContaining({ code: 'APPROXIMATED_KIND', status: 'approximated' }),
       expect.objectContaining({ code: 'UNRESOLVED_NAVIGATION', status: 'unresolved' }),
     ]));
+    expect(anomalies.find((anomaly) => anomaly.code === 'UNSUPPORTED_KIND')).toMatchObject({
+      paths: ['groups[0].items[0].kind'],
+      guidance: expect.stringContaining('SwiftUI'),
+    });
   });
 
   it('reports unknown M3E fields instead of silently dropping them', () => {
@@ -1301,6 +1306,32 @@ describe('M3E compatibility importer', () => {
       unknownFields: [],
       roundTripValid: true,
     });
+  });
+
+  it('accepts the canonical M3E frame mode without losing the selected screen', () => {
+    const source = {
+      frame: 'phone',
+      activeFrame: 'detail',
+      frames: [
+        { id: 'home', name: 'ホーム', x: 0, y: 0 },
+        { id: 'detail', name: '詳細', x: 532, y: 0 },
+      ],
+      groups: [
+        { id: 'home-body', x: 0, y: 0, axis: 'y', items: [{ id: 'home-text', kind: 'text', label: '一覧' }] },
+        { id: 'detail-body', x: 532, y: 0, axis: 'y', items: [{ id: 'detail-text', kind: 'text', label: '詳細' }] },
+      ],
+    };
+
+    expect(inspectM3eCompatibility(source)?.invalidFields).toEqual([]);
+    const document = convertM3eDocument(source);
+    expect(document?.activeScreenId).toBe('screen-detail');
+    expect(document?.m3eMetadata?.frameMode).toBe('phone');
+    if (!document) throw new Error('Canonical M3E frame fixture was not converted');
+
+    const exported = exportM3eDocument(document);
+    expect(exported.frame).toBe('phone');
+    expect(exported.activeFrame).toBe('screen-detail');
+    expect(inspectM3eExportCompatibility(document).roundTripValid).toBe(true);
   });
 
   it('reports and drops groups that are outside every valid frame', () => {

@@ -17,6 +17,7 @@ import type {
   M3eContrast,
   M3eDocumentMetadata,
   M3eFont,
+  M3eFrameMode,
   M3eItemMetadata,
   M3eMenuAction,
   M3eMotion,
@@ -154,7 +155,8 @@ export interface M3eExportDocument {
     motion: M3eMotion;
   };
   platform: M3ePlatform;
-  frame: string;
+  frame: M3eFrameMode;
+  activeFrame?: string;
   frames: M3eExportFrame[];
   groups: M3eExportGroup[];
   customPalette?: Record<string, unknown>;
@@ -229,7 +231,26 @@ export interface M3eCompatibilityAnomaly {
   status: M3eCompatibilityAnomalyStatus;
   label: string;
   detail: string;
+  paths: string[];
+  guidance: string;
 }
+
+const m3eAnomalyGuidance: Record<M3eCompatibilityAnomalyCode, string> = {
+  INVALID_FRAME: 'フレームの必須値を確認してから、もう一度読み込んでください。',
+  INVALID_GROUP: 'グループのID・座標・軸・項目配列を確認してください。',
+  ORPHANED_GROUP: '画面内に収まる位置へ戻すか、不要なグループを元データから削除してください。',
+  DISCARDED_ITEM: '項目のIDと種別を補正すると、読み込み時に保持できます。',
+  FLATTENED_LAYOUT: '自由配置はSwiftUIの意味構造へ変換されています。必要ならキャンバス上で親子関係を調整してください。',
+  UNSUPPORTED_KIND: '対応するSwiftUI標準部品へ置き換え、実装メモに必要な挙動を残してください。',
+  APPROXIMATED_KIND: '出力後に、対象コンポーネント固有の状態や表示をSwiftUI側で補ってください。',
+  APPROXIMATED_FIELD: '値は近いSwiftUI表現へ変換されています。生成コードの該当箇所を確認してください。',
+  UNRESOLVED_NAVIGATION: '遷移先の画面IDを追加または修正してから、再度書き出してください。',
+  LOST_FIELD: 'この情報は射影先にありません。必要な仕様を実装用の説明へ転記してください。',
+  INVALID_FIELD: '値の型・範囲・参照先を修正してから、再度読み込んでください。',
+  DUPLICATE_ID: 'IDを一意にして、遷移や項目参照の曖昧さを解消してください。',
+  UNKNOWN_FIELD: '未対応フィールドは無視される可能性があります。元データと出力後の意味を確認してください。',
+  ROUND_TRIP: '生成したM3E JSONを再読込できません。JSONの構造と必須値を確認してください。',
+};
 
 export interface M3eExportCompatibilityReport {
   flattenedItemCount: number;
@@ -305,13 +326,22 @@ export function describeM3eCompatibilityFields(fields: string[]): string {
   }).join(', ');
 }
 
+export function describeM3eCompatibilityStatus(status: M3eCompatibilityAnomalyStatus): string {
+  switch (status) {
+    case 'approximated': return '近似';
+    case 'unresolved': return '未解決';
+    case 'lost': return '要確認';
+  }
+}
+
 function compatibilityAnomaly(
   status: M3eCompatibilityAnomalyStatus,
   code: M3eCompatibilityAnomalyCode,
   label: string,
   detail: string,
+  paths: string[] = [],
 ): M3eCompatibilityAnomaly {
-  return { status, code, label, detail };
+  return { status, code, label, detail, paths, guidance: m3eAnomalyGuidance[code] };
 }
 
 function unresolvedNavigationDetail(
@@ -328,47 +358,49 @@ function compatibilityDetail(summary: string, paths: string[]): string {
 
 function importCompatibilityAnomalies(report: M3eCompatibilityReport): M3eCompatibilityAnomaly[] {
   const anomalies: M3eCompatibilityAnomaly[] = [];
-  if (report.invalidFrameCount > 0) anomalies.push(compatibilityAnomaly('lost', 'INVALID_FRAME', '無効な画面', compatibilityDetail(`${report.invalidFrameCount}件を読み込めませんでした。`, report.invalidFramePaths)));
-  if (report.invalidGroupCount > 0) anomalies.push(compatibilityAnomaly('lost', 'INVALID_GROUP', '無効なグループ', compatibilityDetail(`${report.invalidGroupCount}件を読み込めませんでした。`, report.invalidGroupPaths)));
-  if (report.orphanedGroupCount > 0) anomalies.push(compatibilityAnomaly('lost', 'ORPHANED_GROUP', '画面外グループ', compatibilityDetail(`${report.orphanedGroupCount}件を画面へ割り当てられませんでした。`, report.orphanedGroupPaths)));
-  if (report.discardedItemCount > 0) anomalies.push(compatibilityAnomaly('lost', 'DISCARDED_ITEM', '破棄した項目', compatibilityDetail(`${report.discardedItemCount}件が有効な項目として解釈できませんでした。`, report.discardedItemPaths)));
-  if (report.flattenedLayoutCount > 0) anomalies.push(compatibilityAnomaly('approximated', 'FLATTENED_LAYOUT', '自由配置の平坦化', compatibilityDetail(`${report.flattenedLayoutCount}件の座標・ロック情報を意味構造へ変換しました。`, report.flattenedPaths)));
+  if (report.invalidFrameCount > 0) anomalies.push(compatibilityAnomaly('lost', 'INVALID_FRAME', '無効な画面', compatibilityDetail(`${report.invalidFrameCount}件を読み込めませんでした。`, report.invalidFramePaths), report.invalidFramePaths));
+  if (report.invalidGroupCount > 0) anomalies.push(compatibilityAnomaly('lost', 'INVALID_GROUP', '無効なグループ', compatibilityDetail(`${report.invalidGroupCount}件を読み込めませんでした。`, report.invalidGroupPaths), report.invalidGroupPaths));
+  if (report.orphanedGroupCount > 0) anomalies.push(compatibilityAnomaly('lost', 'ORPHANED_GROUP', '画面外グループ', compatibilityDetail(`${report.orphanedGroupCount}件を画面へ割り当てられませんでした。`, report.orphanedGroupPaths), report.orphanedGroupPaths));
+  if (report.discardedItemCount > 0) anomalies.push(compatibilityAnomaly('lost', 'DISCARDED_ITEM', '破棄した項目', compatibilityDetail(`${report.discardedItemCount}件が有効な項目として解釈できませんでした。`, report.discardedItemPaths), report.discardedItemPaths));
+  if (report.flattenedLayoutCount > 0) anomalies.push(compatibilityAnomaly('approximated', 'FLATTENED_LAYOUT', '自由配置の平坦化', compatibilityDetail(`${report.flattenedLayoutCount}件の座標・ロック情報を意味構造へ変換しました。`, report.flattenedPaths), report.flattenedPaths));
   if (report.unresolvedDestinationCount > 0 || report.unresolvedActionCount > 0) {
     anomalies.push(compatibilityAnomaly(
       'unresolved',
       'UNRESOLVED_NAVIGATION',
       '未解決の遷移',
       unresolvedNavigationDetail(report, 'を確認できませんでした。'),
+      report.unresolvedPaths,
     ));
   }
-  if (report.unsupportedKinds.length > 0) anomalies.push(compatibilityAnomaly('lost', 'UNSUPPORTED_KIND', '未対応パーツ', compatibilityDetail(report.unsupportedKinds.join(', '), report.unsupportedPaths)));
-  if (report.approximatedKinds.length > 0) anomalies.push(compatibilityAnomaly('approximated', 'APPROXIMATED_KIND', '近似変換', compatibilityDetail(describeM3eCompatibilityKinds(report.approximatedKinds), report.approximatedPaths)));
-  if (report.approximatedFields.length > 0) anomalies.push(compatibilityAnomaly('approximated', 'APPROXIMATED_FIELD', '近似フィールド', describeM3eCompatibilityFields(report.approximatedFields)));
-  if (report.lostFields.length > 0) anomalies.push(compatibilityAnomaly('lost', 'LOST_FIELD', '失われたフィールド', report.lostFields.join(', ')));
-  if (report.invalidFields.length > 0) anomalies.push(compatibilityAnomaly('lost', 'INVALID_FIELD', '不正な値', report.invalidFields.join(', ')));
-  if (report.duplicateIdFields.length > 0) anomalies.push(compatibilityAnomaly('lost', 'DUPLICATE_ID', '重複したID', report.duplicateIdFields.join(', ')));
-  if (report.unknownFields.length > 0) anomalies.push(compatibilityAnomaly('lost', 'UNKNOWN_FIELD', '未知のフィールド', report.unknownFields.join(', ')));
+  if (report.unsupportedKinds.length > 0) anomalies.push(compatibilityAnomaly('lost', 'UNSUPPORTED_KIND', '未対応パーツ', compatibilityDetail(report.unsupportedKinds.join(', '), report.unsupportedPaths), report.unsupportedPaths));
+  if (report.approximatedKinds.length > 0) anomalies.push(compatibilityAnomaly('approximated', 'APPROXIMATED_KIND', '近似変換', compatibilityDetail(describeM3eCompatibilityKinds(report.approximatedKinds), report.approximatedPaths), report.approximatedPaths));
+  if (report.approximatedFields.length > 0) anomalies.push(compatibilityAnomaly('approximated', 'APPROXIMATED_FIELD', '近似フィールド', describeM3eCompatibilityFields(report.approximatedFields), report.approximatedFields));
+  if (report.lostFields.length > 0) anomalies.push(compatibilityAnomaly('lost', 'LOST_FIELD', '失われたフィールド', report.lostFields.join(', '), report.lostFields));
+  if (report.invalidFields.length > 0) anomalies.push(compatibilityAnomaly('lost', 'INVALID_FIELD', '不正な値', report.invalidFields.join(', '), report.invalidFields));
+  if (report.duplicateIdFields.length > 0) anomalies.push(compatibilityAnomaly('lost', 'DUPLICATE_ID', '重複したID', report.duplicateIdFields.join(', '), report.duplicateIdFields));
+  if (report.unknownFields.length > 0) anomalies.push(compatibilityAnomaly('lost', 'UNKNOWN_FIELD', '未知のフィールド', report.unknownFields.join(', '), report.unknownFields));
   return anomalies;
 }
 
 function exportCompatibilityAnomalies(report: M3eExportCompatibilityReport): M3eCompatibilityAnomaly[] {
   const anomalies: M3eCompatibilityAnomaly[] = [];
-  if (report.unsupportedNodeKinds.length > 0) anomalies.push(compatibilityAnomaly('lost', 'UNSUPPORTED_KIND', '直接対応のない要素', compatibilityDetail(report.unsupportedNodeKinds.join(', '), report.unsupportedPaths)));
-  if (report.flattenedNodeKinds.length > 0) anomalies.push(compatibilityAnomaly('approximated', 'FLATTENED_LAYOUT', '構造平坦化', compatibilityDetail(report.flattenedNodeKinds.join(', '), report.flattenedPaths)));
-  if (report.approximatedKinds.length > 0) anomalies.push(compatibilityAnomaly('approximated', 'APPROXIMATED_KIND', '近似変換', compatibilityDetail(describeM3eCompatibilityKinds(report.approximatedKinds), report.approximatedPaths)));
+  if (report.unsupportedNodeKinds.length > 0) anomalies.push(compatibilityAnomaly('lost', 'UNSUPPORTED_KIND', '直接対応のない要素', compatibilityDetail(report.unsupportedNodeKinds.join(', '), report.unsupportedPaths), report.unsupportedPaths));
+  if (report.flattenedNodeKinds.length > 0) anomalies.push(compatibilityAnomaly('approximated', 'FLATTENED_LAYOUT', '構造平坦化', compatibilityDetail(report.flattenedNodeKinds.join(', '), report.flattenedPaths), report.flattenedPaths));
+  if (report.approximatedKinds.length > 0) anomalies.push(compatibilityAnomaly('approximated', 'APPROXIMATED_KIND', '近似変換', compatibilityDetail(describeM3eCompatibilityKinds(report.approximatedKinds), report.approximatedPaths), report.approximatedPaths));
   if (report.unresolvedDestinationCount > 0 || report.unresolvedActionCount > 0) {
     anomalies.push(compatibilityAnomaly(
       'unresolved',
       'UNRESOLVED_NAVIGATION',
       '未解決の遷移',
       unresolvedNavigationDetail(report, 'を出力できませんでした。'),
+      report.unresolvedPaths,
     ));
   }
-  if (report.approximatedFields.length > 0) anomalies.push(compatibilityAnomaly('approximated', 'APPROXIMATED_FIELD', '近似フィールド', describeM3eCompatibilityFields(report.approximatedFields)));
-  if (report.lostFields.length > 0) anomalies.push(compatibilityAnomaly('lost', 'LOST_FIELD', '出力できないフィールド', report.lostFields.join(', ')));
-  if (report.invalidFields.length > 0) anomalies.push(compatibilityAnomaly('lost', 'INVALID_FIELD', '不正な値', report.invalidFields.join(', ')));
-  if (report.duplicateIdFields.length > 0) anomalies.push(compatibilityAnomaly('lost', 'DUPLICATE_ID', '重複したID', report.duplicateIdFields.join(', ')));
-  if (report.unknownFields.length > 0) anomalies.push(compatibilityAnomaly('lost', 'UNKNOWN_FIELD', '未知のフィールド', report.unknownFields.join(', ')));
+  if (report.approximatedFields.length > 0) anomalies.push(compatibilityAnomaly('approximated', 'APPROXIMATED_FIELD', '近似フィールド', describeM3eCompatibilityFields(report.approximatedFields), report.approximatedFields));
+  if (report.lostFields.length > 0) anomalies.push(compatibilityAnomaly('lost', 'LOST_FIELD', '出力できないフィールド', report.lostFields.join(', '), report.lostFields));
+  if (report.invalidFields.length > 0) anomalies.push(compatibilityAnomaly('lost', 'INVALID_FIELD', '不正な値', report.invalidFields.join(', '), report.invalidFields));
+  if (report.duplicateIdFields.length > 0) anomalies.push(compatibilityAnomaly('lost', 'DUPLICATE_ID', '重複したID', report.duplicateIdFields.join(', '), report.duplicateIdFields));
+  if (report.unknownFields.length > 0) anomalies.push(compatibilityAnomaly('lost', 'UNKNOWN_FIELD', '未知のフィールド', report.unknownFields.join(', '), report.unknownFields));
   if (!report.roundTripValid) anomalies.push(compatibilityAnomaly('lost', 'ROUND_TRIP', '再読込検証', '書き出したM3E JSONを再読込できませんでした。'));
   return anomalies;
 }
@@ -809,7 +841,7 @@ function inspectM3eItemFields(item: JsonObject): { preserved: string[]; approxim
 }
 
 const m3ePaletteKeys = ['blue', 'purple', 'green', 'coral', 'amber', 'teal', 'mono', 'custom'] as const;
-const m3eDocumentFields = new Set(['title', 'paletteKey', 'theme', 'platform', 'frame', 'frames', 'groups', 'customPalette', 'dynamicColor', 'brief', 'promptEdit']);
+const m3eDocumentFields = new Set(['title', 'paletteKey', 'theme', 'platform', 'frame', 'activeFrame', 'frames', 'groups', 'customPalette', 'dynamicColor', 'brief', 'promptEdit']);
 const m3eThemeFields = new Set(['dark', 'bothModes', 'contrast', 'shape', 'font', 'emphasized', 'motion']);
 const m3eFrameFields = new Set(['id', 'name', 'x', 'y', 'w', 'h', 'bg', 'note', 'place', 'swipe']);
 const m3eGroupFields = new Set(['id', 'x', 'y', 'axis', 'items', 'free', 'locked', 'pos']);
@@ -843,6 +875,7 @@ function isHexColor(value: unknown): value is string {
 
 function readM3eDocumentMetadata(value: JsonObject, theme: JsonObject | undefined): M3eDocumentMetadata | undefined {
   const metadata: M3eDocumentMetadata = {};
+  if (isOneOf(value.frame, ['blank', 'phone'])) metadata.frameMode = value.frame as M3eFrameMode;
   if (isOneOf(value.paletteKey, m3ePaletteKeys)) metadata.paletteKey = value.paletteKey;
   const customPalette = recordValue(value, 'customPalette');
   if (customPalette) metadata.customPalette = customPalette;
@@ -990,7 +1023,10 @@ function collectM3eInvalidFields(value: unknown): string[] {
   if (Object.prototype.hasOwnProperty.call(value, 'brief') && typeof value.brief !== 'string') invalidFields.add('document.brief');
   if (Object.prototype.hasOwnProperty.call(value, 'promptEdit') && typeof value.promptEdit !== 'string') invalidFields.add('document.promptEdit');
   if (Object.prototype.hasOwnProperty.call(value, 'frame')) {
-    if (typeof value.frame !== 'string' || !value.frame.trim() || !frameIds.has(value.frame)) invalidFields.add('document.frame');
+    if (typeof value.frame !== 'string' || !value.frame.trim() || (!frameIds.has(value.frame) && !isOneOf(value.frame, ['blank', 'phone']))) invalidFields.add('document.frame');
+  }
+  if (Object.prototype.hasOwnProperty.call(value, 'activeFrame')) {
+    if (typeof value.activeFrame !== 'string' || !value.activeFrame.trim() || !frameIds.has(value.activeFrame)) invalidFields.add('document.activeFrame');
   }
   if (Object.prototype.hasOwnProperty.call(value, 'theme')) {
     if (!isRecord(value.theme)) {
@@ -2045,7 +2081,8 @@ export function convertM3eDocument(value: unknown): CanvasDocument | null {
   for (const frame of frames) frameIds.set(frame.id, stableId('screen', frame.id, usedIds));
   const context: ConversionContext = { usedIds, frameIds };
   const screens = frames.map((frame) => convertScreen(frame, groups, frames, context));
-  const requestedActiveFrame = stringValue(value, 'frame');
+  const requestedActiveFrame = stringValue(value, 'activeFrame')
+    ?? (isOneOf(value.frame, ['blank', 'phone']) ? undefined : stringValue(value, 'frame'));
   const activeScreenId = (requestedActiveFrame ? frameIds.get(requestedActiveFrame) : undefined) ?? screens[0]?.id;
   if (!activeScreenId) return null;
 
@@ -2796,7 +2833,8 @@ function exportMeaningfulSignatures(document: M3eExportDocument): string[] {
     paletteKey: document.paletteKey,
     theme: document.theme,
     platform: document.platform,
-    frame: frameReference(document.frame),
+    frame: document.frame,
+    ...(document.activeFrame === undefined ? {} : { activeFrame: frameReference(document.activeFrame) }),
     ...(document.customPalette === undefined ? {} : { customPalette: document.customPalette }),
     ...(document.dynamicColor === undefined ? {} : { dynamicColor: document.dynamicColor }),
     ...(document.brief === undefined ? {} : { brief: document.brief }),
@@ -2947,7 +2985,8 @@ export function exportM3eDocument(document: CanvasDocument): M3eExportDocument {
       motion: sourceTheme?.motion ?? 'standard',
     },
     platform: metadata?.platform ?? 'web',
-    frame: document.activeScreenId,
+    frame: metadata?.frameMode ?? 'phone',
+    activeFrame: document.activeScreenId,
     frames,
     groups,
     ...(paletteKey === 'custom' && metadata?.customPalette !== undefined ? { customPalette: metadata.customPalette } : {}),

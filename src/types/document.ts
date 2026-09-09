@@ -114,6 +114,7 @@ export type M3eShape = 'square' | 'rounded' | 'full';
 export type M3eFont = 'roboto' | 'robotoFlex' | 'robotoSerif' | 'system';
 export type M3eMotion = 'standard' | 'expressive';
 export type M3ePlatform = 'android' | 'web';
+export type M3eFrameMode = 'blank' | 'phone';
 
 export interface M3eTab {
   label: string;
@@ -203,6 +204,7 @@ export interface M3eThemeMetadata {
 }
 
 export interface M3eDocumentMetadata {
+  frameMode?: M3eFrameMode;
   paletteKey?: string;
   customPalette?: Record<string, unknown>;
   dynamicColor?: boolean;

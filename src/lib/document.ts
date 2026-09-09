@@ -1,5 +1,5 @@
 import { isContainerNode } from './nodes';
-import type { AccentColor, AlertAction, AppearanceAccentColor, BackgroundStyle, ButtonStyle, ButtonToggle, CanvasDocument, CanvasNode, CanvasScreen, CardContentAlignment, CardImagePosition, ColorScheme, ContentPlacement, FontDesign, FrameWidth, GlassShape, GlassStyle, ImageSource, M3eAction, M3eContrast, M3eDocumentMetadata, M3eFont, M3eItemMetadata, M3eMenuAction, M3eMotion, M3ePresentationKind, M3eShape, M3eTab, M3eTextColor, M3eToggleAppearance, M3eVariant, NavigationTitleDisplayMode, NavigationTransition, NodeKind, ProgressStyle, ScreenBackground, ScreenDevice, ScreenOrientation, ShadowStyle, StackAlignment, SwipeDirection, TextAlignment, TextStyle, ToolbarItem, ToolbarPlacement } from '../types/document';
+import type { AccentColor, AlertAction, AppearanceAccentColor, BackgroundStyle, ButtonStyle, ButtonToggle, CanvasDocument, CanvasNode, CanvasScreen, CardContentAlignment, CardImagePosition, ColorScheme, ContentPlacement, FontDesign, FrameWidth, GlassShape, GlassStyle, ImageSource, M3eAction, M3eContrast, M3eDocumentMetadata, M3eFont, M3eFrameMode, M3eItemMetadata, M3eMenuAction, M3eMotion, M3ePresentationKind, M3eShape, M3eTab, M3eTextColor, M3eToggleAppearance, M3eVariant, NavigationTitleDisplayMode, NavigationTransition, NodeKind, ProgressStyle, ScreenBackground, ScreenDevice, ScreenOrientation, ShadowStyle, StackAlignment, SwipeDirection, TextAlignment, TextStyle, ToolbarItem, ToolbarPlacement } from '../types/document';
 
 type RecordValue = Record<string, unknown>;
 
@@ -27,6 +27,7 @@ function readM3eDocumentMetadata(value: unknown): M3eDocumentMetadata | null | u
   if (value === undefined) return undefined;
   if (!isRecord(value)) return null;
   if (value.paletteKey !== undefined && !isString(value.paletteKey)) return null;
+  if (value.frameMode !== undefined && !isOneOf(value.frameMode, ['blank', 'phone'])) return null;
   if (value.customPalette !== undefined && (!isRecord(value.customPalette)
     || (value.customPalette.primary !== undefined && !isHexColor(value.customPalette.primary)))) return null;
   if (value.dynamicColor !== undefined && typeof value.dynamicColor !== 'boolean') return null;
@@ -58,6 +59,7 @@ function readM3eDocumentMetadata(value: unknown): M3eDocumentMetadata | null | u
       }
     : undefined;
   return {
+    ...(value.frameMode === undefined ? {} : { frameMode: value.frameMode as M3eFrameMode }),
     ...(value.paletteKey === undefined ? {} : { paletteKey: value.paletteKey }),
     ...(value.customPalette === undefined ? {} : { customPalette: value.customPalette }),
     ...(value.dynamicColor === undefined ? {} : { dynamicColor: value.dynamicColor }),

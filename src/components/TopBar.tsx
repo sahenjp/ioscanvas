@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { parseCanvasDocument } from '../lib/document';
-import { convertM3eDocument, describeM3eCompatibilityFields, describeM3eCompatibilityKinds, getM3eCompatibilityAnomalies, inspectM3eCompatibility, type M3eCompatibilityAnomaly } from '../lib/m3e';
+import { convertM3eDocument, describeM3eCompatibilityFields, describeM3eCompatibilityKinds, describeM3eCompatibilityStatus, getM3eCompatibilityAnomalies, inspectM3eCompatibility, type M3eCompatibilityAnomaly } from '../lib/m3e';
 import { lintDocument } from '../lib/hig';
 import { findNode } from '../lib/nodes';
 import { copyText, createShareUrl } from '../lib/share';
@@ -170,8 +170,12 @@ export function TopBar() {
                 <ul className="m3e-anomaly-list">
                   {fileAnomalies.map((anomaly) => (
                     <li key={`${anomaly.code}-${anomaly.label}`} className={`m3e-anomaly-${anomaly.status}`}>
-                      <strong>{anomaly.label}</strong>
+                      <div className="m3e-anomaly-heading">
+                        <span className="m3e-anomaly-status">{describeM3eCompatibilityStatus(anomaly.status)}</span>
+                        <strong>{anomaly.label}</strong>
+                      </div>
                       <span>{anomaly.detail}</span>
+                      <small>{anomaly.guidance}</small>
                     </li>
                   ))}
                 </ul>
