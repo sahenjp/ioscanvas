@@ -1913,7 +1913,7 @@ function exportItem(node: CanvasNode, frameIds: Map<string, string>, inheritedNo
       const linkedPicker = node.children?.find((child): child is Extract<CanvasNode, { kind: 'picker' }> => child.kind === 'picker');
       if (node.m3eKind === 'select' && linkedPicker) {
         const action = exportAction(node, frameIds);
-        const selected = linkedPicker.initialOption ? linkedPicker.options.indexOf(linkedPicker.initialOption) : -1;
+        const selected = linkedPicker.initialOption !== undefined ? linkedPicker.options.indexOf(linkedPicker.initialOption) : -1;
         return base('select', linkedPicker.label, null, {
           tabs: linkedPicker.options.map((label, index) => ({ label, icon: node.m3eMetadata?.tabs?.[index]?.icon ?? null })),
           ...(selected < 0 ? {} : { selected }),
@@ -2013,7 +2013,7 @@ function exportItem(node: CanvasNode, frameIds: Map<string, string>, inheritedNo
     case 'texteditor':
       return base('textField', node.label, null, { note: 'SwiftUIではTextEditorとして再構成します。' });
     case 'picker': {
-      const selected = node.initialOption ? Math.max(0, node.options.indexOf(node.initialOption)) : undefined;
+      const selected = node.initialOption !== undefined ? Math.max(0, node.options.indexOf(node.initialOption)) : undefined;
       return base('select', node.label, null, {
         tabs: node.options.map((label, index) => ({ label, icon: node.m3eMetadata?.tabs?.[index]?.icon ?? null })),
         ...(selected === undefined || selected < 0 ? {} : { selected }),
@@ -2304,7 +2304,7 @@ function exportContainerItems(node: ContainerNode, frameIds: Map<string, string>
     ...(isCard && card.src ? { src: card.src } : {}),
     note: exportNote(node, node.kind === 'sheet' ? 'SwiftUI sheetとして再構成します。' : undefined),
   }, node.m3eMetadata);
-  return [containerItem, ...children];
+  return node.m3eKind === 'card' ? [containerItem] : [containerItem, ...children];
 }
 
 function frameDimensions(screen: CanvasScreen): { width: number; height: number } {
@@ -2407,7 +2407,7 @@ function exportGroupsForScreen(screen: CanvasScreen, frameIds: Map<string, strin
   }
 
   const bottomBar = exportBottomBar(screen, frameIds);
-  if (bottomBar) groups.push({ id: `${screen.id}-group-bottom-bar`, x: 0, y: Math.max(y, size.height - 88), axis: 'x', items: [bottomBar] });
+  if (bottomBar) groups.push({ id: `${screen.id}-group-bottom-bar`, x: 0, y: Math.max(0, size.height - 88), axis: 'x', items: [bottomBar] });
   return groups;
 }
 

@@ -608,6 +608,8 @@ describe('M3E compatibility importer', () => {
       'textField', 'select', 'switch', 'checkbox', 'slider', 'text', 'image', 'camera', 'map', 'divider', 'loadingIndicator',
       'linearProgress', 'circularProgress', 'splitButton', 'fabMenu', 'toolbar', 'tabs', 'radio', 'badge', 'topAppBar', 'bottomNav', 'navRail',
     ]));
+    const report = inspectM3eExportCompatibility(document);
+    expect(report.roundTripValid).toBe(true);
   });
 
   it('keeps non-action M3E kinds when the semantic tree is edited and exported', () => {
