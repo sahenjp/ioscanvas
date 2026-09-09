@@ -2357,10 +2357,14 @@ function exportItem(node: CanvasNode, frameIds: Map<string, string>, inheritedNo
       const tabs = actions.length > 0
         ? actions.map((action, index) => ({ label: action.label, icon: node.m3eMetadata?.tabs?.[index]?.icon ?? null }))
         : undefined;
+      const exportedPrimaryAction = node.m3eMetadata?.action && actions[0]
+        ? exportAlertAction(actions[0], frameIds)
+        : undefined;
       return base('dialog', node.title || node.label, null, {
         supporting: node.message,
         ...(tabs ? { tabs } : {}),
         ...(Object.keys(exportedActions).length > 0 ? { actions: exportedActions } : {}),
+        ...(exportedPrimaryAction ? { action: exportedPrimaryAction } : {}),
         note: `主ボタン: ${node.primaryButton}${node.secondaryButton ? ` / 副ボタン: ${node.secondaryButton}` : ''}`,
       });
     }
@@ -2799,11 +2803,22 @@ export function inspectM3eExportCompatibility(document: CanvasDocument): M3eExpo
   const collectExportedFields = (item: M3eExportItem): void => {
     Object.keys(item).forEach((field) => exportedFields.add(field));
   };
-  const collectUnresolvedMetadataActions = (metadata: M3eItemMetadata | undefined, path: string): void => {
+  const collectUnresolvedMetadataActions = (
+    metadata: M3eItemMetadata | undefined,
+    path: string,
+    exportedItem?: Pick<M3eExportItem, 'action' | 'actions'>,
+  ): void => {
     if (!metadata) return;
     const actions = [
-      ...(metadata.action ? [{ path: `${path}.action.to`, action: metadata.action }] : []),
-      ...Object.entries(metadata.actions ?? {}).map(([slot, action]) => ({ path: `${path}.actions.${slot}.to`, action })),
+      ...(metadata.action && (exportedItem?.action === undefined || exportedItem.action === metadata.action)
+        ? [{ path: `${path}.action.to`, action: metadata.action }]
+        : []),
+      ...Object.entries(metadata.actions ?? {}).flatMap(([slot, action]) => {
+        const exportedAction = exportedItem?.actions?.[slot];
+        return exportedAction === undefined || exportedAction === action
+          ? [{ path: `${path}.actions.${slot}.to`, action }]
+          : [];
+      }),
     ];
     for (const { path: actionPath, action } of actions) {
       if (action.to !== 'back' && !frameIds.has(action.to)) {
@@ -2818,8 +2833,8 @@ export function inspectM3eExportCompatibility(document: CanvasDocument): M3eExpo
   for (const screen of document.screens) {
     collectExportCompatibilityKinds(screen.root, flattenedNodeKinds, approximatedKinds, unsupportedNodeKinds, frameIds);
     collectMetadataFields(screen.root);
-    collectUnresolvedMetadataActions(screen.m3eTopAppBar, `screens[${screen.id}].m3eTopAppBar`);
-    collectUnresolvedMetadataActions(screen.m3eBottomNav, `screens[${screen.id}].m3eBottomNav`);
+    collectUnresolvedMetadataActions(screen.m3eTopAppBar, `screens[${screen.id}].m3eTopAppBar`, exportTopBar(screen, frameIds) ?? undefined);
+    collectUnresolvedMetadataActions(screen.m3eBottomNav, `screens[${screen.id}].m3eBottomNav`, exportBottomBar(screen, frameIds) ?? undefined);
     Object.keys(screen.m3eTopAppBar ?? {}).forEach((field) => sourceFields.add(field));
     Object.keys(screen.m3eBottomNav ?? {}).forEach((field) => sourceFields.add(field));
     for (const [index, node] of screen.root.children.entries()) {
@@ -2848,7 +2863,7 @@ export function inspectM3eExportCompatibility(document: CanvasDocument): M3eExpo
             unresolvedPaths.add(`${path}.m3eMenuActions.${slot}.destinationScreenId`);
           }
         }
-        collectUnresolvedMetadataActions(current.m3eMetadata, `${path}.m3eMetadata`);
+        collectUnresolvedMetadataActions(current.m3eMetadata, `${path}.m3eMetadata`, exportItem(current, frameIds) ?? undefined);
         if (Array.isArray(current.children)) {
           for (const [childIndex, child] of current.children.entries()) visit(child, `${path}.children[${childIndex}]`);
         }

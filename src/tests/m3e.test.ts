@@ -286,6 +286,32 @@ describe('M3E compatibility importer', () => {
     ]));
   });
 
+  it('rewrites imported dialog action metadata to current frame ids', () => {
+    const document = convertM3eDocument({
+      frames: [{ id: 'home', name: 'ホーム', x: 0, y: 0 }, { id: 'detail', name: '詳細', x: 492, y: 0 }],
+      groups: [{
+        id: 'content',
+        x: 16,
+        y: 80,
+        axis: 'y',
+        items: [{ id: 'dialog', kind: 'dialog', label: '確認', action: { to: 'detail', transition: 'fade' } }],
+      }],
+    });
+
+    expect(document).not.toBeNull();
+    if (!document) throw new Error('Dialog compatibility fixture was not converted');
+    const exported = exportM3eDocument(document).groups.flatMap((group) => group.items).find((item) => item.kind === 'dialog');
+    expect(exported).toEqual(expect.objectContaining({
+      action: { to: 'screen-detail', transition: 'fade' },
+      actions: { 'tab:0': { to: 'screen-detail', transition: 'fade' } },
+    }));
+    expect(inspectM3eExportCompatibility(document)).toMatchObject({
+      unresolvedDestinationCount: 0,
+      unresolvedActionCount: 0,
+      unresolvedPaths: [],
+    });
+  });
+
   it('reports invalid values in the exported M3E projection', () => {
     const document: CanvasDocument = {
       version: 1,
