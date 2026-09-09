@@ -119,6 +119,7 @@ describe('M3E compatibility importer', () => {
       preservedFields: [],
       approximatedFields: [],
       lostFields: [],
+      unknownFields: [],
       normalizedScreenCount: 1,
       roundTripValid: true,
     });
@@ -393,6 +394,41 @@ describe('M3E compatibility importer', () => {
     ]));
   });
 
+  it('keeps actions on linked input controls and boxes', () => {
+    const document = convertM3eDocument({
+      frames: [{ id: 'home', name: 'ホーム', x: 0, y: 0 }, { id: 'detail', name: '詳細', x: 492, y: 0 }],
+      groups: [{
+        id: 'controls',
+        x: 16,
+        y: 80,
+        axis: 'y',
+        items: [
+          { id: 'box', kind: 'box', label: '設定', icon: null, variant: 'outlined', action: { to: 'detail', transition: 'fade' } },
+          { id: 'input', kind: 'textField', label: '名前', icon: null, variant: 'filled', action: { to: 'detail', transition: 'slide' } },
+          { id: 'sort', kind: 'select', label: '並び順', icon: null, variant: 'filled', tabs: [{ label: '新しい順' }, { label: '古い順' }], selected: 1, action: { to: 'detail', transition: 'slideUp' } },
+          { id: 'notifications', kind: 'switch', label: '通知', icon: null, variant: 'filled', checked: true, action: { to: 'detail', transition: 'slideDown' } },
+          { id: 'volume', kind: 'slider', label: '音量', icon: null, variant: 'filled', value: 25, minimum: 0, maximum: 100, step: 5, action: { to: 'detail', transition: 'none' } },
+        ],
+      }],
+    });
+
+    expect(document).not.toBeNull();
+    if (!document) throw new Error('Linked input fixture was not converted');
+    const nodes = document.screens[0]?.root.children ?? [];
+    expect(findNode(nodes, 'm3e-link-m3e-input')).toMatchObject({ kind: 'navigation-link', destinationScreenId: 'screen-detail', navigationTransition: 'slide' });
+    expect(findNode(nodes, 'm3e-link-m3e-sort')).toMatchObject({ kind: 'navigation-link', destinationScreenId: 'screen-detail' });
+    expect(findNode(nodes, 'm3e-link-m3e-notifications')).toMatchObject({ kind: 'navigation-link', destinationScreenId: 'screen-detail' });
+    expect(findNode(nodes, 'm3e-link-m3e-volume')).toMatchObject({ kind: 'navigation-link', destinationScreenId: 'screen-detail' });
+
+    expect(exportM3eDocument(document).groups.flatMap((group) => group.items)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: 'box', label: '設定', action: { to: 'screen-detail', transition: 'fade' } }),
+      expect.objectContaining({ kind: 'textField', label: '名前', action: { to: 'screen-detail', transition: 'slide' } }),
+      expect.objectContaining({ kind: 'select', label: '並び順', selected: 1, action: { to: 'screen-detail', transition: 'slideUp' } }),
+      expect.objectContaining({ kind: 'switch', label: '通知', checked: true, action: { to: 'screen-detail', transition: 'slideDown' } }),
+      expect.objectContaining({ kind: 'slider', label: '音量', value: 25, action: { to: 'screen-detail', transition: 'none' } }),
+    ]));
+  });
+
   it('keeps approximation notes when exporting native SwiftUI controls to M3E', () => {
     const document = structuredClone(defaultDocument);
     const screen = document.screens[0];
@@ -596,6 +632,7 @@ describe('M3E compatibility importer', () => {
       preservedFields: ['action', 'icon'],
       approximatedFields: [],
       lostFields: [],
+      unknownFields: [],
       flattenedLayoutCount: 0,
     });
     if (!report) throw new Error('Compatibility report was not generated');
@@ -603,6 +640,41 @@ describe('M3E compatibility importer', () => {
       expect.objectContaining({ code: 'UNSUPPORTED_KIND', status: 'lost' }),
       expect.objectContaining({ code: 'APPROXIMATED_KIND', status: 'approximated' }),
       expect.objectContaining({ code: 'UNRESOLVED_NAVIGATION', status: 'unresolved' }),
+    ]));
+  });
+
+  it('reports unknown M3E fields instead of silently dropping them', () => {
+    const report = inspectM3eCompatibility({
+      futureProjectField: true,
+      theme: { dark: false, futureThemeField: true },
+      frames: [{ id: 'home', name: 'ホーム', x: 0, y: 0, futureFrameField: true, swipe: { diagonal: 'home' } }],
+      groups: [{
+        id: 'content',
+        x: 0,
+        y: 0,
+        axis: 'y',
+        items: [{
+          id: 'text',
+          kind: 'text',
+          label: '本文',
+          futureItemField: true,
+          action: { to: 'home', futureActionField: 'preserve-me' },
+          tabs: [{ label: 'タブ', futureTabField: true }],
+        }],
+      }],
+    });
+
+    expect(report?.unknownFields).toEqual(expect.arrayContaining([
+      'document.futureProjectField',
+      'theme.futureThemeField',
+      'frames[0].futureFrameField',
+      'frames[0].swipe.diagonal',
+      'groups[0].items[0].futureItemField',
+      'groups[0].items[0].action.futureActionField',
+      'groups[0].items[0].tabs[0].futureTabField',
+    ]));
+    expect(getM3eCompatibilityAnomalies(report!)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'UNKNOWN_FIELD', status: 'lost' }),
     ]));
   });
 

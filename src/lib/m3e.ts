@@ -180,6 +180,7 @@ export interface M3eCompatibilityReport {
   preservedFields: string[];
   approximatedFields: string[];
   lostFields: string[];
+  unknownFields: string[];
 }
 
 export type M3eCompatibilityAnomalyStatus = 'approximated' | 'unresolved' | 'lost';
@@ -194,6 +195,7 @@ export type M3eCompatibilityAnomalyCode =
   | 'APPROXIMATED_FIELD'
   | 'UNRESOLVED_NAVIGATION'
   | 'LOST_FIELD'
+  | 'UNKNOWN_FIELD'
   | 'ROUND_TRIP';
 
 export interface M3eCompatibilityAnomaly {
@@ -213,6 +215,7 @@ export interface M3eExportCompatibilityReport {
   preservedFields: string[];
   approximatedFields: string[];
   lostFields: string[];
+  unknownFields: string[];
   normalizedScreenCount: number;
   roundTripValid: boolean;
 }
@@ -298,6 +301,7 @@ function importCompatibilityAnomalies(report: M3eCompatibilityReport): M3eCompat
   if (report.approximatedKinds.length > 0) anomalies.push(compatibilityAnomaly('approximated', 'APPROXIMATED_KIND', '近似変換', describeM3eCompatibilityKinds(report.approximatedKinds)));
   if (report.approximatedFields.length > 0) anomalies.push(compatibilityAnomaly('approximated', 'APPROXIMATED_FIELD', '近似フィールド', describeM3eCompatibilityFields(report.approximatedFields)));
   if (report.lostFields.length > 0) anomalies.push(compatibilityAnomaly('lost', 'LOST_FIELD', '失われたフィールド', report.lostFields.join(', ')));
+  if (report.unknownFields.length > 0) anomalies.push(compatibilityAnomaly('lost', 'UNKNOWN_FIELD', '未知のフィールド', report.unknownFields.join(', ')));
   return anomalies;
 }
 
@@ -316,6 +320,7 @@ function exportCompatibilityAnomalies(report: M3eExportCompatibilityReport): M3e
   }
   if (report.approximatedFields.length > 0) anomalies.push(compatibilityAnomaly('approximated', 'APPROXIMATED_FIELD', '近似フィールド', describeM3eCompatibilityFields(report.approximatedFields)));
   if (report.lostFields.length > 0) anomalies.push(compatibilityAnomaly('lost', 'LOST_FIELD', '出力できないフィールド', report.lostFields.join(', ')));
+  if (report.unknownFields.length > 0) anomalies.push(compatibilityAnomaly('lost', 'UNKNOWN_FIELD', '未知のフィールド', report.unknownFields.join(', ')));
   if (!report.roundTripValid) anomalies.push(compatibilityAnomaly('lost', 'ROUND_TRIP', '再読込検証', '書き出したM3E JSONを再読込できませんでした。'));
   return anomalies;
 }
@@ -341,6 +346,8 @@ const supportedM3eKinds = new Set([
   'slider', 'text', 'image', 'camera', 'map', 'divider', 'loadingIndicator', 'linearProgress',
   'circularProgress', 'splitButton', 'fabMenu', 'toolbar', 'tabs', 'radio', 'badge',
 ]);
+
+const m3eButtonKinds = new Set<M3ePresentationKind>(['button', 'iconButton', 'fab', 'extendedFab', 'chip', 'splitButton']);
 
 const m3ePreservableFields = [
   'supporting', 'icon', 'icon2', 'size', 'size2', 'minimum', 'maximum', 'step', 'value', 'bold', 'note', 'radiusTop', 'radiusBottom', 'corners',
@@ -748,6 +755,74 @@ function inspectM3eItemFields(item: JsonObject): { preserved: string[]; approxim
   return { preserved, approximated, lost };
 }
 
+const m3eDocumentFields = new Set(['title', 'paletteKey', 'theme', 'platform', 'frame', 'frames', 'groups']);
+const m3eThemeFields = new Set(['dark', 'bothModes', 'font']);
+const m3eFrameFields = new Set(['id', 'name', 'x', 'y', 'w', 'h', 'bg', 'note', 'place', 'swipe']);
+const m3eGroupFields = new Set(['id', 'x', 'y', 'axis', 'items', 'free', 'locked', 'pos']);
+const m3eItemFields = new Set([
+  'id', 'kind', 'label', 'icon', 'icon2', 'variant', 'supporting', 'size', 'size2', 'minimum', 'maximum', 'step',
+  'radiusTop', 'radiusBottom', 'corners', 'bold', 'checked', 'value', 'tabs', 'selected', 'action', 'actions',
+  'note', 'noteHistory', 'wavy', 'trackThickness', 'contained', 'switch', 'noCheck', 'fill', 'iconFill', 'textColor',
+  'noImage', 'imagePos', 'imageSize', 'contentAlign', 'src', 'railExpanded', 'railModal', 'railExpansionSide', 'toggle',
+  'locked', 'pos',
+]);
+const m3eTabFields = new Set(['label', 'icon']);
+const m3eActionFields = new Set(['to', 'transition']);
+const m3eCornersFields = new Set(['tl', 'tr', 'bl', 'br']);
+const m3eToggleFields = new Set(['icon', 'variant', 'label']);
+
+function collectUnknownObjectFields(value: unknown, allowed: ReadonlySet<string>, path: string, unknownFields: Set<string>): void {
+  if (!isRecord(value)) return;
+  for (const key of Object.keys(value)) {
+    if (!allowed.has(key)) unknownFields.add(`${path}.${key}`);
+  }
+}
+
+function collectM3eUnknownFields(value: unknown): string[] {
+  if (!isRecord(value)) return [];
+  const unknownFields = new Set<string>();
+  collectUnknownObjectFields(value, m3eDocumentFields, 'document', unknownFields);
+
+  const theme = recordValue(value, 'theme');
+  collectUnknownObjectFields(theme, m3eThemeFields, 'theme', unknownFields);
+
+  const frames = Array.isArray(value.frames) ? value.frames : [];
+  frames.forEach((frame, frameIndex) => {
+    const framePath = `frames[${frameIndex}]`;
+    collectUnknownObjectFields(frame, m3eFrameFields, framePath, unknownFields);
+    if (!isRecord(frame)) return;
+    collectUnknownObjectFields(recordValue(frame, 'swipe'), new Set(['left', 'right', 'up', 'down']), `${framePath}.swipe`, unknownFields);
+  });
+
+  const groups = Array.isArray(value.groups) ? value.groups : [];
+  groups.forEach((group, groupIndex) => {
+    const groupPath = `groups[${groupIndex}]`;
+    collectUnknownObjectFields(group, m3eGroupFields, groupPath, unknownFields);
+    if (!isRecord(group) || !Array.isArray(group.items)) return;
+    group.items.forEach((item, itemIndex) => {
+      const itemPath = `${groupPath}.items[${itemIndex}]`;
+      collectUnknownObjectFields(item, m3eItemFields, itemPath, unknownFields);
+      if (!isRecord(item)) return;
+      collectUnknownObjectFields(recordValue(item, 'corners'), m3eCornersFields, `${itemPath}.corners`, unknownFields);
+      collectUnknownObjectFields(recordValue(item, 'toggle'), m3eToggleFields, `${itemPath}.toggle`, unknownFields);
+      collectUnknownObjectFields(recordValue(item, 'action'), m3eActionFields, `${itemPath}.action`, unknownFields);
+      const actions = recordValue(item, 'actions');
+      if (actions) {
+        Object.entries(actions).forEach(([slot, action]) => {
+          collectUnknownObjectFields(action, m3eActionFields, `${itemPath}.actions.${slot}`, unknownFields);
+        });
+      }
+      if (Array.isArray(item.tabs)) {
+        item.tabs.forEach((tab, tabIndex) => {
+          collectUnknownObjectFields(tab, m3eTabFields, `${itemPath}.tabs[${tabIndex}]`, unknownFields);
+        });
+      }
+    });
+  });
+
+  return [...unknownFields].sort();
+}
+
 function appendNotes(node: CanvasNode, item: JsonObject, extra: string[] = []): CanvasNode {
   const notes = [
     node.notes?.trim() ?? '',
@@ -1028,22 +1103,22 @@ function mapItem(item: JsonObject, context: ConversionContext): CanvasNode | nul
       return appendNotes(node, item);
     }
     case 'searchBar':
-      return appendNotes({ id, kind: 'searchfield', label: label || '検索', binding: `query_${sourceId}`, prompt: label || '検索', minHeight: 44 }, item);
+      return linkM3eNode({ id, kind: 'searchfield', label: label || '検索', binding: `query_${sourceId}`, prompt: label || '検索', minHeight: 44 }, item, context, '検索');
     case 'textField':
-      return appendNotes({ id, kind: 'textfield', label: label || '入力', binding: `value_${sourceId}`, minHeight: 44 }, item);
+      return linkM3eNode({ id, kind: 'textfield', label: label || '入力', binding: `value_${sourceId}`, minHeight: 44 }, item, context, '入力');
     case 'select': {
       const options = tabEntries(item).map((tab, index) => labelOf(tab, `選択肢${index + 1}`));
       const safeOptions = options.length > 0 ? options : ['選択肢'];
       const selected = numberValue(item, 'selected');
       const initialOption = selected !== undefined && Number.isInteger(selected) && safeOptions[selected] !== undefined ? safeOptions[selected] : undefined;
-      return appendNotes({ id, kind: 'picker', label: label || '選択', binding: `selection_${sourceId}`, options: safeOptions, ...(initialOption === undefined ? {} : { initialOption }), minHeight: 44 }, item);
+      return linkM3eNode({ id, kind: 'picker', label: label || '選択', binding: `selection_${sourceId}`, options: safeOptions, ...(initialOption === undefined ? {} : { initialOption }), minHeight: 44 }, item, context, '選択');
     }
     case 'switch':
     case 'checkbox':
     case 'radio': {
       const checked = booleanValue(item, 'checked');
       const controlKind = item.kind === 'checkbox' || item.kind === 'radio' ? item.kind : undefined;
-      return appendNotes({ id, kind: 'toggle', label: label || '設定', binding: `is_${sourceId}`, ...(checked === undefined ? {} : { isOn: checked }), minHeight: 44, ...(controlKind ? { m3eKind: controlKind } : {}) }, item);
+      return linkM3eNode({ id, kind: 'toggle', label: label || '設定', binding: `is_${sourceId}`, ...(checked === undefined ? {} : { isOn: checked }), minHeight: 44, ...(controlKind ? { m3eKind: controlKind } : {}) }, item, context, '設定');
     }
     case 'slider': {
       const minimum = numberValue(item, 'minimum') ?? 0;
@@ -1051,7 +1126,7 @@ function mapItem(item: JsonObject, context: ConversionContext): CanvasNode | nul
       const step = Math.min(maximum - minimum, Math.max(0.01, numberValue(item, 'step') ?? 1));
       const normalizedValue = Math.max(0, Math.min(1, (numberValue(item, 'value') ?? 50) / 100));
       const value = minimum + (maximum - minimum) * normalizedValue;
-      return appendNotes({ id, kind: 'slider', label: label || '値', binding: `value_${sourceId}`, value, minimum, maximum, step, minHeight: 44 }, item);
+      return linkM3eNode({ id, kind: 'slider', label: label || '値', binding: `value_${sourceId}`, value, minimum, maximum, step, minHeight: 44 }, item, context, '値');
     }
     case 'text': {
       const fontSize = Math.max(11, numberValue(item, 'size') ?? 17);
@@ -1096,14 +1171,14 @@ function mapItem(item: JsonObject, context: ConversionContext): CanvasNode | nul
     case 'badge':
       return linkM3eNode({ id, kind: 'text', text: label, fontSize: 13, weight: 'semibold', textStyle: 'caption', m3eKind: 'badge' }, item, context, 'バッジ');
     case 'box':
-      return appendNotes({
+      return linkM3eNode({
         id,
         kind: 'groupbox',
         title: label || 'ボックス',
         children: [],
         ...(backgroundStyle(item) ? { background: backgroundStyle(item) } : {}),
         ...(booleanValue(item, 'checked') ? { isBottomSheet: true } : {}),
-      }, item, booleanValue(item, 'checked') ? ['M3Eのボックスをボトムシートとして読み込みました。SwiftUIではsheetとpresentationDetentsへ変換します。'] : []);
+      }, item, context, 'ボックス', booleanValue(item, 'checked') ? ['M3Eのボックスをボトムシートとして読み込みました。SwiftUIではsheetとpresentationDetentsへ変換します。'] : []);
     case 'card': {
       const imagePosition: CardImagePosition = isOneOf(stringValue(item, 'imagePos'), ['top', 'leading', 'trailing', 'background']) ? stringValue(item, 'imagePos') as CardImagePosition : 'top';
       const contentAlignment: CardContentAlignment = isOneOf(stringValue(item, 'contentAlign'), ['start', 'center', 'end']) ? stringValue(item, 'contentAlign') as CardContentAlignment : 'start';
@@ -1528,6 +1603,7 @@ export function inspectM3eCompatibility(value: unknown): M3eCompatibilityReport 
     preservedFields: [...preservedFields].sort(),
     approximatedFields: [...approximatedFields].sort(),
     lostFields: [...lostFields].sort(),
+    unknownFields: collectM3eUnknownFields(value),
   };
 }
 
@@ -1789,10 +1865,13 @@ function exportItem(node: CanvasNode, frameIds: Map<string, string>, inheritedNo
           : { bold: node.weight === 'bold' || node.weight === 'semibold' }),
       });
     case 'button': {
+      const action = exportAction(node, frameIds);
+      if (node.m3eKind && !m3eButtonKinds.has(node.m3eKind)) {
+        return base(node.m3eKind, node.label, node.m3eKind === 'searchBar' ? 'magnifyingglass' : node.systemName || null, action ? { action } : {});
+      }
       const buttonKind = node.m3eKind === 'button' || node.m3eKind === 'iconButton' || node.m3eKind === 'fab' || node.m3eKind === 'extendedFab' || node.m3eKind === 'chip' || node.m3eKind === 'splitButton'
         ? node.m3eKind
         : node.label.trim() ? 'button' : node.systemName ? 'iconButton' : 'button';
-      const action = exportAction(node, frameIds);
       const menuActions = node.m3eKind === 'splitButton' ? exportM3eMenuActions(node, frameIds) : undefined;
       return base(buttonKind, node.label, node.systemName ?? null, {
         ...(node.m3eIcon2 === undefined ? {} : { icon2: node.m3eIcon2 }),
@@ -1809,6 +1888,47 @@ function exportItem(node: CanvasNode, frameIds: Map<string, string>, inheritedNo
       });
     }
     case 'navigation-link': {
+      const linkedBox = node.children?.find((child): child is ContainerNode => child.kind === 'groupbox');
+      if (node.m3eKind === 'box' && linkedBox) {
+        const action = exportAction(node, frameIds);
+        return base('box', linkedBox.title || node.label, null, action ? { action } : {});
+      }
+      const linkedSearch = node.children?.find((child): child is Extract<CanvasNode, { kind: 'searchfield' }> => child.kind === 'searchfield');
+      if (node.m3eKind === 'searchBar' && linkedSearch) {
+        const action = exportAction(node, frameIds);
+        return base('searchBar', linkedSearch.prompt || linkedSearch.label, 'magnifyingglass', action ? { action } : {});
+      }
+      const linkedTextField = node.children?.find((child): child is Extract<CanvasNode, { kind: 'textfield' }> => child.kind === 'textfield');
+      if (node.m3eKind === 'textField' && linkedTextField) {
+        const action = exportAction(node, frameIds);
+        return base('textField', linkedTextField.label, null, action ? { action } : {});
+      }
+      const linkedPicker = node.children?.find((child): child is Extract<CanvasNode, { kind: 'picker' }> => child.kind === 'picker');
+      if (node.m3eKind === 'select' && linkedPicker) {
+        const action = exportAction(node, frameIds);
+        const selected = linkedPicker.initialOption ? linkedPicker.options.indexOf(linkedPicker.initialOption) : -1;
+        return base('select', linkedPicker.label, null, {
+          tabs: linkedPicker.options.map((label) => ({ label, icon: null })),
+          ...(selected < 0 ? {} : { selected }),
+          ...(action ? { action } : {}),
+        });
+      }
+      const linkedToggle = node.children?.find((child): child is Extract<CanvasNode, { kind: 'toggle' }> => child.kind === 'toggle');
+      if ((node.m3eKind === 'switch' || node.m3eKind === 'checkbox' || node.m3eKind === 'radio') && linkedToggle) {
+        const action = exportAction(node, frameIds);
+        return base(node.m3eKind, linkedToggle.label, null, { checked: linkedToggle.isOn ?? false, ...(action ? { action } : {}) });
+      }
+      const linkedSlider = node.children?.find((child): child is Extract<CanvasNode, { kind: 'slider' }> => child.kind === 'slider');
+      if (node.m3eKind === 'slider' && linkedSlider) {
+        const action = exportAction(node, frameIds);
+        return base('slider', linkedSlider.label, null, {
+          value: linkedSlider.maximum > linkedSlider.minimum ? ((linkedSlider.value - linkedSlider.minimum) / (linkedSlider.maximum - linkedSlider.minimum)) * 100 : 0,
+          minimum: linkedSlider.minimum,
+          maximum: linkedSlider.maximum,
+          step: linkedSlider.step,
+          ...(action ? { action } : {}),
+        });
+      }
       const linkedCamera = node.children?.find((child): child is Extract<CanvasNode, { kind: 'camera' }> => child.kind === 'camera');
       if (node.m3eKind === 'camera' && linkedCamera) {
         const action = exportAction(node, frameIds);
@@ -2415,6 +2535,7 @@ export function inspectM3eExportCompatibility(document: CanvasDocument): M3eExpo
     preservedFields,
     approximatedFields,
     lostFields,
+    unknownFields: [],
     normalizedScreenCount: exported.frames.length,
     roundTripValid: roundTripped !== null
       && roundTripped.screens.length === exported.frames.length
