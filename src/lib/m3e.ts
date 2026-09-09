@@ -2582,6 +2582,18 @@ function exportContainerItems(node: ContainerNode, frameIds: Map<string, string>
   return node.m3eKind === 'card' ? [containerItem] : [containerItem, ...children];
 }
 
+function exportCompatibilityItem(node: CanvasNode, frameIds: Map<string, string>): M3eExportItem | null {
+  if (!isExportContainer(node)) return exportItem(node, frameIds);
+  const isSemanticM3eContainer = node.m3eKind !== undefined
+    || node.kind === 'tabview'
+    || node.kind === 'navigation-split-view'
+    || node.kind === 'section'
+    || node.kind === 'groupbox'
+    || node.kind === 'disclosure-group'
+    || node.kind === 'sheet';
+  return isSemanticM3eContainer ? exportContainerItems(node, frameIds)[0] ?? null : null;
+}
+
 function frameDimensions(screen: CanvasScreen): { width: number; height: number } {
   const sizes: Record<ScreenDevice, { width: number; height: number }> = {
     'iphone-se': { width: 375, height: 667 },
@@ -2863,7 +2875,7 @@ export function inspectM3eExportCompatibility(document: CanvasDocument): M3eExpo
             unresolvedPaths.add(`${path}.m3eMenuActions.${slot}.destinationScreenId`);
           }
         }
-        collectUnresolvedMetadataActions(current.m3eMetadata, `${path}.m3eMetadata`, exportItem(current, frameIds) ?? undefined);
+        collectUnresolvedMetadataActions(current.m3eMetadata, `${path}.m3eMetadata`, exportCompatibilityItem(current, frameIds) ?? undefined);
         if (Array.isArray(current.children)) {
           for (const [childIndex, child] of current.children.entries()) visit(child, `${path}.children[${childIndex}]`);
         }

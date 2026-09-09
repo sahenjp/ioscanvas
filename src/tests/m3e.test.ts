@@ -312,6 +312,33 @@ describe('M3E compatibility importer', () => {
     });
   });
 
+  it('does not flag valid tab actions retained in container metadata', () => {
+    const document = convertM3eDocument({
+      frames: [{ id: 'home', name: 'ホーム', x: 0, y: 0 }, { id: 'detail', name: '詳細', x: 492, y: 0 }],
+      groups: [{
+        id: 'content',
+        x: 16,
+        y: 80,
+        axis: 'y',
+        items: [{
+          id: 'tabs',
+          kind: 'tabs',
+          label: '画面切替',
+          tabs: [{ label: '詳細' }],
+          actions: { 'tab:0': { to: 'detail', transition: 'slide' } },
+        }],
+      }],
+    });
+
+    expect(document).not.toBeNull();
+    if (!document) throw new Error('Tab compatibility fixture was not converted');
+    expect(inspectM3eExportCompatibility(document)).toMatchObject({
+      unresolvedDestinationCount: 0,
+      unresolvedActionCount: 0,
+      unresolvedPaths: [],
+    });
+  });
+
   it('reports invalid values in the exported M3E projection', () => {
     const document: CanvasDocument = {
       version: 1,
