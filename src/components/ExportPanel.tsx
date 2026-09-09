@@ -98,6 +98,7 @@ export function ExportPanel() {
             {m3eReport.approximatedKinds.length > 0 && <span>近似変換: {describeM3eCompatibilityKinds(m3eReport.approximatedKinds)}</span>}
             {m3eReport.unresolvedDestinationCount > 0 && <span>未解決の遷移: {m3eReport.unresolvedDestinationCount}件</span>}
             {m3eReport.unresolvedActionCount > 0 && <span>未解決の操作: {m3eReport.unresolvedActionCount}件</span>}
+            {m3eReport.lostActionPaths.length > 0 && <span>出力できない操作: {m3eReport.lostActionPaths.length}件</span>}
             {m3eReport.preservedFields.length > 0 && <span>保持フィールド: {m3eReport.preservedFields.length}件</span>}
             {m3eReport.approximatedFields.length > 0 && <span>近似フィールド: {describeM3eCompatibilityFields(m3eReport.approximatedFields)}</span>}
             {m3eReport.lostFields.length > 0 && <span>出力できないフィールド: {m3eReport.lostFields.join(', ')}</span>}

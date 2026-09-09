@@ -123,6 +123,7 @@ describe('M3E compatibility importer', () => {
       preservedFields: [],
       approximatedFields: [],
       lostFields: [],
+      lostActionPaths: [],
       invalidFields: [],
       duplicateIdFields: [],
       unknownFields: [],
@@ -1808,6 +1809,53 @@ describe('M3E compatibility importer', () => {
     expect(report.preservedFields).toContain('screens[home].root.children[0].children[0].m3eMetadata.icon');
     expect(report.lostFields).toContain('screens[home].root.children[0].children[0].m3eMetadata.supporting');
     expect(report.lostFields).toContain('screens[home].root.children[1].children[0].m3eMetadata.supporting');
+  });
+
+  it('reports semantic child actions lost by compressed M3E items', () => {
+    const report = inspectM3eExportCompatibility({
+      version: 1,
+      name: '圧縮操作診断',
+      platform: 'iOS',
+      minimumOS: '26.0',
+      appearance: { colorScheme: 'system', accentColor: 'blue' },
+      activeScreenId: 'home',
+      screens: [
+        {
+          id: 'home',
+          name: 'ホーム',
+          navigationTitle: 'ホーム',
+          root: {
+            id: 'root',
+            kind: 'vstack',
+            children: [
+              {
+                id: 'card',
+                kind: 'groupbox',
+                m3eKind: 'card',
+                title: 'カード',
+                children: [{ id: 'card-action', kind: 'button', label: '詳細', role: 'normal', minHeight: 44, destinationScreenId: 'detail' }],
+              },
+              {
+                id: 'tabs',
+                kind: 'tabview',
+                children: [{ id: 'tab-action', kind: 'button', label: '詳細', role: 'normal', minHeight: 44, destinationScreenId: 'detail' }],
+              },
+            ],
+          },
+        },
+        {
+          id: 'detail',
+          name: '詳細',
+          navigationTitle: '詳細',
+          root: { id: 'detail-root', kind: 'vstack', children: [] },
+        },
+      ],
+    });
+
+    expect(report.lostActionPaths).toEqual(['screens[home].root.children[0].children[0].destinationScreenId']);
+    expect(getM3eCompatibilityAnomalies(report)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'LOST_ACTION', status: 'lost', detail: expect.stringContaining('screens[home].root.children[0].children[0]') }),
+    ]));
   });
 
   it('retains typed M3E presentation fields through an editable round trip', () => {

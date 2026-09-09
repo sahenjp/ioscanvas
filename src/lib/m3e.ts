@@ -227,6 +227,7 @@ export type M3eCompatibilityAnomalyCode =
   | 'APPROXIMATED_KIND'
   | 'APPROXIMATED_FIELD'
   | 'UNRESOLVED_NAVIGATION'
+  | 'LOST_ACTION'
   | 'LOST_FIELD'
   | 'INVALID_FIELD'
   | 'DUPLICATE_ID'
@@ -252,6 +253,7 @@ const m3eAnomalyGuidance: Record<M3eCompatibilityAnomalyCode, string> = {
   APPROXIMATED_KIND: '出力後に、対象コンポーネント固有の状態や表示をSwiftUI側で補ってください。',
   APPROXIMATED_FIELD: '値は近いSwiftUI表現へ変換されています。生成コードの該当箇所を確認してください。',
   UNRESOLVED_NAVIGATION: '遷移先の画面IDを追加または修正してから、再度書き出してください。',
+  LOST_ACTION: 'この操作はM3Eの圧縮項目へ含められません。親要素へ操作を設定するか、実装用の説明へ移してください。',
   LOST_FIELD: 'この情報は射影先にありません。必要な仕様を実装用の説明へ転記してください。',
   INVALID_FIELD: '値の型・範囲・参照先を修正してから、再度読み込んでください。',
   DUPLICATE_ID: 'IDを一意にして、遷移や項目参照の曖昧さを解消してください。',
@@ -278,6 +280,8 @@ export interface M3eExportCompatibilityReport {
   approximatedFields: string[];
   /** JSON paths of metadata fields that could not be represented. */
   lostFields: string[];
+  /** JSON paths of semantic child actions that are omitted by a compressed M3E item. */
+  lostActionPaths: string[];
   invalidFields: string[];
   duplicateIdFields: string[];
   unknownFields: string[];
@@ -410,6 +414,7 @@ function exportCompatibilityAnomalies(report: M3eExportCompatibilityReport): M3e
       report.unresolvedPaths,
     ));
   }
+  if (report.lostActionPaths.length > 0) anomalies.push(compatibilityAnomaly('lost', 'LOST_ACTION', '出力できない操作', compatibilityDetail(`${report.lostActionPaths.length}件の子要素操作をM3Eへ投影できませんでした。`, report.lostActionPaths), report.lostActionPaths));
   if (report.approximatedFields.length > 0) anomalies.push(compatibilityAnomaly('approximated', 'APPROXIMATED_FIELD', '近似フィールド', describeM3eCompatibilityFields(report.approximatedFields), report.approximatedFields));
   if (report.lostFields.length > 0) anomalies.push(compatibilityAnomaly('lost', 'LOST_FIELD', '出力できないフィールド', report.lostFields.join(', '), report.lostFields));
   if (report.invalidFields.length > 0) anomalies.push(compatibilityAnomaly('lost', 'INVALID_FIELD', '不正な値', report.invalidFields.join(', '), report.invalidFields));
@@ -2807,7 +2812,9 @@ function exportContainerItems(node: ContainerNode, frameIds: Map<string, string>
     ...(isCard && node.cardContentAlignment ? { contentAlign: node.cardContentAlignment } : {}),
     ...(isCard && card.supporting ? { supporting: card.supporting } : {}),
     ...(isCard && card.src ? { src: card.src } : {}),
-    note: exportNote(node, node.kind === 'sheet' ? 'SwiftUI sheetとして再構成します。' : undefined),
+    ...(exportNote(node, node.kind === 'sheet' ? 'SwiftUI sheetとして再構成します。' : undefined)
+      ? { note: exportNote(node, node.kind === 'sheet' ? 'SwiftUI sheetとして再構成します。' : undefined) }
+      : {}),
   }, node.m3eMetadata);
   return node.m3eKind === 'card' ? [containerItem] : [containerItem, ...children];
 }
@@ -3087,6 +3094,7 @@ export function inspectM3eExportCompatibility(document: CanvasDocument): M3eExpo
   const preservedFields = new Set<string>();
   const approximatedFields = new Set<string>();
   const lostFields = new Set<string>();
+  const lostActionPaths = new Set<string>();
   const unresolvedDestinations = new Set<string>();
   let unresolvedActionCount = 0;
   const unresolvedPaths = new Set<string>();
@@ -3102,14 +3110,15 @@ export function inspectM3eExportCompatibility(document: CanvasDocument): M3eExpo
       if (approximatedM3eFields.has(field as M3ePreservableField)) approximatedFields.add(fieldPath);
     }
   };
-  type MetadataExportMode = 'normal' | 'tab-item' | 'tab-container' | 'not-exported';
+  type MetadataExportMode = 'normal' | 'tab-item' | 'tab-container' | 'action-only' | 'not-exported';
   const tabItemFields = new Set<string>(['icon']);
   const childExportMode = (node: ContainerNode, index: number): MetadataExportMode => {
     if (node.m3eKind === 'listItem'
       || (node.kind === 'groupbox' && node.m3eKind === 'card')
-      || exportSnackbarNode(node, frameIds, '') !== null) {
+      ) {
       return 'not-exported';
     }
+    if (exportSnackbarNode(node, frameIds, '') !== null) return 'action-only';
     if (node.kind === 'navigation-split-view') return index === 0 ? 'tab-container' : 'normal';
     if (node.m3eKind === 'fabMenu' || node.kind === 'tabview' || exportToolbarNode(node, frameIds, '') !== null) {
       return 'tab-item';
@@ -3165,6 +3174,22 @@ export function inspectM3eExportCompatibility(document: CanvasDocument): M3eExpo
           unresolvedDestinations.add(current.destinationScreenId);
           unresolvedActionCount += 1;
           unresolvedPaths.add(`${path}.destinationScreenId`);
+        }
+        if (mode === 'not-exported') {
+          if (current.navigationAction === 'back') lostActionPaths.add(`${path}.navigationAction`);
+          if ((current.kind === 'button' || current.kind === 'navigation-link') && current.destinationScreenId) {
+            lostActionPaths.add(`${path}.destinationScreenId`);
+          }
+          for (const [slot, action] of Object.entries(current.m3eMenuActions ?? {})) {
+            lostActionPaths.add(`${path}.m3eMenuActions.${slot}.${action.navigationAction === 'back' ? 'navigationAction' : 'destinationScreenId'}`);
+          }
+          if (current.kind === 'alert') {
+            for (const [actionIndex, action] of (current.actions ?? []).entries()) {
+              if (action.navigationAction === 'back' || action.destinationScreenId) {
+                lostActionPaths.add(`${path}.actions[${actionIndex}].${action.navigationAction === 'back' ? 'navigationAction' : 'destinationScreenId'}`);
+              }
+            }
+          }
         }
         if (current.kind === 'alert') {
           for (const [actionIndex, action] of (current.actions ?? []).entries()) {
@@ -3233,6 +3258,7 @@ export function inspectM3eExportCompatibility(document: CanvasDocument): M3eExpo
     preservedFields: [...preservedFields].sort(),
     approximatedFields: [...approximatedFields].sort(),
     lostFields: [...lostFields].sort(),
+    lostActionPaths: [...lostActionPaths].sort(),
     invalidFields: collectM3eInvalidFields(exported),
     duplicateIdFields: collectM3eDuplicateIdFields(exported),
     unknownFields: collectM3eUnknownFields(exported),
