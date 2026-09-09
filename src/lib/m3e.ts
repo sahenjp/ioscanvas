@@ -2896,7 +2896,9 @@ function exportMeaningfulSignatures(document: M3eExportDocument): string[] {
     .map((item) => `item:${canonicalJson(Object.fromEntries(
       Object.entries(normalizeItem(item)).filter(([key]) => key !== 'id' && key !== 'note' && key !== 'noteHistory'),
     ))}`);
-  return [`document:${documentSignature}`, ...frameSignatures, ...itemSignatures].sort();
+  // Keep frame and item order meaningful. Sorting these signatures would make a
+  // reordered rail or list look lossless even when the M3E projection changed it.
+  return [`document:${documentSignature}`, ...frameSignatures, ...itemSignatures];
 }
 
 function exportTopBar(screen: CanvasScreen, frameIds: Map<string, string>): M3eExportItem | null {

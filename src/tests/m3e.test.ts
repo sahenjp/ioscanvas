@@ -237,6 +237,44 @@ describe('M3E compatibility importer', () => {
     ]));
   });
 
+  it('detects when a Navigation Rail reorders body content during projection', () => {
+    const report = inspectM3eExportCompatibility({
+      version: 1,
+      name: 'Rail順序診断',
+      platform: 'iOS',
+      minimumOS: '26.0',
+      appearance: { colorScheme: 'system', accentColor: 'blue' },
+      activeScreenId: 'home',
+      screens: [{
+        id: 'home',
+        name: 'ホーム',
+        navigationTitle: 'ホーム',
+        root: {
+          id: 'root',
+          kind: 'vstack',
+          children: [
+            { id: 'body', kind: 'text', text: '本文', fontSize: 17, weight: 'regular' },
+            {
+              id: 'rail',
+              kind: 'navigation-split-view',
+              m3eKind: 'navRail',
+              children: [
+                { id: 'sidebar', kind: 'list', children: [{ id: 'home-link', kind: 'button', label: 'ホーム', role: 'normal', minHeight: 44 }] },
+                { id: 'detail', kind: 'vstack', children: [] },
+              ],
+            },
+          ],
+        },
+      }],
+    });
+
+    expect(report.approximatedKinds).toContain('navigation-split-view');
+    expect(report.roundTripValid).toBe(false);
+    expect(getM3eCompatibilityAnomalies(report)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'ROUND_TRIP', status: 'lost' }),
+    ]));
+  });
+
   it('reports unresolved actions retained in M3E metadata during export', () => {
     const document: CanvasDocument = {
       version: 1,
@@ -2168,5 +2206,37 @@ describe('M3E compatibility importer', () => {
     ]));
     expect(inspectM3eCompatibility(source)?.lostFields).toEqual([]);
     expect(inspectM3eExportCompatibility(document).lostFields).toEqual([]);
+  });
+
+  it('keeps Navigation Rail expansion side visible through export and SwiftUI guidance', () => {
+    const document = convertM3eDocument({
+      frames: [{ id: 'home', name: 'ホーム', x: 0, y: 0 }],
+      groups: [{
+        id: 'rail',
+        x: 0,
+        y: 0,
+        axis: 'y',
+        items: [{
+          id: 'navigation',
+          kind: 'navRail',
+          label: 'ナビゲーション',
+          icon: null,
+          variant: 'filled',
+          railExpanded: true,
+          railModal: true,
+          railExpansionSide: 'right',
+          tabs: [{ label: 'ホーム', icon: 'house' }],
+        }],
+      }],
+    });
+
+    expect(document).not.toBeNull();
+    if (!document) throw new Error('Navigation Rail fixture was not converted');
+    const rail = document.screens[0]?.root.children[0];
+    expect(rail?.m3eMetadata).toMatchObject({ railExpansionSide: 'right' });
+    expect(generateSwiftUI(document)).toContain('expansionSide=right');
+    expect(exportM3eDocument(document).groups.flatMap((group) => group.items)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: 'navRail', railExpansionSide: 'right' }),
+    ]));
   });
 });

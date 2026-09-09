@@ -782,7 +782,7 @@ function renderNodeContent(
           ? <NodeView key={sidebar.id} node={sidebar} allNodes={allNodes} screenId={screenId} onOpenSheet={onOpenSheet} onNavigateScreen={onNavigateScreen} onNavigateBack={onNavigateBack} />
           : <div className="empty-container">サイドバーを追加</div>;
       return (
-        <div className={`canvas-navigation-split ${node.railExpanded ? 'rail-expanded' : ''} ${node.railModal ? 'rail-modal' : ''}`}>
+        <div className={`canvas-navigation-split ${node.railExpanded ? 'rail-expanded' : ''} ${node.railModal ? 'rail-modal' : ''} ${node.m3eMetadata?.railExpansionSide === 'right' ? 'rail-expand-right' : ''}`}>
           <div className="navigation-split-pane navigation-split-sidebar">
             {sidebarContent}
           </div>

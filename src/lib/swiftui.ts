@@ -965,8 +965,9 @@ function renderNodeContent(node: CanvasNode, depth: number, context: RenderConte
         const detailChildren = detailNodes.map((child) => renderNode(child, depth + 2, context)).join('\n');
         detail = `${indent(depth + 1)}VStack {\n${detailChildren}\n${indent(depth + 1)}}`;
       }
-      const railNote = node.railExpanded !== undefined || node.railModal !== undefined
-        ? `${pad}// Navigation Rail: expanded=${node.railExpanded ?? false}, modal=${node.railModal ?? false}. NavigationSplitViewの適応レイアウトを使用します。\n`
+      const railSide = node.m3eMetadata?.railExpansionSide;
+      const railNote = node.railExpanded !== undefined || node.railModal !== undefined || railSide !== undefined
+        ? `${pad}// Navigation Rail: expanded=${node.railExpanded ?? false}, modal=${node.railModal ?? false}, expansionSide=${railSide ?? 'leading'}. NavigationSplitViewの適応レイアウトを使用します。\n`
         : '';
       return `${railNote}${pad}NavigationSplitView {\n${sidebar}\n${pad}} detail: {\n${detail}\n${pad}}`;
     }

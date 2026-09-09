@@ -500,9 +500,14 @@ button.ios-navigation-link:hover { background: #f5f5f7; }
 .canvas-navigation-split { display: grid; grid-template-columns: minmax(0, .82fr) minmax(0, 1.48fr); min-width: 0; gap: 1px; padding: 1px; border: 1px solid rgba(120, 120, 128, .26); border-radius: 9px; background: rgba(120, 120, 128, .18); }
 .canvas-navigation-split.rail-expanded { grid-template-columns: minmax(0, 1.05fr) minmax(0, 1.25fr); }
 .canvas-navigation-split.rail-modal.rail-expanded .navigation-split-sidebar { box-shadow: 5px 0 14px rgba(0, 0, 0, .14); }
+.canvas-navigation-split.rail-expand-right { grid-template-columns: minmax(0, 1.48fr) minmax(0, .82fr); }
+.canvas-navigation-split.rail-expand-right.rail-expanded { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1.05fr); }
 .navigation-split-pane { min-width: 0; min-height: 100px; padding: 7px; background: rgba(255, 255, 255, .62); }
 .navigation-split-sidebar { border-radius: 7px 0 0 7px; }
 .navigation-split-detail { border-radius: 0 7px 7px 0; }
+.rail-expand-right .navigation-split-sidebar { grid-column: 2; grid-row: 1; border-radius: 0 7px 7px 0; }
+.rail-expand-right .navigation-split-detail { grid-column: 1; grid-row: 1; border-radius: 7px 0 0 7px; }
+.rail-expand-right.rail-modal.rail-expanded .navigation-split-sidebar { box-shadow: -5px 0 14px rgba(0, 0, 0, .14); }
 .navigation-rail-preview { display: flex; flex-direction: column; gap: 4px; }
 .navigation-rail-item { border-radius: 7px; }
 .navigation-rail-item .ios-row { background: transparent; }
