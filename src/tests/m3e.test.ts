@@ -967,7 +967,7 @@ describe('M3E compatibility importer', () => {
       unsupportedPaths: ['groups[0].items[0].kind'],
       approximatedKinds: ['fab'],
       approximatedPaths: ['groups[0].items[2].kind'],
-      preservedFields: ['action', 'icon'],
+      preservedFields: ['groups[0].items[1].action', 'groups[0].items[2].icon'],
       approximatedFields: [],
       lostFields: [],
       invalidFields: ['frames[1].name', 'groups[0].items[3]', 'groups[1].axis', 'groups[1].items'],
@@ -1026,7 +1026,11 @@ describe('M3E compatibility importer', () => {
       frames: [{ id: 'home', name: 'ホーム', x: 0, y: 0 }],
       groups: [{ id: 'invalid', x: 0, y: 0, axis: 'y', items: [{ id: 'bad', kind: 'select', label: 12, noteHistory: ['有効', 2], tabs: [{ label: 12 }], actions: { 'tab:0': null } }] }],
     });
-    expect(invalid?.lostFields).toEqual(expect.arrayContaining(['actions', 'tabs']));
+    expect(invalid?.lostFields).toEqual(expect.arrayContaining([
+      'groups[0].items[0].actions',
+      'groups[0].items[0].noteHistory',
+      'groups[0].items[0].tabs',
+    ]));
     expect(invalid?.invalidFields).toEqual(expect.arrayContaining([
       'groups[0].items[0].label',
       'groups[0].items[0].noteHistory',
@@ -1658,6 +1662,55 @@ describe('M3E compatibility importer', () => {
     ]));
   });
 
+  it('scopes field compatibility diagnostics to the element that owns each field', () => {
+    const imported = inspectM3eCompatibility({
+      frames: [{ id: 'home', name: 'ホーム', x: 0, y: 0 }],
+      groups: [{
+        id: 'content',
+        x: 0,
+        y: 0,
+        axis: 'y',
+        items: [
+          { id: 'valid', kind: 'button', label: '有効', icon: null, variant: 'filled', size: 120 },
+          { id: 'invalid', kind: 'button', label: '不正', icon: null, variant: 'filled', size: '120' },
+        ],
+      }],
+    });
+
+    expect(imported?.preservedFields).toContain('groups[0].items[0].size');
+    expect(imported?.approximatedFields).toContain('groups[0].items[0].size');
+    expect(imported?.lostFields).toContain('groups[0].items[1].size');
+    expect(imported?.preservedFields).not.toContain('size');
+    expect(imported?.lostFields).not.toContain('size');
+
+    const exported = inspectM3eExportCompatibility({
+      version: 1,
+      name: '要素別診断',
+      platform: 'iOS',
+      minimumOS: '26.0',
+      appearance: { colorScheme: 'system', accentColor: 'blue' },
+      activeScreenId: 'home',
+      screens: [{
+        id: 'home',
+        name: 'ホーム',
+        navigationTitle: 'ホーム',
+        root: {
+          id: 'root',
+          kind: 'vstack',
+          children: [
+            { id: 'flattened', kind: 'vstack', children: [], m3eMetadata: { supporting: '保持できない補足' } },
+            { id: 'button', kind: 'button', label: '保存', role: 'normal', minHeight: 44, m3eMetadata: { supporting: '保持できる補足' } },
+          ],
+        },
+      }],
+    });
+
+    expect(exported.preservedFields).toContain('screens[home].root.children[1].m3eMetadata.supporting');
+    expect(exported.lostFields).toContain('screens[home].root.children[0].m3eMetadata.supporting');
+    expect(exported.preservedFields).not.toContain('supporting');
+    expect(exported.lostFields).not.toContain('supporting');
+  });
+
   it('retains typed M3E presentation fields through an editable round trip', () => {
     const source = {
       title: '互換プロジェクト',
@@ -1784,11 +1837,41 @@ describe('M3E compatibility importer', () => {
 
     const importReport = inspectM3eCompatibility(source);
     expect(importReport?.lostFields).toEqual([]);
-    expect(importReport?.preservedFields).toEqual(expect.arrayContaining(['action', 'corners', 'fill', 'noCheck', 'size', 'toggle']));
-    expect(importReport?.approximatedFields).toEqual(expect.arrayContaining(['corners', 'noCheck', 'size']));
+    expect(importReport?.preservedFields).toEqual(expect.arrayContaining([
+      'groups[0].items[0].actions',
+      'groups[0].items[0].fill',
+      'groups[0].items[0].radiusTop',
+      'groups[0].items[0].radiusBottom',
+      'groups[0].items[0].size',
+      'groups[1].items[0].action',
+      'groups[1].items[0].corners',
+      'groups[1].items[0].fill',
+      'groups[1].items[0].noCheck',
+      'groups[1].items[0].size',
+      'groups[1].items[0].toggle',
+    ]));
+    expect(importReport?.approximatedFields).toEqual(expect.arrayContaining([
+      'groups[0].items[0].radiusTop',
+      'groups[0].items[0].radiusBottom',
+      'groups[0].items[0].size',
+      'groups[1].items[0].corners',
+      'groups[1].items[0].noCheck',
+      'groups[1].items[0].size',
+    ]));
     const exportReport = inspectM3eExportCompatibility(document);
     expect(exportReport.lostFields).toEqual([]);
-    expect(exportReport.preservedFields).toEqual(expect.arrayContaining(['corners', 'fill', 'noCheck', 'size', 'toggle']));
+    expect(exportReport.preservedFields).toEqual(expect.arrayContaining([
+      'screens[screen-home].m3eTopAppBar.actions',
+      'screens[screen-home].m3eTopAppBar.fill',
+      'screens[screen-home].root.children[0].m3eMetadata.corners',
+      'screens[screen-home].root.children[0].m3eMetadata.fill',
+      'screens[screen-home].root.children[0].m3eMetadata.noCheck',
+      'screens[screen-home].root.children[0].m3eMetadata.size',
+      'screens[screen-home].root.children[0].m3eMetadata.toggle',
+      'screens[screen-home].m3eBottomNav.contained',
+      'screens[screen-home].m3eBottomNav.selected',
+      'screens[screen-home].m3eBottomNav.tabs',
+    ]));
     expect(exportReport.roundTripValid).toBe(true);
   });
 

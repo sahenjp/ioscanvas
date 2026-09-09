@@ -203,8 +203,11 @@ export interface M3eCompatibilityReport {
   unsupportedPaths: string[];
   approximatedKinds: string[];
   approximatedPaths: string[];
+  /** JSON paths of item fields that survived semantic import. */
   preservedFields: string[];
+  /** JSON paths of item fields that were retained with an approximation. */
   approximatedFields: string[];
+  /** JSON paths of item fields that could not be represented. */
   lostFields: string[];
   invalidFields: string[];
   duplicateIdFields: string[];
@@ -265,8 +268,11 @@ export interface M3eExportCompatibilityReport {
   unresolvedDestinationCount: number;
   unresolvedActionCount: number;
   unresolvedPaths: string[];
+  /** JSON paths of metadata fields that survived M3E projection. */
   preservedFields: string[];
+  /** JSON paths of metadata fields retained with an approximation. */
   approximatedFields: string[];
+  /** JSON paths of metadata fields that could not be represented. */
   lostFields: string[];
   invalidFields: string[];
   duplicateIdFields: string[];
@@ -323,7 +329,8 @@ export function describeM3eCompatibilityKinds(kinds: string[]): string {
 
 export function describeM3eCompatibilityFields(fields: string[]): string {
   return fields.map((field) => {
-    const reason = m3eFieldApproximationReasons[field];
+    const fieldName = field.split('.').at(-1) ?? field;
+    const reason = m3eFieldApproximationReasons[fieldName];
     return reason ? `${field}（${reason}）` : field;
   }).join(', ');
 }
@@ -832,18 +839,19 @@ function readM3eMetadata(item: JsonObject): M3eItemMetadata | undefined {
   return Object.keys(metadata).length > 0 ? metadata : undefined;
 }
 
-function inspectM3eItemFields(item: JsonObject): { preserved: string[]; approximated: string[]; lost: string[] } {
+function inspectM3eItemFields(item: JsonObject, path: string): { preserved: string[]; approximated: string[]; lost: string[] } {
   const metadata = readM3eMetadata(item);
   const preserved: string[] = [];
   const approximated: string[] = [];
   const lost: string[] = [];
   for (const field of m3ePreservableFields) {
     if (!Object.prototype.hasOwnProperty.call(item, field)) continue;
+    const fieldPath = `${path}.${field}`;
     if (metadata && Object.prototype.hasOwnProperty.call(metadata, field)) {
-      preserved.push(field);
-      if (approximatedM3eFields.has(field)) approximated.push(field);
+      preserved.push(fieldPath);
+      if (approximatedM3eFields.has(field)) approximated.push(fieldPath);
     } else {
-      lost.push(field);
+      lost.push(fieldPath);
     }
   }
   return { preserved, approximated, lost };
@@ -2018,7 +2026,7 @@ export function inspectM3eCompatibility(value: unknown): M3eCompatibilityReport 
         approximatedKinds.add(kind);
         approximatedPaths.add(kindPath);
       }
-      const fieldSummary = inspectM3eItemFields(rawItem);
+      const fieldSummary = inspectM3eItemFields(rawItem, itemPath);
       fieldSummary.preserved.forEach((field) => preservedFields.add(field));
       fieldSummary.approximated.forEach((field) => approximatedFields.add(field));
       fieldSummary.lost.forEach((field) => lostFields.add(field));
@@ -3059,18 +3067,23 @@ export function inspectM3eExportCompatibility(document: CanvasDocument): M3eExpo
   const flattenedPaths = new Set<string>();
   const approximatedKinds = new Set<string>();
   const approximatedPaths = new Set<string>();
-  const sourceFields = new Set<string>();
-  const exportedFields = new Set<string>();
+  const preservedFields = new Set<string>();
+  const approximatedFields = new Set<string>();
+  const lostFields = new Set<string>();
   let unresolvedDestinationCount = 0;
   let unresolvedActionCount = 0;
   const unresolvedPaths = new Set<string>();
 
-  const collectMetadataFields = (node: CanvasNode): void => {
-    Object.keys(node.m3eMetadata ?? {}).forEach((field) => sourceFields.add(field));
-    if (Array.isArray(node.children)) node.children.forEach(collectMetadataFields);
-  };
-  const collectExportedFields = (item: M3eExportItem): void => {
-    Object.keys(item).forEach((field) => exportedFields.add(field));
+  const collectMetadataFields = (metadata: M3eItemMetadata | undefined, path: string, exportedItem: M3eExportItem | null): void => {
+    for (const field of Object.keys(metadata ?? {})) {
+      const fieldPath = `${path}.${field}`;
+      if (!exportedItem || !Object.prototype.hasOwnProperty.call(exportedItem, field)) {
+        lostFields.add(fieldPath);
+        continue;
+      }
+      preservedFields.add(fieldPath);
+      if (approximatedM3eFields.has(field as M3ePreservableField)) approximatedFields.add(fieldPath);
+    }
   };
   const collectUnresolvedMetadataActions = (
     metadata: M3eItemMetadata | undefined,
@@ -3097,17 +3110,18 @@ export function inspectM3eExportCompatibility(document: CanvasDocument): M3eExpo
       }
     }
   };
-  exported.groups.forEach((group) => group.items.forEach(collectExportedFields));
-
   for (const screen of document.screens) {
     collectExportCompatibilityKinds(screen.root, `screens[${screen.id}].root`, flattenedNodeKinds, flattenedPaths, approximatedKinds, approximatedPaths, unsupportedNodeKinds, unsupportedPaths, frameIds);
-    collectMetadataFields(screen.root);
-    collectUnresolvedMetadataActions(screen.m3eTopAppBar, `screens[${screen.id}].m3eTopAppBar`, exportTopBar(screen, frameIds) ?? undefined);
-    collectUnresolvedMetadataActions(screen.m3eBottomNav, `screens[${screen.id}].m3eBottomNav`, exportBottomBar(screen, frameIds) ?? undefined);
-    Object.keys(screen.m3eTopAppBar ?? {}).forEach((field) => sourceFields.add(field));
-    Object.keys(screen.m3eBottomNav ?? {}).forEach((field) => sourceFields.add(field));
+    const topBar = exportTopBar(screen, frameIds);
+    const bottomBar = exportBottomBar(screen, frameIds);
+    collectMetadataFields(screen.m3eTopAppBar, `screens[${screen.id}].m3eTopAppBar`, topBar);
+    collectMetadataFields(screen.m3eBottomNav, `screens[${screen.id}].m3eBottomNav`, bottomBar);
+    collectUnresolvedMetadataActions(screen.m3eTopAppBar, `screens[${screen.id}].m3eTopAppBar`, topBar ?? undefined);
+    collectUnresolvedMetadataActions(screen.m3eBottomNav, `screens[${screen.id}].m3eBottomNav`, bottomBar ?? undefined);
     for (const [index, node] of screen.root.children.entries()) {
       const visit = (current: CanvasNode, path: string): void => {
+        const exportedItem = exportCompatibilityItem(current, frameIds);
+        collectMetadataFields(current.m3eMetadata, `${path}.m3eMetadata`, exportedItem);
         if ((current.kind === 'button' || current.kind === 'navigation-link')
           && current.navigationAction !== 'back'
           && current.destinationScreenId
@@ -3132,7 +3146,7 @@ export function inspectM3eExportCompatibility(document: CanvasDocument): M3eExpo
             unresolvedPaths.add(`${path}.m3eMenuActions.${slot}.destinationScreenId`);
           }
         }
-        collectUnresolvedMetadataActions(current.m3eMetadata, `${path}.m3eMetadata`, exportCompatibilityItem(current, frameIds) ?? undefined);
+        collectUnresolvedMetadataActions(current.m3eMetadata, `${path}.m3eMetadata`, exportedItem ?? undefined);
         if (Array.isArray(current.children)) {
           for (const [childIndex, child] of current.children.entries()) visit(child, `${path}.children[${childIndex}]`);
         }
@@ -3159,10 +3173,6 @@ export function inspectM3eExportCompatibility(document: CanvasDocument): M3eExpo
     }
   }
 
-  const preservedFields = [...sourceFields].filter((field) => exportedFields.has(field)).sort();
-  const lostFields = [...sourceFields].filter((field) => !exportedFields.has(field)).sort();
-  const approximatedFields = [...sourceFields].filter((field): field is M3ePreservableField => approximatedM3eFields.has(field as M3ePreservableField)).sort();
-
   return {
     flattenedItemCount: exported.groups.reduce(
       (count, group) => count + group.items.filter((item) => item.kind !== 'topAppBar' && item.kind !== 'bottomNav').length,
@@ -3177,9 +3187,9 @@ export function inspectM3eExportCompatibility(document: CanvasDocument): M3eExpo
     unresolvedDestinationCount,
     unresolvedActionCount,
     unresolvedPaths: [...unresolvedPaths].sort(),
-    preservedFields,
-    approximatedFields,
-    lostFields,
+    preservedFields: [...preservedFields].sort(),
+    approximatedFields: [...approximatedFields].sort(),
+    lostFields: [...lostFields].sort(),
     invalidFields: collectM3eInvalidFields(exported),
     duplicateIdFields: collectM3eDuplicateIdFields(exported),
     unknownFields: collectM3eUnknownFields(exported),
