@@ -905,7 +905,8 @@ function collectM3eInvalidFields(value: unknown): string[] {
 
   const frames = Array.isArray(value.frames) ? value.frames : [];
   const frameIds = new Set(frames.flatMap((frame) => isRecord(frame) && typeof frame.id === 'string' ? [frame.id] : []));
-  if (frames.length === 0) invalidFields.add('document.frames');
+  if (!Array.isArray(value.frames) || frames.length === 0) invalidFields.add('document.frames');
+  if (!Array.isArray(value.groups)) invalidFields.add('document.groups');
   if (Object.prototype.hasOwnProperty.call(value, 'title') && typeof value.title !== 'string') invalidFields.add('document.title');
   if (Object.prototype.hasOwnProperty.call(value, 'paletteKey') && !isOneOf(value.paletteKey, ['blue', 'purple', 'green', 'coral', 'amber', 'teal', 'mono'])) invalidFields.add('document.paletteKey');
   if (Object.prototype.hasOwnProperty.call(value, 'platform') && typeof value.platform !== 'string') invalidFields.add('document.platform');
@@ -1805,13 +1806,16 @@ function convertScreen(frame: M3eFrame, groups: M3eGroup[], frames: M3eFrame[], 
 }
 
 export function isM3eDocument(value: unknown): value is JsonObject {
-  return isRecord(value) && Array.isArray(value.frames) && Array.isArray(value.groups) && !Array.isArray(value.screens);
+  return isRecord(value)
+    && !Array.isArray(value.screens)
+    && (Object.prototype.hasOwnProperty.call(value, 'frames') || Object.prototype.hasOwnProperty.call(value, 'groups'));
 }
 
 export function inspectM3eCompatibility(value: unknown): M3eCompatibilityReport | null {
   if (!isM3eDocument(value)) return null;
 
-  const rawFrames = value.frames as unknown[];
+  const rawFrames = Array.isArray(value.frames) ? value.frames : [];
+  const rawGroups = Array.isArray(value.groups) ? value.groups : [];
   const invalidFramePaths = new Set<string>();
   const frames = rawFrames.flatMap((rawFrame, frameIndex) => {
     const frame = readFrame(rawFrame);
@@ -1838,7 +1842,7 @@ export function inspectM3eCompatibility(value: unknown): M3eCompatibilityReport 
   let flattenedLayoutCount = 0;
   const flattenedPaths = new Set<string>();
 
-  for (const [groupIndex, rawGroup] of (value.groups as unknown[]).entries()) {
+  for (const [groupIndex, rawGroup] of rawGroups.entries()) {
     const groupPath = `groups[${groupIndex}]`;
     if (!isRecord(rawGroup) || !Array.isArray(rawGroup.items)) {
       invalidGroupCount += 1;

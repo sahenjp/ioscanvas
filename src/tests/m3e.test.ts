@@ -919,6 +919,14 @@ describe('M3E compatibility importer', () => {
     ]));
   });
 
+  it('diagnoses malformed M3E collections instead of treating them as unrelated files', () => {
+    const source = { frames: { home: true }, groups: [] };
+
+    expect(isM3eDocument(source)).toBe(true);
+    expect(inspectM3eCompatibility(source)?.invalidFields).toContain('document.frames');
+    expect(convertM3eDocument(source)).toBeNull();
+  });
+
   it('reports M3E data that needs review after import', () => {
     const report = inspectM3eCompatibility({
       frames: [
