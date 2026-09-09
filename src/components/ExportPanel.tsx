@@ -22,7 +22,8 @@ export function ExportPanel() {
   const m3eReport = useMemo(() => inspectM3eExportCompatibility(document), [document]);
   const m3eAnomalies = useMemo(() => getM3eCompatibilityAnomalies(m3eReport), [m3eReport]);
   const value = tab === 'swiftui' ? swiftui : tab === 'prompt' ? prompt : m3e;
-  const m3eHasWarnings = m3eAnomalies.length > 0;
+  const m3eActionableAnomalies = m3eAnomalies.filter((anomaly) => anomaly.status !== 'approximated');
+  const m3eHasWarnings = m3eActionableAnomalies.length > 0;
   const lostAnomalyCount = m3eAnomalies.filter((anomaly) => anomaly.status === 'lost').length;
   const unresolvedAnomalyCount = m3eAnomalies.filter((anomaly) => anomaly.status === 'unresolved').length;
   const approximatedAnomalyCount = m3eAnomalies.filter((anomaly) => anomaly.status === 'approximated').length;
@@ -96,10 +97,10 @@ export function ExportPanel() {
           )}
         </div>
         {tab === 'm3e' && (
-          <div className={`m3e-compatibility ${m3eHasWarnings ? 'has-warning' : ''}`} role="status" aria-label="M3E互換診断">
+          <div className={`m3e-compatibility ${m3eHasWarnings ? 'has-warning' : approximatedAnomalyCount > 0 ? 'has-approximation' : ''}`} role="status" aria-label="M3E互換診断">
             <strong>M3E互換診断</strong>
             <div className="m3e-compatibility-summary" aria-live="polite">
-              <span className={m3eHasWarnings ? 'has-anomalies' : 'is-clean'}>{m3eHasWarnings ? `互換異常 ${m3eAnomalies.length}件` : '互換異常なし'}</span>
+              <span className={m3eHasWarnings ? 'has-anomalies' : approximatedAnomalyCount > 0 ? 'has-approximation' : 'is-clean'}>{m3eHasWarnings ? `互換異常 ${m3eActionableAnomalies.length}件` : approximatedAnomalyCount > 0 ? `近似 ${approximatedAnomalyCount}件` : '互換異常なし'}</span>
               {lostAnomalyCount > 0 && <span>要確認 {lostAnomalyCount}件</span>}
               {unresolvedAnomalyCount > 0 && <span>未解決 {unresolvedAnomalyCount}件</span>}
               {approximatedAnomalyCount > 0 && <span>近似 {approximatedAnomalyCount}件</span>}
@@ -120,7 +121,7 @@ export function ExportPanel() {
             {m3eReport.unknownFields.length > 0 && <span>未知のフィールド: {m3eReport.unknownFields.join(', ')}</span>}
             {m3eAnomalies.length > 0 && (
               <details className="m3e-anomaly-details">
-                <summary>互換異常 {m3eAnomalies.length}件を確認</summary>
+                <summary>{m3eHasWarnings ? `互換異常 ${m3eActionableAnomalies.length}件を確認` : `近似 ${approximatedAnomalyCount}件を確認`}</summary>
                 <ul className="m3e-anomaly-list">
                   {m3eAnomalies.map((anomaly) => (
                     <li key={`${anomaly.code}-${anomaly.label}`} className={`m3e-anomaly-${anomaly.status}`}>

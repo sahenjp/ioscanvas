@@ -702,9 +702,12 @@ button.ios-navigation-link:hover { background: #f5f5f7; }
 .m3e-compatibility strong { color: var(--text-soft); font-size: 11px; }
 .m3e-compatibility-summary { display: flex; flex-wrap: wrap; gap: 8px; color: var(--muted-2); }
 .m3e-compatibility-summary .has-anomalies { color: var(--warning); font-weight: 650; }
+.m3e-compatibility-summary .has-approximation { color: #8fb9dc; font-weight: 650; }
 .m3e-compatibility-summary .is-clean { color: var(--success); font-weight: 650; }
 .m3e-compatibility.has-warning { background: #1c1812; color: #d2b37e; }
 .m3e-compatibility.has-warning strong { color: #f0d49b; }
+.m3e-compatibility.has-approximation { background: #18232d; color: #9aa9b7; }
+.m3e-compatibility.has-approximation strong { color: #d5e9fb; }
 .m3e-anomaly-details { margin-top: 3px; border-top: 1px solid rgba(210, 179, 126, .25); padding-top: 4px; }
 .m3e-anomaly-details summary { color: inherit; cursor: pointer; }
 .m3e-anomaly-list { display: grid; gap: 3px; margin: 5px 0 0; padding-left: 16px; }
@@ -786,6 +789,8 @@ button.ios-navigation-link:hover { background: #f5f5f7; }
   .delete-button { border-color: #e5b4b0; background: #fff5f4; }
   .m3e-compatibility.has-warning { background: #fff9ed; color: #8a661f; }
   .m3e-compatibility.has-warning strong { color: #6f5015; }
+  .m3e-compatibility.has-approximation { background: #edf6fd; color: #53687e; }
+  .m3e-compatibility.has-approximation strong { color: #1f527e; }
   .phone-shell { border-color: #c5c8cd; background: #17191c; }
   .phone-screen.has-glass { background-color: #edf0f3; }
   .canvas-container { background: rgba(255, 255, 255, .28); }
@@ -877,6 +882,8 @@ button.ios-navigation-link:hover { background: #f5f5f7; }
 .app-shell[data-theme="light"] .delete-button { border-color: #e5b4b0; background: #fff5f4; }
 .app-shell[data-theme="light"] .m3e-compatibility.has-warning { background: #fff9ed; color: #8a661f; }
 .app-shell[data-theme="light"] .m3e-compatibility.has-warning strong { color: #6f5015; }
+.app-shell[data-theme="light"] .m3e-compatibility.has-approximation { background: #edf6fd; color: #53687e; }
+.app-shell[data-theme="light"] .m3e-compatibility.has-approximation strong { color: #1f527e; }
 .app-shell[data-theme="light"] .code-preview, .app-shell[data-theme="light"] .export-code { background: #f5f6f7; color: #26282b; }
 .app-shell[data-theme="light"] .screen-list-item.is-selected .screen-index,
 .app-shell[data-theme="light"] .screen-list-item.is-selected .screen-list-arrow,

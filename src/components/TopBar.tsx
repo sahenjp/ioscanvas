@@ -172,7 +172,7 @@ export function TopBar() {
         </button>
         <button className={`lint-status m3e-status ${m3eActionableAnomalies.length > 0 ? 'has-issues' : m3eApproximationCount > 0 ? 'has-approximation' : ''}`} type="button" onClick={() => { setExportTab('m3e'); setExportOpen(true); }} aria-label="M3E互換診断を表示">
           <span className="status-label">M3E</span>
-          <span>{m3eActionableAnomalies.length > 0 ? `要確認 ${m3eActionableAnomalies.length}件` : m3eApproximationCount > 0 ? `近似 ${m3eApproximationCount}件` : '問題なし'}</span>
+          <span>{m3eActionableAnomalies.length > 0 ? `互換異常 ${m3eActionableAnomalies.length}件` : m3eApproximationCount > 0 ? `近似 ${m3eApproximationCount}件` : '問題なし'}</span>
           {m3eActionableAnomalies.length > 0 && m3eApproximationCount > 0 && <span className="status-notes">近似 {m3eApproximationCount}件</span>}
           {!m3eReport.roundTripValid && <span className="status-notes">再読込要確認</span>}
         </button>
