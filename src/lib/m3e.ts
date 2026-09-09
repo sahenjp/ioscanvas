@@ -2784,13 +2784,22 @@ export function inspectM3eExportCompatibility(document: CanvasDocument): M3eExpo
     for (const node of screen.root.children) {
       const visit = (current: CanvasNode): void => {
         if ((current.kind === 'button' || current.kind === 'navigation-link')
+          && current.navigationAction !== 'back'
           && current.destinationScreenId
           && !frameIds.has(current.destinationScreenId)) {
           unresolvedDestinationCount += 1;
           unresolvedActionCount += 1;
         }
+        if (current.kind === 'alert') {
+          for (const action of current.actions ?? []) {
+            if (action.destinationScreenId && action.navigationAction !== 'back' && !frameIds.has(action.destinationScreenId)) {
+              unresolvedDestinationCount += 1;
+              unresolvedActionCount += 1;
+            }
+          }
+        }
         for (const action of Object.values(current.m3eMenuActions ?? {})) {
-          if (action.destinationScreenId && !frameIds.has(action.destinationScreenId)) {
+          if (action.navigationAction !== 'back' && action.destinationScreenId && !frameIds.has(action.destinationScreenId)) {
             unresolvedDestinationCount += 1;
             unresolvedActionCount += 1;
           }
@@ -2803,7 +2812,7 @@ export function inspectM3eExportCompatibility(document: CanvasDocument): M3eExpo
       visit(node);
     }
     for (const item of [...(screen.toolbarItems ?? []), ...(screen.tabBarItems ?? [])]) {
-      if (item.destinationScreenId && !frameIds.has(item.destinationScreenId)) {
+      if (item.navigationAction !== 'back' && item.destinationScreenId && !frameIds.has(item.destinationScreenId)) {
         unresolvedDestinationCount += 1;
         unresolvedActionCount += 1;
       }
