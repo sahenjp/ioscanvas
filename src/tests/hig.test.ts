@@ -394,6 +394,17 @@ describe('HIG linter', () => {
     ]));
   });
 
+  it('flags a swipe destination that does not exist', () => {
+    const document = structuredClone(defaultDocument);
+    const screen = document.screens[0];
+    if (!screen) throw new Error('Fixture screen missing');
+    screen.swipe = { right: 'missing-screen' };
+
+    expect(lintDocument(document)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ nodeId: screen.root.id, code: 'NAVIGATION_DESTINATION' }),
+    ]));
+  });
+
   it('checks that NavigationSplitView has sidebar and detail content', () => {
     const document = structuredClone(defaultDocument);
     const split = { id: 'split-test', kind: 'navigation-split-view' as const, children: [{ id: 'sidebar-only', kind: 'list' as const, children: [] }] };

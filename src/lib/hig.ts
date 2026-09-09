@@ -431,7 +431,14 @@ export function lintDocument(document: CanvasDocument): LintIssue[] {
       }
     }
     for (const [direction, destination] of Object.entries(screen.swipe ?? {})) {
-      if (destination === screen.id) {
+      if (!screenIds.has(destination)) {
+        issues.push({
+          nodeId: screen.root.id,
+          severity: 'warning',
+          code: 'NAVIGATION_DESTINATION',
+          message: `${direction}方向のスワイプ遷移先画面が未設定です。表示する画面を指定してください。`,
+        });
+      } else if (destination === screen.id) {
         issues.push({
           nodeId: screen.root.id,
           severity: 'warning',
