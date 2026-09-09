@@ -851,11 +851,29 @@ function collectM3eInvalidFields(value: unknown): string[] {
     if (field !== undefined && field <= 0) invalidFields.add(path);
   };
   const selectionKinds = new Set(['select', 'tabs', 'bottomNav', 'navRail']);
+  const validTransitions: readonly NavigationTransition[] = ['slide', 'slideLeft', 'slideUp', 'slideDown', 'fade', 'expand', 'none'];
+  const invalidAction = (action: unknown, path: string): void => {
+    if (!isRecord(action)) {
+      invalidFields.add(path);
+      return;
+    }
+    if (typeof action.to !== 'string' || !action.to.trim()) invalidFields.add(`${path}.to`);
+    if (hasField(action, 'transition') && !isOneOf(action.transition, validTransitions)) invalidFields.add(`${path}.transition`);
+  };
 
   const frames = Array.isArray(value.frames) ? value.frames : [];
   frames.forEach((frame, frameIndex) => {
-    if (!isRecord(frame)) return;
     const framePath = `frames[${frameIndex}]`;
+    if (!isRecord(frame)) {
+      invalidFields.add(framePath);
+      return;
+    }
+    if (typeof frame.id !== 'string' || !frame.id.trim()) invalidFields.add(`${framePath}.id`);
+    if (typeof frame.name !== 'string' || !frame.name.trim()) invalidFields.add(`${framePath}.name`);
+    numericField(frame, 'x', `${framePath}.x`);
+    numericField(frame, 'y', `${framePath}.y`);
+    if (Object.prototype.hasOwnProperty.call(frame, 'place') && !isOneOf(frame.place, ['top', 'center', 'bottom', 'spread'])) invalidFields.add(`${framePath}.place`);
+    if (Object.prototype.hasOwnProperty.call(frame, 'bg') && !isOneOf(frame.bg, ['surface', 'surfaceContainerLow', 'surfaceContainer', 'surfaceContainerHigh', 'surfaceContainerHighest', 'primaryContainer', 'secondaryContainer', 'tertiaryContainer', 'primary', 'inverseSurface'])) invalidFields.add(`${framePath}.bg`);
     positiveDimension(frame, 'w', `${framePath}.w`);
     positiveDimension(frame, 'h', `${framePath}.h`);
     if (!hasField(frame, 'swipe')) return;
@@ -872,10 +890,60 @@ function collectM3eInvalidFields(value: unknown): string[] {
 
   const groups = Array.isArray(value.groups) ? value.groups : [];
   groups.forEach((group, groupIndex) => {
-    if (!isRecord(group) || !Array.isArray(group.items)) return;
+    const groupPath = `groups[${groupIndex}]`;
+    if (!isRecord(group)) {
+      invalidFields.add(groupPath);
+      return;
+    }
+    if (typeof group.id !== 'string' || !group.id.trim()) invalidFields.add(`${groupPath}.id`);
+    numericField(group, 'x', `${groupPath}.x`);
+    numericField(group, 'y', `${groupPath}.y`);
+    if (!isOneOf(group.axis, ['x', 'y'])) invalidFields.add(`${groupPath}.axis`);
+    if (!Array.isArray(group.items)) {
+      invalidFields.add(`${groupPath}.items`);
+      return;
+    }
+    if (group.items.length === 0) invalidFields.add(`${groupPath}.items`);
     group.items.forEach((item, itemIndex) => {
-      if (!isRecord(item)) return;
-      const itemPath = `groups[${groupIndex}].items[${itemIndex}]`;
+      const itemPath = `${groupPath}.items[${itemIndex}]`;
+      if (!isRecord(item)) {
+        invalidFields.add(itemPath);
+        return;
+      }
+      for (const key of ['size', 'size2', 'minimum', 'maximum', 'step', 'value', 'radiusTop', 'radiusBottom', 'imageSize'] as const) {
+        const field = numericField(item, key, `${itemPath}.${key}`);
+        if (field !== undefined && field < 0) invalidFields.add(`${itemPath}.${key}`);
+      }
+      if (Object.prototype.hasOwnProperty.call(item, 'trackThickness')) {
+        const trackThickness = numericField(item, 'trackThickness', `${itemPath}.trackThickness`);
+        if (trackThickness !== undefined && (!Number.isInteger(trackThickness) || trackThickness < 2 || trackThickness > 16)) invalidFields.add(`${itemPath}.trackThickness`);
+      }
+      for (const key of ['bold', 'checked', 'switch', 'noCheck', 'noImage', 'wavy', 'contained', 'railExpanded', 'railModal'] as const) {
+        if (Object.prototype.hasOwnProperty.call(item, key) && typeof item[key] !== 'boolean') invalidFields.add(`${itemPath}.${key}`);
+      }
+      for (const key of ['supporting', 'note', 'src'] as const) {
+        if (Object.prototype.hasOwnProperty.call(item, key) && typeof item[key] !== 'string') invalidFields.add(`${itemPath}.${key}`);
+      }
+      for (const key of ['icon', 'icon2'] as const) {
+        if (Object.prototype.hasOwnProperty.call(item, key) && item[key] !== null && typeof item[key] !== 'string') invalidFields.add(`${itemPath}.${key}`);
+      }
+      if (Object.prototype.hasOwnProperty.call(item, 'variant') && !isOneOf(item.variant, ['filled', 'tonal', 'elevated', 'outlined', 'text'])) invalidFields.add(`${itemPath}.variant`);
+      if (Object.prototype.hasOwnProperty.call(item, 'imagePos') && !isOneOf(item.imagePos, ['top', 'leading', 'trailing', 'background'])) invalidFields.add(`${itemPath}.imagePos`);
+      if (Object.prototype.hasOwnProperty.call(item, 'contentAlign') && !isOneOf(item.contentAlign, ['start', 'center', 'end'])) invalidFields.add(`${itemPath}.contentAlign`);
+      if (Object.prototype.hasOwnProperty.call(item, 'fill') && !isOneOf(item.fill, ['surface', 'surfaceContainerLow', 'surfaceContainer', 'surfaceContainerHigh', 'surfaceContainerHighest', 'primaryContainer', 'secondaryContainer', 'tertiaryContainer', 'primary', 'inverseSurface'])) invalidFields.add(`${itemPath}.fill`);
+      if (Object.prototype.hasOwnProperty.call(item, 'iconFill') && item.iconFill !== 'none' && !isOneOf(item.iconFill, ['surface', 'surfaceContainerLow', 'surfaceContainer', 'surfaceContainerHigh', 'surfaceContainerHighest', 'primaryContainer', 'secondaryContainer', 'tertiaryContainer', 'primary', 'inverseSurface'])) invalidFields.add(`${itemPath}.iconFill`);
+      if (Object.prototype.hasOwnProperty.call(item, 'textColor') && !isOneOf(item.textColor, ['primary', 'secondary', 'onSurface', 'onSurfaceVariant', 'onPrimaryContainer', 'onSecondaryContainer', 'onTertiaryContainer', 'inverseOnSurface'])) invalidFields.add(`${itemPath}.textColor`);
+      if (Object.prototype.hasOwnProperty.call(item, 'railExpansionSide') && !isOneOf(item.railExpansionSide, ['left', 'right'])) invalidFields.add(`${itemPath}.railExpansionSide`);
+      if (Object.prototype.hasOwnProperty.call(item, 'corners')) {
+        if (!isRecord(item.corners)) {
+          invalidFields.add(`${itemPath}.corners`);
+        } else {
+          for (const corner of ['tl', 'tr', 'bl', 'br'] as const) {
+            const value = numericField(item.corners, corner, `${itemPath}.corners.${corner}`);
+            if (value !== undefined && value < 0) invalidFields.add(`${itemPath}.corners.${corner}`);
+          }
+        }
+      }
       if (item.kind === 'slider') {
         const minimum = numericField(item, 'minimum', `${itemPath}.minimum`);
         const maximum = numericField(item, 'maximum', `${itemPath}.maximum`);
@@ -891,14 +959,48 @@ function collectM3eInvalidFields(value: unknown): string[] {
         }
         if (value !== undefined && (value < 0 || value > 100)) invalidFields.add(`${itemPath}.value`);
       }
-      if (!selectionKinds.has(String(item.kind)) || !hasField(item, 'selected')) return;
-      const selected = numericField(item, 'selected', `${itemPath}.selected`);
-      if (selected === undefined || !Number.isInteger(selected) || selected < 0) {
-        invalidFields.add(`${itemPath}.selected`);
-        return;
+      if (hasField(item, 'selected')) {
+        const selected = numericField(item, 'selected', `${itemPath}.selected`);
+        if (selected === undefined || !Number.isInteger(selected) || selected < 0) {
+          invalidFields.add(`${itemPath}.selected`);
+        } else if (selectionKinds.has(String(item.kind))) {
+          const optionCount = Array.isArray(item.tabs) ? item.tabs.filter(isRecord).length : 0;
+          if (selected >= optionCount) invalidFields.add(`${itemPath}.selected`);
+        }
       }
-      const optionCount = Array.isArray(item.tabs) ? item.tabs.filter(isRecord).length : 0;
-      if (selected >= optionCount) invalidFields.add(`${itemPath}.selected`);
+      if (Object.prototype.hasOwnProperty.call(item, 'tabs')) {
+        if (!Array.isArray(item.tabs)) {
+          invalidFields.add(`${itemPath}.tabs`);
+        } else {
+          item.tabs.forEach((tab, tabIndex) => {
+            const tabPath = `${itemPath}.tabs[${tabIndex}]`;
+            if (!isRecord(tab)) {
+              invalidFields.add(tabPath);
+              return;
+            }
+            if (typeof tab.label !== 'string') invalidFields.add(`${tabPath}.label`);
+            if (tab.icon !== undefined && tab.icon !== null && typeof tab.icon !== 'string') invalidFields.add(`${tabPath}.icon`);
+          });
+        }
+      }
+      if (Object.prototype.hasOwnProperty.call(item, 'action')) invalidAction(item.action, `${itemPath}.action`);
+      if (Object.prototype.hasOwnProperty.call(item, 'actions')) {
+        if (!isRecord(item.actions)) {
+          invalidFields.add(`${itemPath}.actions`);
+        } else {
+          Object.entries(item.actions).forEach(([slot, action]) => invalidAction(action, `${itemPath}.actions.${slot}`));
+        }
+      }
+      if (Object.prototype.hasOwnProperty.call(item, 'toggle')) {
+        const toggle = item.toggle;
+        if (!isRecord(toggle)) {
+          invalidFields.add(`${itemPath}.toggle`);
+        } else {
+          if (toggle.icon !== undefined && toggle.icon !== null && typeof toggle.icon !== 'string') invalidFields.add(`${itemPath}.toggle.icon`);
+          if (toggle.variant !== undefined && !isOneOf(toggle.variant, ['filled', 'tonal', 'elevated', 'outlined', 'text'])) invalidFields.add(`${itemPath}.toggle.variant`);
+          if (toggle.label !== undefined && typeof toggle.label !== 'string') invalidFields.add(`${itemPath}.toggle.label`);
+        }
+      }
     });
   });
 

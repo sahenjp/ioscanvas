@@ -131,6 +131,38 @@ describe('M3E compatibility importer', () => {
     ]));
   });
 
+  it('reports invalid values in the exported M3E projection', () => {
+    const document: CanvasDocument = {
+      version: 1,
+      name: '不正値の書き出し',
+      platform: 'iOS',
+      minimumOS: '26.0',
+      appearance: { colorScheme: 'system', accentColor: 'blue' },
+      activeScreenId: 'home',
+      screens: [{
+        id: 'home',
+        name: 'ホーム',
+        navigationTitle: 'ホーム',
+        previewDevice: 'iphone-se',
+        root: {
+          id: 'root',
+          kind: 'vstack',
+          children: [{ id: 'range', kind: 'slider', label: '範囲', binding: 'range', value: 5, minimum: 10, maximum: 5, step: 0, minHeight: 44 }],
+        },
+      }],
+    };
+
+    const report = inspectM3eExportCompatibility(document);
+    expect(report.invalidFields).toEqual(expect.arrayContaining([
+      'groups[1].items[0].minimum',
+      'groups[1].items[0].maximum',
+      'groups[1].items[0].step',
+    ]));
+    expect(getM3eCompatibilityAnomalies(report)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'INVALID_FIELD', status: 'lost' }),
+    ]));
+  });
+
   it('preserves card presentation and indeterminate circular progress on export', () => {
     const document: CanvasDocument = {
       version: 1,
@@ -690,7 +722,7 @@ describe('M3E compatibility importer', () => {
       preservedFields: ['action', 'icon'],
       approximatedFields: [],
       lostFields: [],
-      invalidFields: [],
+      invalidFields: ['frames[1].name', 'groups[0].items[3]', 'groups[1].axis', 'groups[1].items'],
       unknownFields: [],
       flattenedLayoutCount: 0,
     });
@@ -741,6 +773,10 @@ describe('M3E compatibility importer', () => {
       groups: [{ id: 'invalid', x: 0, y: 0, axis: 'y', items: [{ id: 'bad', kind: 'select', tabs: [{ label: 12 }], actions: { 'tab:0': null } }] }],
     });
     expect(invalid?.lostFields).toEqual(expect.arrayContaining(['actions', 'tabs']));
+    expect(invalid?.invalidFields).toEqual(expect.arrayContaining([
+      'groups[0].items[0].tabs[0].label',
+      'groups[0].items[0].actions.tab:0',
+    ]));
   });
 
   it('reports values that the importer would normalize instead of preserving them', () => {
@@ -763,7 +799,7 @@ describe('M3E compatibility importer', () => {
           { id: 'range', kind: 'slider', minimum: 10, maximum: 5, step: 0, value: 120 },
           { id: 'select', kind: 'select', tabs: [{ label: '一' }, { label: '二' }], selected: 2 },
           { id: 'tabs', kind: 'tabs', tabs: [{ label: '一' }], selected: -1 },
-          { id: 'rail', kind: 'navRail', tabs: [{ label: '一' }], selected: '0' },
+          { id: 'rail', kind: 'navRail', tabs: [{ label: '一' }], selected: '0', variant: 'ghost', checked: 'yes', corners: { tl: -1, tr: 0, bl: 0, br: 0 } },
         ],
       }],
     });
@@ -781,6 +817,9 @@ describe('M3E compatibility importer', () => {
       'groups[0].items[1].selected',
       'groups[0].items[2].selected',
       'groups[0].items[3].selected',
+      'groups[0].items[3].variant',
+      'groups[0].items[3].checked',
+      'groups[0].items[3].corners.tl',
     ]));
     expect(getM3eCompatibilityAnomalies(report!)).toEqual(expect.arrayContaining([
       expect.objectContaining({ code: 'INVALID_FIELD', status: 'lost' }),
