@@ -116,6 +116,7 @@ describe('M3E compatibility importer', () => {
       approximatedKinds: ['securefield'],
       unresolvedDestinationCount: 2,
       unresolvedActionCount: 2,
+      unresolvedPaths: ['screens[home].root.children[3].destinationScreenId', 'screens[home].swipe.right'],
       preservedFields: [],
       approximatedFields: [],
       lostFields: [],
@@ -231,8 +232,17 @@ describe('M3E compatibility importer', () => {
     const report = inspectM3eExportCompatibility(document);
     expect(report.unresolvedDestinationCount).toBe(3);
     expect(report.unresolvedActionCount).toBe(3);
+    expect(report.unresolvedPaths).toEqual([
+      'screens[home].m3eTopAppBar.actions.icon.to',
+      'screens[home].root.children[0].m3eMetadata.action.to',
+      'screens[home].root.children[0].m3eMetadata.actions.icon2.to',
+    ]);
     expect(getM3eCompatibilityAnomalies(report)).toEqual(expect.arrayContaining([
-      expect.objectContaining({ code: 'UNRESOLVED_NAVIGATION', status: 'unresolved' }),
+      expect.objectContaining({
+        code: 'UNRESOLVED_NAVIGATION',
+        status: 'unresolved',
+        detail: expect.stringContaining('screens[home].m3eTopAppBar.actions.icon.to'),
+      }),
     ]));
   });
 
@@ -270,6 +280,7 @@ describe('M3E compatibility importer', () => {
     const report = inspectM3eExportCompatibility(document);
     expect(report.unresolvedDestinationCount).toBe(1);
     expect(report.unresolvedActionCount).toBe(1);
+    expect(report.unresolvedPaths).toEqual(['screens[home].root.children[0].actions[0].destinationScreenId']);
     expect(getM3eCompatibilityAnomalies(report)).toEqual(expect.arrayContaining([
       expect.objectContaining({ code: 'UNRESOLVED_NAVIGATION', status: 'unresolved' }),
     ]));
@@ -861,6 +872,7 @@ describe('M3E compatibility importer', () => {
       discardedItemCount: 1,
       unresolvedDestinationCount: 2,
       unresolvedActionCount: 2,
+      unresolvedPaths: ['frames[0].swipe.left', 'groups[0].items[1].action.to'],
       unsupportedKinds: ['unknownPart'],
       approximatedKinds: ['fab'],
       preservedFields: ['action', 'icon'],

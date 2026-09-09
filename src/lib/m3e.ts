@@ -174,6 +174,7 @@ export interface M3eCompatibilityReport {
   discardedItemCount: number;
   unresolvedDestinationCount: number;
   unresolvedActionCount: number;
+  unresolvedPaths: string[];
   flattenedLayoutCount: number;
   unsupportedKinds: string[];
   approximatedKinds: string[];
@@ -216,6 +217,7 @@ export interface M3eExportCompatibilityReport {
   approximatedKinds: string[];
   unresolvedDestinationCount: number;
   unresolvedActionCount: number;
+  unresolvedPaths: string[];
   preservedFields: string[];
   approximatedFields: string[];
   lostFields: string[];
@@ -288,6 +290,14 @@ function compatibilityAnomaly(
   return { status, code, label, detail };
 }
 
+function unresolvedNavigationDetail(
+  report: Pick<M3eCompatibilityReport | M3eExportCompatibilityReport, 'unresolvedDestinationCount' | 'unresolvedActionCount' | 'unresolvedPaths'>,
+  suffix: string,
+): string {
+  const summary = `遷移先${report.unresolvedDestinationCount}件、操作${report.unresolvedActionCount}件${suffix}`;
+  return report.unresolvedPaths.length > 0 ? `${summary} 対象: ${report.unresolvedPaths.join(', ')}` : summary;
+}
+
 function importCompatibilityAnomalies(report: M3eCompatibilityReport): M3eCompatibilityAnomaly[] {
   const anomalies: M3eCompatibilityAnomaly[] = [];
   if (report.invalidFrameCount > 0) anomalies.push(compatibilityAnomaly('lost', 'INVALID_FRAME', '無効な画面', `${report.invalidFrameCount}件を読み込めませんでした。`));
@@ -300,7 +310,7 @@ function importCompatibilityAnomalies(report: M3eCompatibilityReport): M3eCompat
       'unresolved',
       'UNRESOLVED_NAVIGATION',
       '未解決の遷移',
-      `遷移先${report.unresolvedDestinationCount}件、操作${report.unresolvedActionCount}件を確認できませんでした。`,
+      unresolvedNavigationDetail(report, 'を確認できませんでした。'),
     ));
   }
   if (report.unsupportedKinds.length > 0) anomalies.push(compatibilityAnomaly('lost', 'UNSUPPORTED_KIND', '未対応パーツ', report.unsupportedKinds.join(', ')));
@@ -323,7 +333,7 @@ function exportCompatibilityAnomalies(report: M3eExportCompatibilityReport): M3e
       'unresolved',
       'UNRESOLVED_NAVIGATION',
       '未解決の遷移',
-      `遷移先${report.unresolvedDestinationCount}件、操作${report.unresolvedActionCount}件を出力できませんでした。`,
+      unresolvedNavigationDetail(report, 'を出力できませんでした。'),
     ));
   }
   if (report.approximatedFields.length > 0) anomalies.push(compatibilityAnomaly('approximated', 'APPROXIMATED_FIELD', '近似フィールド', describeM3eCompatibilityFields(report.approximatedFields)));
@@ -1791,9 +1801,10 @@ export function inspectM3eCompatibility(value: unknown): M3eCompatibilityReport 
   let discardedItemCount = 0;
   let unresolvedDestinationCount = 0;
   let unresolvedActionCount = 0;
+  const unresolvedPaths = new Set<string>();
   let flattenedLayoutCount = 0;
 
-  for (const rawGroup of value.groups as unknown[]) {
+  for (const [groupIndex, rawGroup] of (value.groups as unknown[]).entries()) {
     if (!isRecord(rawGroup) || !Array.isArray(rawGroup.items)) {
       invalidGroupCount += 1;
       continue;
@@ -1807,7 +1818,7 @@ export function inspectM3eCompatibility(value: unknown): M3eCompatibilityReport 
     for (const field of ['free', 'locked', 'pos']) {
       if (Object.prototype.hasOwnProperty.call(rawGroup, field)) flattenedLayoutCount += 1;
     }
-    for (const rawItem of rawGroup.items) {
+    for (const [itemIndex, rawItem] of rawGroup.items.entries()) {
       if (!isRecord(rawItem)) {
         discardedItemCount += 1;
         continue;
@@ -1822,25 +1833,34 @@ export function inspectM3eCompatibility(value: unknown): M3eCompatibilityReport 
       fieldSummary.preserved.forEach((field) => preservedFields.add(field));
       fieldSummary.approximated.forEach((field) => approximatedFields.add(field));
       fieldSummary.lost.forEach((field) => lostFields.add(field));
+      const itemPath = `groups[${groupIndex}].items[${itemIndex}]`;
       const actionTargets = [
-        recordValue(rawItem, 'action'),
-        ...Object.values(recordValue(rawItem, 'actions') ?? {}).filter(isRecord),
-      ].filter(isRecord);
-      for (const action of actionTargets) {
+        { path: `${itemPath}.action`, action: recordValue(rawItem, 'action') },
+        ...Object.entries(recordValue(rawItem, 'actions') ?? {}).map(([slot, value]) => ({
+          path: `${itemPath}.actions.${slot}`,
+          action: isRecord(value) ? value : undefined,
+        })),
+      ];
+      for (const { path, action } of actionTargets) {
+        if (!action) continue;
         const target = stringValue(action, 'to');
         if (target && target !== 'back' && !frameIds.has(target)) {
           unresolvedDestinationCount += 1;
           unresolvedActionCount += 1;
+          unresolvedPaths.add(`${path}.to`);
         }
       }
     }
   }
 
-  for (const frame of frames) {
-    for (const destination of Object.values(frame.swipe ?? {})) {
+  for (const [frameIndex, rawFrame] of rawFrames.entries()) {
+    const frame = readFrame(rawFrame);
+    if (!frame) continue;
+    for (const [direction, destination] of Object.entries(frame.swipe ?? {})) {
       if (destination && !frameIds.has(destination)) {
         unresolvedDestinationCount += 1;
         unresolvedActionCount += 1;
+        unresolvedPaths.add(`frames[${frameIndex}].swipe.${direction}`);
       }
     }
   }
@@ -1852,6 +1872,7 @@ export function inspectM3eCompatibility(value: unknown): M3eCompatibilityReport 
     discardedItemCount,
     unresolvedDestinationCount,
     unresolvedActionCount,
+    unresolvedPaths: [...unresolvedPaths].sort(),
     flattenedLayoutCount,
     unsupportedKinds: [...unsupportedKinds].sort(),
     approximatedKinds: [...approximatedKinds].sort(),
@@ -2769,6 +2790,7 @@ export function inspectM3eExportCompatibility(document: CanvasDocument): M3eExpo
   const exportedFields = new Set<string>();
   let unresolvedDestinationCount = 0;
   let unresolvedActionCount = 0;
+  const unresolvedPaths = new Set<string>();
 
   const collectMetadataFields = (node: CanvasNode): void => {
     Object.keys(node.m3eMetadata ?? {}).forEach((field) => sourceFields.add(field));
@@ -2777,13 +2799,17 @@ export function inspectM3eExportCompatibility(document: CanvasDocument): M3eExpo
   const collectExportedFields = (item: M3eExportItem): void => {
     Object.keys(item).forEach((field) => exportedFields.add(field));
   };
-  const collectUnresolvedMetadataActions = (metadata: M3eItemMetadata | undefined): void => {
+  const collectUnresolvedMetadataActions = (metadata: M3eItemMetadata | undefined, path: string): void => {
     if (!metadata) return;
-    const actions = [metadata.action, ...Object.values(metadata.actions ?? {})].filter((action): action is M3eAction => action !== undefined);
-    for (const action of actions) {
+    const actions = [
+      ...(metadata.action ? [{ path: `${path}.action.to`, action: metadata.action }] : []),
+      ...Object.entries(metadata.actions ?? {}).map(([slot, action]) => ({ path: `${path}.actions.${slot}.to`, action })),
+    ];
+    for (const { path: actionPath, action } of actions) {
       if (action.to !== 'back' && !frameIds.has(action.to)) {
         unresolvedDestinationCount += 1;
         unresolvedActionCount += 1;
+        unresolvedPaths.add(actionPath);
       }
     }
   };
@@ -2792,50 +2818,59 @@ export function inspectM3eExportCompatibility(document: CanvasDocument): M3eExpo
   for (const screen of document.screens) {
     collectExportCompatibilityKinds(screen.root, flattenedNodeKinds, approximatedKinds, unsupportedNodeKinds, frameIds);
     collectMetadataFields(screen.root);
-    collectUnresolvedMetadataActions(screen.m3eTopAppBar);
-    collectUnresolvedMetadataActions(screen.m3eBottomNav);
+    collectUnresolvedMetadataActions(screen.m3eTopAppBar, `screens[${screen.id}].m3eTopAppBar`);
+    collectUnresolvedMetadataActions(screen.m3eBottomNav, `screens[${screen.id}].m3eBottomNav`);
     Object.keys(screen.m3eTopAppBar ?? {}).forEach((field) => sourceFields.add(field));
     Object.keys(screen.m3eBottomNav ?? {}).forEach((field) => sourceFields.add(field));
-    for (const node of screen.root.children) {
-      const visit = (current: CanvasNode): void => {
+    for (const [index, node] of screen.root.children.entries()) {
+      const visit = (current: CanvasNode, path: string): void => {
         if ((current.kind === 'button' || current.kind === 'navigation-link')
           && current.navigationAction !== 'back'
           && current.destinationScreenId
           && !frameIds.has(current.destinationScreenId)) {
           unresolvedDestinationCount += 1;
           unresolvedActionCount += 1;
+          unresolvedPaths.add(`${path}.destinationScreenId`);
         }
         if (current.kind === 'alert') {
-          for (const action of current.actions ?? []) {
+          for (const [actionIndex, action] of (current.actions ?? []).entries()) {
             if (action.destinationScreenId && action.navigationAction !== 'back' && !frameIds.has(action.destinationScreenId)) {
               unresolvedDestinationCount += 1;
               unresolvedActionCount += 1;
+              unresolvedPaths.add(`${path}.actions[${actionIndex}].destinationScreenId`);
             }
           }
         }
-        for (const action of Object.values(current.m3eMenuActions ?? {})) {
+        for (const [slot, action] of Object.entries(current.m3eMenuActions ?? {})) {
           if (action.navigationAction !== 'back' && action.destinationScreenId && !frameIds.has(action.destinationScreenId)) {
             unresolvedDestinationCount += 1;
             unresolvedActionCount += 1;
+            unresolvedPaths.add(`${path}.m3eMenuActions.${slot}.destinationScreenId`);
           }
         }
-        collectUnresolvedMetadataActions(current.m3eMetadata);
+        collectUnresolvedMetadataActions(current.m3eMetadata, `${path}.m3eMetadata`);
         if (Array.isArray(current.children)) {
-          for (const child of current.children) visit(child);
+          for (const [childIndex, child] of current.children.entries()) visit(child, `${path}.children[${childIndex}]`);
         }
       };
-      visit(node);
+      visit(node, `screens[${screen.id}].root.children[${index}]`);
     }
-    for (const item of [...(screen.toolbarItems ?? []), ...(screen.tabBarItems ?? [])]) {
+    const toolbarItems = [
+      ...(screen.toolbarItems ?? []).map((item, index) => ({ item, path: `screens[${screen.id}].toolbarItems[${index}]` })),
+      ...(screen.tabBarItems ?? []).map((item, index) => ({ item, path: `screens[${screen.id}].tabBarItems[${index}]` })),
+    ];
+    for (const { item, path } of toolbarItems) {
       if (item.navigationAction !== 'back' && item.destinationScreenId && !frameIds.has(item.destinationScreenId)) {
         unresolvedDestinationCount += 1;
         unresolvedActionCount += 1;
+        unresolvedPaths.add(`${path}.destinationScreenId`);
       }
     }
-    for (const destination of Object.values(screen.swipe ?? {})) {
+    for (const [direction, destination] of Object.entries(screen.swipe ?? {})) {
       if (destination && !frameIds.has(destination)) {
         unresolvedDestinationCount += 1;
         unresolvedActionCount += 1;
+        unresolvedPaths.add(`screens[${screen.id}].swipe.${direction}`);
       }
     }
   }
@@ -2854,6 +2889,7 @@ export function inspectM3eExportCompatibility(document: CanvasDocument): M3eExpo
     approximatedKinds: [...approximatedKinds].sort(),
     unresolvedDestinationCount,
     unresolvedActionCount,
+    unresolvedPaths: [...unresolvedPaths].sort(),
     preservedFields,
     approximatedFields,
     lostFields,
