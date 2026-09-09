@@ -910,6 +910,15 @@ describe('M3E compatibility importer', () => {
     expect(convertM3eDocument({ frames: [], groups: [] })).toBeNull();
   });
 
+  it('reports an empty frame collection before conversion fails', () => {
+    const report = inspectM3eCompatibility({ frames: [], groups: [] });
+
+    expect(report?.invalidFields).toContain('document.frames');
+    expect(getM3eCompatibilityAnomalies(report!)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'INVALID_FIELD', status: 'lost' }),
+    ]));
+  });
+
   it('reports M3E data that needs review after import', () => {
     const report = inspectM3eCompatibility({
       frames: [

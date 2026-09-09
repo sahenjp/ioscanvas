@@ -905,6 +905,7 @@ function collectM3eInvalidFields(value: unknown): string[] {
 
   const frames = Array.isArray(value.frames) ? value.frames : [];
   const frameIds = new Set(frames.flatMap((frame) => isRecord(frame) && typeof frame.id === 'string' ? [frame.id] : []));
+  if (frames.length === 0) invalidFields.add('document.frames');
   if (Object.prototype.hasOwnProperty.call(value, 'title') && typeof value.title !== 'string') invalidFields.add('document.title');
   if (Object.prototype.hasOwnProperty.call(value, 'paletteKey') && !isOneOf(value.paletteKey, ['blue', 'purple', 'green', 'coral', 'amber', 'teal', 'mono'])) invalidFields.add('document.paletteKey');
   if (Object.prototype.hasOwnProperty.call(value, 'platform') && typeof value.platform !== 'string') invalidFields.add('document.platform');

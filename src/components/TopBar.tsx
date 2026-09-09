@@ -63,11 +63,20 @@ export function TopBar() {
     try {
       const raw: unknown = JSON.parse(await file.text());
       const parsed = parseCanvasDocument(raw);
+      const report = parsed ? null : inspectM3eCompatibility(raw);
       const imported = parsed ? null : convertM3eDocument(raw);
       const loadedDocument = parsed ?? imported;
-      if (!loadedDocument) throw new Error('Invalid project file');
+      if (!loadedDocument) {
+        if (report) {
+          const anomalies = getM3eCompatibilityAnomalies(report);
+          setFileAnomalies(anomalies);
+          setFileNotice(`M3E互換確認: ${anomalies.map((anomaly) => `${anomaly.label}: ${anomaly.detail}`).join(' / ') || '変換できる画面がありません。'}`);
+          setFileError('プロジェクトファイルを開けませんでした。互換診断を確認してください。');
+          return;
+        }
+        throw new Error('Invalid project file');
+      }
       loadDocument(loadedDocument);
-      const report = imported ? inspectM3eCompatibility(raw) : null;
       if (report) {
         const anomalies = getM3eCompatibilityAnomalies(report);
         setFileAnomalies(anomalies);
