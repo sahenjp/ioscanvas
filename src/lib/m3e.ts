@@ -969,6 +969,8 @@ function collectM3eInvalidFields(value: unknown): string[] {
         invalidFields.add(itemPath);
         return;
       }
+      if (typeof item.id !== 'string' || !item.id.trim()) invalidFields.add(`${itemPath}.id`);
+      if (typeof item.kind !== 'string' || !item.kind.trim()) invalidFields.add(`${itemPath}.kind`);
       position(item, `${itemPath}.pos`);
       for (const key of ['size', 'size2', 'minimum', 'maximum', 'step', 'value', 'radiusTop', 'radiusBottom', 'imageSize'] as const) {
         const field = numericField(item, key, `${itemPath}.${key}`);

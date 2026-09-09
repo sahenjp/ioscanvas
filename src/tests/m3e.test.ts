@@ -374,6 +374,18 @@ describe('M3E compatibility importer', () => {
     ]));
   });
 
+  it('reports missing M3E item identity instead of hiding importer fallbacks', () => {
+    const report = inspectM3eCompatibility({
+      frames: [{ id: 'home', name: 'ホーム', x: 0, y: 0 }],
+      groups: [{ id: 'content', x: 0, y: 0, axis: 'y', items: [{ id: 42, kind: null, label: '本文' }] }],
+    });
+
+    expect(report?.invalidFields).toEqual(expect.arrayContaining([
+      'groups[0].items[0].id',
+      'groups[0].items[0].kind',
+    ]));
+  });
+
   it('preserves card presentation and indeterminate circular progress on export', () => {
     const document: CanvasDocument = {
       version: 1,
