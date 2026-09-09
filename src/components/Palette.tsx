@@ -319,8 +319,11 @@ export function PartsLibrary() {
       </div>
       <div className="parts-scroll">
         <div className="component-insert-hint">
-          <span>追加先</span>
-          <strong>{insertionContainer ? nodeLabel(insertionContainer) : '画面のルート'}</strong>
+          <div className="component-insert-target">
+            <span>追加先</span>
+            <strong>{insertionContainer ? nodeLabel(insertionContainer) : '画面のルート'}</strong>
+          </div>
+          <small>クリックで追加 · ドラッグで配置</small>
         </div>
         <label className="component-search">
           <span aria-hidden="true">⌕</span>
@@ -339,6 +342,39 @@ export function PartsLibrary() {
                   onAdd={() => addNode(item.kind, insertionParentId)}
                   onToggleFavorite={() => toggleFavorite(item.kind)}
                 />
+              ))}
+            </div>
+          </section>
+        )}
+        {(filteredGlassPresets.length > 0 || 'glasseffectcontainer glass要素をまとめる'.includes(normalizedQuery)) && (
+          <section className="palette-group palette-glass-group">
+            <div className="palette-group-title">Liquid Glass</div>
+            <div className="palette-items">
+              {'GlassEffectContainer glass要素をまとめる'.toLowerCase().includes(normalizedQuery) && (
+                <button
+                  className="palette-item palette-glass-item"
+                  draggable
+                  type="button"
+                  onClick={() => addNode('glass-container', insertionParentId)}
+                  onDragStart={(event) => startDrag(event, { kind: 'new', nodeKind: 'glass-container' })}
+                  title={`GlassEffectContainerを${insertionContainer ? '選択中のコンテナ' : '画面'}に追加`}
+                >
+                  <span className="palette-item-name">GlassEffectContainer</span>
+                  <span className="palette-item-description">Glass要素をまとめる</span>
+                </button>
+              )}
+              {filteredGlassPresets.map((item) => (
+                <button
+                  className="palette-item palette-glass-item"
+                  key={item.name}
+                  type="button"
+                  disabled={!selectedNodeId}
+                  onClick={() => updateSelectedNode({ ...item.patch, buttonStyle: undefined })}
+                  title={selectedNodeId ? `${item.name} — ${item.description}を選択中の要素に適用` : '要素を選択すると適用できます'}
+                >
+                  <span className="palette-item-name">{item.name}</span>
+                  <span className="palette-item-description">{item.description}</span>
+                </button>
               ))}
             </div>
           </section>
@@ -388,39 +424,6 @@ export function PartsLibrary() {
                 >
                   <span className="palette-item-name">{pattern.name}</span>
                   <span className="palette-item-description">{pattern.description}</span>
-                </button>
-              ))}
-            </div>
-          </section>
-        )}
-        {(filteredGlassPresets.length > 0 || 'glasseffectcontainer glass要素をまとめる'.includes(normalizedQuery)) && (
-          <section className="palette-group palette-glass-group">
-            <div className="palette-group-title">Liquid Glass</div>
-            <div className="palette-items">
-              {'GlassEffectContainer glass要素をまとめる'.toLowerCase().includes(normalizedQuery) && (
-                <button
-                  className="palette-item palette-glass-item"
-                  draggable
-                  type="button"
-                  onClick={() => addNode('glass-container', insertionParentId)}
-                  onDragStart={(event) => startDrag(event, { kind: 'new', nodeKind: 'glass-container' })}
-                  title={`GlassEffectContainerを${insertionContainer ? '選択中のコンテナ' : '画面'}に追加`}
-                >
-                  <span className="palette-item-name">GlassEffectContainer</span>
-                  <span className="palette-item-description">Glass要素をまとめる</span>
-                </button>
-              )}
-              {filteredGlassPresets.map((item) => (
-                <button
-                  className="palette-item palette-glass-item"
-                  key={item.name}
-                  type="button"
-                  disabled={!selectedNodeId}
-                  onClick={() => updateSelectedNode({ ...item.patch, buttonStyle: undefined })}
-                  title={selectedNodeId ? `${item.name} — ${item.description}を選択中の要素に適用` : '要素を選択すると適用できます'}
-                >
-                  <span className="palette-item-name">{item.name}</span>
-                  <span className="palette-item-description">{item.description}</span>
                 </button>
               ))}
             </div>

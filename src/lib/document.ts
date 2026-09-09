@@ -323,6 +323,7 @@ function readNodeProperties(value: RecordValue): {
   if (m3eVariant === null) return null;
   if (value.m3eIcon !== undefined && !isString(value.m3eIcon)) return null;
   if (value.m3eIcon2 !== undefined && value.m3eIcon2 !== null && !isString(value.m3eIcon2)) return null;
+  if (value.m3eSourceId !== undefined && !isString(value.m3eSourceId)) return null;
   const m3eMetadata = readM3eMetadata(value.m3eMetadata);
   if (m3eMetadata === null) return null;
   const m3eMenuActions = readM3eMenuActions(value.m3eMenuActions);
@@ -348,6 +349,7 @@ function readNodeProperties(value: RecordValue): {
     ...(m3eVariant === undefined ? {} : { m3eVariant }),
     ...(value.m3eIcon === undefined ? {} : { m3eIcon: value.m3eIcon }),
     ...(value.m3eIcon2 === undefined ? {} : { m3eIcon2: value.m3eIcon2 === null ? null : value.m3eIcon2 }),
+    ...(value.m3eSourceId === undefined ? {} : { m3eSourceId: value.m3eSourceId }),
     ...(m3eMetadata === undefined ? {} : { m3eMetadata }),
     ...(m3eMenuActions === undefined ? {} : { m3eMenuActions }),
   };
@@ -688,6 +690,7 @@ function readScreen(value: unknown, ids: Set<string>): CanvasScreen | null {
   if (!isRecord(value) || !isString(value.id) || !isString(value.name) || !isString(value.navigationTitle)) return null;
   if (ids.has(value.id)) return null;
   ids.add(value.id);
+  if (value.m3eSourceId !== undefined && !isString(value.m3eSourceId)) return null;
   if (value.notes !== undefined && !isString(value.notes)) return null;
   if (value.navigationTitleDisplayMode !== undefined && !isOneOf(value.navigationTitleDisplayMode, ['automatic', 'inline', 'large'])) return null;
   if (value.contentPlacement !== undefined && !isOneOf(value.contentPlacement, ['top', 'center', 'bottom', 'spread'])) return null;
@@ -706,8 +709,9 @@ function readScreen(value: unknown, ids: Set<string>): CanvasScreen | null {
   if (swipe === null) return null;
   const root = readNode(value.root, ids);
   return root && isContainerNode(root)
-    ? {
+      ? {
         id: value.id,
+        ...(value.m3eSourceId === undefined ? {} : { m3eSourceId: value.m3eSourceId }),
         name: value.name,
         navigationTitle: value.navigationTitle,
         ...(value.notes === undefined ? {} : { notes: value.notes }),

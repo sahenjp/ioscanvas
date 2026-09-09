@@ -16,7 +16,8 @@
 - Save and open validated `.ioscanvas.json` project files.
 - Open M3E Canvas JSON projects and convert their screens, bars, controls, links, palette, and font choices into a SwiftUI semantic tree without retaining absolute coordinates; actionable content and list rows become editable NavigationLinks, bottom navigation becomes native TabView tabs, screen body placement is preserved, and lossy or unresolved imports are reported.
 - Export the semantic tree as a deterministic M3E JSON projection, then reopen it in iOSCanvas for a documented round trip; the source editor remains coordinate-free.
-- Show M3E export compatibility diagnostics for flattened structure, approximate mappings, unresolved transitions, and device-preset normalization.
+- Show M3E export compatibility diagnostics for flattened structure, approximate mappings, unresolved transitions, and device-preset normalization, then carry those findings into the implementation brief.
+- Edit retained M3E project metadata such as palette projection, frame mode, theme hints, and implementation notes from the Inspector.
 - Copy a local share link that reopens the validated document in another browser.
 - Save the active iPhone preview as a PNG for review or handoff.
 - Opt into iOS 26 Liquid Glass styles from the Inspector and export the corresponding SwiftUI modifiers.

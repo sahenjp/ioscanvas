@@ -238,6 +238,8 @@ export interface BaseNode {
   m3eVariant?: M3eVariant;
   m3eIcon?: string;
   m3eIcon2?: string | null;
+  /** Original M3E item ID used only to keep compatibility diagnostics targetable. */
+  m3eSourceId?: string;
   m3eMetadata?: M3eItemMetadata;
   m3eMenuActions?: Record<string, M3eMenuAction>;
 }
@@ -528,6 +530,8 @@ export type CanvasNode =
 
 export interface CanvasScreen {
   id: string;
+  /** Original M3E frame ID used to resolve retained navigation metadata. */
+  m3eSourceId?: string;
   name: string;
   navigationTitle: string;
   notes?: string;

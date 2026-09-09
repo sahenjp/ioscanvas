@@ -11,6 +11,7 @@ beforeEach(() => {
     selectedNodeId: null,
     selectedNodeIds: [],
     exportOpen: false,
+    exportTab: 'swiftui',
     previewMode: false,
     clipboard: null,
     past: [],
@@ -229,6 +230,16 @@ describe('editor screen workflow', () => {
     expect(useEditorStore.getState().document.name).toBe('新規プロジェクト');
     store.updateDocumentName('   ');
     expect(useEditorStore.getState().document.name).toBe('新規プロジェクト');
+  });
+
+  it('edits M3E document metadata as an undoable document edit', () => {
+    const store = useEditorStore.getState();
+
+    store.updateM3eDocumentMetadata({ paletteKey: 'custom', customPalette: { primary: '#123456' }, platform: 'android', brief: 'M3E互換の補足' });
+
+    expect(useEditorStore.getState().document.m3eMetadata).toEqual({ paletteKey: 'custom', customPalette: { primary: '#123456' }, platform: 'android', brief: 'M3E互換の補足' });
+    store.undo();
+    expect(useEditorStore.getState().document.m3eMetadata).toBeUndefined();
   });
 
   it('tidies SwiftUI spacing and hit targets in one undoable edit', () => {

@@ -99,6 +99,13 @@ describe('implementation prompt generator', () => {
     const screen = document.screens[0];
     const button = screen?.root.children.find((node) => node.kind === 'button');
     if (!screen || !button) throw new Error('M3E prompt fixture missing');
+    document.m3eMetadata = {
+      platform: 'android',
+      paletteKey: 'custom',
+      customPalette: { primary: '#123456' },
+      frameMode: 'phone',
+      theme: { font: 'robotoFlex', contrast: 'high' },
+    };
     button.m3eKind = 'button';
     button.m3eVariant = 'tonal';
     button.m3eMetadata = {
@@ -116,7 +123,26 @@ describe('implementation prompt generator', () => {
     expect(output).toContain('M3E kind=button / variant=tonal');
     expect(output).toContain('fill=primaryContainer / iconFill=secondaryContainer');
     expect(output).toContain('size=140dp');
+    expect(output).toContain('M3E互換射影: platform=android / palette=custom / customPrimary=#123456 / frame=phone / contrast=high / font=robotoFlex');
     expect(output).toContain('M3E Top App Bar: / M3E size=56dp / fill=surfaceContainerHigh');
+  });
+
+  it('includes M3E compatibility anomalies in the implementation brief', () => {
+    const document = structuredClone(defaultDocument);
+    document.screens[0]?.root.children.push({
+      id: 'compatibility-input',
+      kind: 'texteditor',
+      label: 'メモ',
+      binding: 'memo',
+      minHeight: 88,
+    });
+
+    const output = generateImplementationPrompt(document);
+
+    expect(output).toContain('M3E互換確認事項:');
+    expect(output).toContain('近似');
+    expect(output).toContain('texteditor');
+    expect(output).toContain('対処=');
   });
 
   it('does not expand M3E data image payloads into the implementation brief', () => {

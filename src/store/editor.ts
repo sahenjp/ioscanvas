@@ -3,15 +3,18 @@ import { persist } from 'zustand/middleware';
 import { defaultDocument } from '../lib/defaultDocument';
 import { parseCanvasDocument } from '../lib/document';
 import { cloneNode, createId, createM3eNode, createM3eScreenNode, createNode, createPattern, findNode, findNodeLocation, insertNode, isContainerNode, moveNode as moveTreeNode, removeNode, updateNode } from '../lib/nodes';
-import type { CanvasDocument, CanvasNode, CanvasScreen, ContainerNode, DocumentAppearance, M3eInsertKind, M3eScreenPartKind, NodeKind, PatternId, ToolbarItem } from '../types/document';
+import type { CanvasDocument, CanvasNode, CanvasScreen, ContainerNode, DocumentAppearance, M3eDocumentMetadata, M3eInsertKind, M3eScreenPartKind, NodeKind, PatternId, ToolbarItem } from '../types/document';
 
 const MAX_HISTORY = 50;
+
+export type ExportTab = 'swiftui' | 'prompt' | 'm3e';
 
 interface EditorState {
   document: CanvasDocument;
   selectedNodeId: string | null;
   selectedNodeIds: string[];
   exportOpen: boolean;
+  exportTab: ExportTab;
   previewMode: boolean;
   clipboard: CanvasNode | null;
   past: CanvasDocument[];
@@ -21,6 +24,7 @@ interface EditorState {
   selectScreen: (id: string) => void;
   setPreviewMode: (open: boolean) => void;
   setExportOpen: (open: boolean) => void;
+  setExportTab: (tab: ExportTab) => void;
   addNode: (kind: NodeKind, parentId?: string | null, index?: number) => void;
   addM3eNode: (kind: M3eInsertKind, parentId?: string | null, index?: number) => void;
   addM3eScreenPart: (kind: M3eScreenPartKind) => void;
@@ -41,6 +45,7 @@ interface EditorState {
   updateSelectedNode: (patch: Partial<CanvasNode>) => void;
   updateSelectedNodes: (patch: Partial<CanvasNode>) => void;
   updateDocumentName: (name: string) => void;
+  updateM3eDocumentMetadata: (patch: Partial<M3eDocumentMetadata>) => void;
   updateActiveScreen: (patch: Partial<Pick<CanvasScreen, 'name' | 'navigationTitle' | 'notes' | 'navigationTitleDisplayMode' | 'contentPlacement' | 'background' | 'previewDevice' | 'previewOrientation' | 'toolbarItems' | 'tabBarItems' | 'm3eTopAppBar' | 'm3eBottomNav' | 'swipe'>>) => void;
   updateAppearance: (patch: Partial<DocumentAppearance>) => void;
   deleteSelectedNode: () => void;
@@ -173,6 +178,7 @@ export const useEditorStore = create<EditorState>()(
       selectedNodeId: null,
       selectedNodeIds: [],
       exportOpen: false,
+      exportTab: 'swiftui',
       previewMode: false,
       clipboard: null,
       past: [],
@@ -198,6 +204,7 @@ export const useEditorStore = create<EditorState>()(
       },
       setPreviewMode: (open) => set({ previewMode: open, selectedNodeId: open ? null : get().selectedNodeId, selectedNodeIds: open ? [] : get().selectedNodeIds }),
       setExportOpen: (open) => set({ exportOpen: open }),
+      setExportTab: (tab) => set({ exportTab: tab }),
       addNode: (kind, parentId = null, index) => {
         set((state) => addNodeToActiveScreen(state, createNode(kind), parentId, index));
       },
@@ -501,6 +508,12 @@ export const useEditorStore = create<EditorState>()(
         set((state) => state.document.name === trimmed
           ? state
           : withHistory(state, { ...state.document, name: trimmed }));
+      },
+      updateM3eDocumentMetadata: (patch) => {
+        set((state) => withHistory(state, {
+          ...state.document,
+          m3eMetadata: { ...state.document.m3eMetadata, ...patch },
+        }));
       },
       updateActiveScreen: (patch) => {
         set((state) => {

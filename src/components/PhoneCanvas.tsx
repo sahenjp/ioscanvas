@@ -259,7 +259,7 @@ function renderNodeContent(
     case 'text':
       if (node.m3eKind === 'badge') {
         return (
-          <div className={`m3e-badge ${node.text.trim() ? 'has-text' : 'is-dot'}`} style={m3eContentStyle(node)} aria-label={node.text.trim() ? `バッジ ${node.text}` : '通知バッジ'}>
+          <div className={`m3e-badge ${node.text.trim() ? 'has-text' : 'is-dot'}`} style={m3eContentStyle(node)} role="img" aria-label={node.text.trim() ? `バッジ ${node.text}` : '通知バッジ'}>
             {node.text.trim() || <span aria-hidden="true" />}
           </div>
         );
@@ -540,7 +540,7 @@ function renderNodeContent(
       return (
         <div className="ios-row ios-color-picker" style={{ minHeight: node.minHeight }}>
           <span>{node.label || 'Color'}</span>
-          <span className="ios-color-swatch" style={{ backgroundColor: node.color }} aria-label={node.color} />
+          <span className="ios-color-swatch" style={{ backgroundColor: node.color }} role="img" aria-label={`色 ${node.color}`} />
         </div>
       );
     case 'slider': {
@@ -605,7 +605,7 @@ function renderNodeContent(
       const progressClass = ['ios-progress', node.style === 'circular' ? 'is-circular' : '', node.wavy ? 'is-wavy' : ''].filter(Boolean).join(' ');
       if (node.style === 'circular') {
         return (
-          <div className={progressClass} aria-label={node.label || 'Progress'} aria-busy={node.indeterminate || undefined}>
+          <div className={progressClass} role="progressbar" aria-label={node.label || 'Progress'} aria-busy={node.indeterminate || undefined} aria-valuemin={0} aria-valuemax={100} aria-valuenow={node.indeterminate ? undefined : percent}>
             <div className="ios-progress-label"><span>{node.label || 'Progress'}</span><span>{node.indeterminate ? '読み込み中' : `${Math.round(percent)}%`}</span></div>
             <div className="ios-progress-ring" style={{ '--progress': `${percent}%`, '--track-thickness': `${thickness}px` } as CSSProperties}>
               <span aria-hidden="true">{node.indeterminate ? '…' : `${Math.round(percent)}%`}</span>
@@ -614,7 +614,7 @@ function renderNodeContent(
         );
       }
       return (
-        <div className={progressClass} aria-label={node.label || 'Progress'} aria-busy={node.indeterminate || undefined}>
+        <div className={progressClass} role="progressbar" aria-label={node.label || 'Progress'} aria-busy={node.indeterminate || undefined} aria-valuemin={0} aria-valuemax={100} aria-valuenow={node.indeterminate ? undefined : percent}>
           <div className="ios-progress-label"><span>{node.label || 'Progress'}</span><span>{node.indeterminate ? '読み込み中' : `${Math.round(percent)}%`}</span></div>
           <div className={`ios-progress-track ${node.indeterminate ? 'is-indeterminate' : ''}`} style={{ height: thickness }}><span style={{ width: `${percent}%` }} /></div>
         </div>
@@ -623,7 +623,7 @@ function renderNodeContent(
     case 'gauge': {
       const percent = ((node.value - node.minimum) / (node.maximum - node.minimum)) * 100;
       return (
-        <div className="ios-gauge" style={{ minHeight: node.minHeight }} aria-label={node.label || 'Gauge'}>
+        <div className="ios-gauge" style={{ minHeight: node.minHeight }} role="meter" aria-label={node.label || 'Gauge'} aria-valuemin={node.minimum} aria-valuemax={node.maximum} aria-valuenow={node.value}>
           <div className="ios-gauge-dial" style={{ '--gauge-progress': `${Math.max(0, Math.min(100, percent))}%` } as CSSProperties}>
             <span>{node.value}</span>
           </div>
@@ -759,9 +759,9 @@ function renderNodeContent(
         </div>
       );
     case 'divider':
-      return <div aria-label="Divider" className="ios-divider" />;
+      return <div role="separator" className="ios-divider" />;
     case 'spacer':
-      return <div aria-label="Spacer" className="ios-spacer">Spacer</div>;
+      return <div aria-hidden="true" className="ios-spacer">Spacer</div>;
     case 'navigation-split-view': {
       const sidebar = node.children[0];
       const detail = node.children.slice(1);
@@ -822,7 +822,7 @@ function renderNodeContent(
       }
       if (node.m3eKind === 'fabMenu') {
         return (
-          <div className="canvas-fab-menu-preview" aria-label={node.label || 'FABメニュー'}>
+          <div className="canvas-fab-menu-preview" role="group" aria-label={node.label || 'FABメニュー'}>
             {controls && splitMenuOpen && (
               <div className="ios-fab-menu-items" role="menu" aria-label={`${node.label || 'FABメニュー'}の項目`}>
                 {node.children.map((child) => <NodeView key={child.id} node={child} allNodes={allNodes} screenId={screenId} onOpenSheet={onOpenSheet} onNavigateScreen={onNavigateScreen} onNavigateBack={onNavigateBack} />)}
@@ -1075,7 +1075,7 @@ function ScreenPreview({
         <span className="screen-preview-size">{screenDevice.width} × {screenDevice.height} pt</span>
       </header>
       {!previewMode && connections.length > 0 && (
-        <div className="screen-flow-summary" aria-label={`${initialScreen.name}の画面遷移`}>
+        <div className="screen-flow-summary" role="region" aria-label={`${initialScreen.name}の画面遷移`}>
           <span className="screen-flow-title">遷移</span>
           <div className="screen-flow-links">
             {connections.map((connection) => {
@@ -1116,6 +1116,7 @@ function ScreenPreview({
           '--screen-background': previewScreenBackground(screen.background, previewScheme, customAccent ?? previewAccentColor(document.appearance.accentColor)),
           '--screen-foreground': previewScreenForeground(screen.background, previewScheme),
         } as CSSProperties}
+          role="region"
           aria-label={`${screen.name} iPhoneプレビュー`}
           onPointerDown={previewMode ? (event) => { swipeStart.current = { x: event.clientX, y: event.clientY }; } : undefined}
           onPointerUp={previewMode ? finishSwipe : undefined}
@@ -1470,7 +1471,7 @@ export function PhoneCanvas() {
               <div className="screen-board-item" key={screen.id}>
                 <ScreenPreview document={document} screen={screen} previewMode={previewMode} previewScheme={previewScheme} device={screenDevice} textScale={previewTextScale} key={`${screen.id}-${previewMode ? 'preview' : 'editor'}-${screenDevice.id}-${screen.previewOrientation ?? 'portrait'}-${previewTextScale}`} />
                 {nextScreen && (
-                  <div className={`screen-connector ${connected ? 'is-connected' : ''}`} aria-label={connected ? `${screen.name}から${nextScreen.name}へ接続` : undefined}>
+                  <div className={`screen-connector ${connected ? 'is-connected' : ''}`} role={connected ? 'img' : undefined} aria-label={connected ? `${screen.name}から${nextScreen.name}へ接続` : undefined}>
                     {connected && <><span className="connector-line" /><span className="connector-arrow" aria-hidden="true">→</span><span className="connector-label">{swipeConnected && !navigationConnected ? 'スワイプ遷移' : 'NavigationLink'}</span></>}
                   </div>
                 )}
@@ -1487,6 +1488,7 @@ export function PhoneCanvas() {
 function CodeShelf({ open, onToggle }: { open: boolean; onToggle: () => void }) {
   const document = useEditorStore((state) => state.document);
   const setExportOpen = useEditorStore((state) => state.setExportOpen);
+  const setExportTab = useEditorStore((state) => state.setExportTab);
   const selectScreen = useEditorStore((state) => state.selectScreen);
   const [imageState, setImageState] = useState<'idle' | 'done' | 'error'>('idle');
   const swiftui = useMemo(() => generateSwiftUI(document), [document]);
@@ -1516,7 +1518,7 @@ function CodeShelf({ open, onToggle }: { open: boolean; onToggle: () => void }) 
           {open && <>
             <span className="code-language">SwiftUI</span>
             <button type="button" onClick={savePng}>{imageState === 'done' ? '画像を保存しました' : imageState === 'error' ? '画像保存に失敗' : 'PNG保存'}</button>
-            <button type="button" onClick={() => setExportOpen(true)}>全コードを表示</button>
+            <button type="button" onClick={() => { setExportTab('swiftui'); setExportOpen(true); }}>全コードを表示</button>
           </>}
           <button type="button" className="code-shelf-toggle" onClick={onToggle} aria-expanded={open} aria-controls="generated-code-preview">
             {open ? 'コードを隠す' : 'コードを表示'}
@@ -1537,7 +1539,7 @@ function CodeShelf({ open, onToggle }: { open: boolean; onToggle: () => void }) 
           </button>
         ))}
       </div>
-      <pre className="code-preview"><code>{lines.slice(0, 18).map((line, index) => `${String(index + 1).padStart(2, ' ')}  ${line}`).join('\n')}{lines.length > 18 ? '\n…' : ''}</code></pre>
+      <pre className="code-preview" tabIndex={0} role="region" aria-label="SwiftUIコードプレビュー"><code>{lines.slice(0, 18).map((line, index) => `${String(index + 1).padStart(2, ' ')}  ${line}`).join('\n')}{lines.length > 18 ? '\n…' : ''}</code></pre>
     </section>
   );
 }

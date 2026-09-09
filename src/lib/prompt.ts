@@ -1,4 +1,5 @@
 import { lintDocument } from './hig';
+import { describeM3eCompatibilityStatus, getM3eCompatibilityAnomalies, inspectM3eExportCompatibility } from './m3e';
 import type { CanvasDocument, CanvasNode, ScreenDevice } from '../types/document';
 
 function promptSource(value: string): string {
@@ -170,6 +171,20 @@ export function generateImplementationPrompt(document: CanvasDocument, scope: Pr
   if (!screen) return '';
   const screens = scope === 'all' ? document.screens : [screen];
   const issues = lintDocument(document);
+  const m3eAnomalies = getM3eCompatibilityAnomalies(inspectM3eExportCompatibility(document));
+  const m3eMetadata = document.m3eMetadata;
+  const customPalettePrimary = typeof m3eMetadata?.customPalette?.primary === 'string' ? m3eMetadata.customPalette.primary : undefined;
+  const m3eProjection = [
+    m3eMetadata?.platform ? `platform=${m3eMetadata.platform}` : '',
+    m3eMetadata?.paletteKey ? `palette=${m3eMetadata.paletteKey}` : '',
+    customPalettePrimary ? `customPrimary=${customPalettePrimary}` : '',
+    m3eMetadata?.frameMode ? `frame=${m3eMetadata.frameMode}` : '',
+    m3eMetadata?.dynamicColor === undefined ? '' : `dynamicColor=${m3eMetadata.dynamicColor}`,
+    m3eMetadata?.theme?.contrast ? `contrast=${m3eMetadata.theme.contrast}` : '',
+    m3eMetadata?.theme?.shape ? `shape=${m3eMetadata.theme.shape}` : '',
+    m3eMetadata?.theme?.font ? `font=${m3eMetadata.theme.font}` : '',
+    m3eMetadata?.theme?.motion ? `motion=${m3eMetadata.theme.motion}` : '',
+  ].filter(Boolean).join(' / ');
 
   return [
     `SwiftUIで${scope === 'all' ? 'この設計全体' : 'この画面'}を実装してください。`,
@@ -177,6 +192,7 @@ export function generateImplementationPrompt(document: CanvasDocument, scope: Pr
     `プロジェクト: ${document.name}`,
     `対象: iOS ${document.minimumOS}以降 / SwiftUI`,
     `外観: ${document.appearance.colorScheme} / tint=${document.appearance.accentColor === 'custom' ? document.appearance.accentHex ?? '#007AFF' : document.appearance.accentColor} / fontDesign=${document.appearance.fontDesign ?? 'default'}`,
+    ...(m3eProjection ? [`M3E互換射影: ${m3eProjection}`] : []),
     '',
     ...screens.flatMap((candidate, index) => [
       ...(scope === 'all' && index > 0 ? [''] : []),
@@ -192,6 +208,13 @@ export function generateImplementationPrompt(document: CanvasDocument, scope: Pr
     '- この仕様にない画面・機能を勝手に増やさない。',
     ...(issues.length > 0
       ? ['', '現在のデザイン警告:', ...issues.map((issue) => `- ${issue.message} (${issue.nodeId})`)]
+      : []),
+    ...(m3eAnomalies.length > 0
+      ? [
+          '',
+          'M3E互換確認事項:',
+          ...m3eAnomalies.map((anomaly) => `- [${describeM3eCompatibilityStatus(anomaly.status)}] ${anomaly.label}: ${anomaly.detail}${anomaly.paths.length > 0 ? ` / 対象=${anomaly.paths.join(', ')}` : ''} / 対処=${anomaly.guidance}`),
+        ]
       : []),
   ].join('\n');
 }

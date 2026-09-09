@@ -286,6 +286,8 @@ export interface M3eExportCompatibilityReport {
   duplicateIdFields: string[];
   unknownFields: string[];
   normalizedScreenCount: number;
+  /** Meaningful M3E paths that changed during the export/import round trip. */
+  roundTripPaths: string[];
   roundTripValid: boolean;
 }
 
@@ -420,12 +422,187 @@ function exportCompatibilityAnomalies(report: M3eExportCompatibilityReport): M3e
   if (report.invalidFields.length > 0) anomalies.push(compatibilityAnomaly('lost', 'INVALID_FIELD', '不正な値', report.invalidFields.join(', '), report.invalidFields));
   if (report.duplicateIdFields.length > 0) anomalies.push(compatibilityAnomaly('lost', 'DUPLICATE_ID', '重複したID', report.duplicateIdFields.join(', '), report.duplicateIdFields));
   if (report.unknownFields.length > 0) anomalies.push(compatibilityAnomaly('lost', 'UNKNOWN_FIELD', '未知のフィールド', report.unknownFields.join(', '), report.unknownFields));
-  if (!report.roundTripValid) anomalies.push(compatibilityAnomaly('lost', 'ROUND_TRIP', '再読込検証', '書き出したM3E JSONを再読込できませんでした。'));
+  if (!report.roundTripValid) anomalies.push(compatibilityAnomaly('lost', 'ROUND_TRIP', '再読込検証', compatibilityDetail('書き出したM3E JSONを再読込できませんでした。', report.roundTripPaths), report.roundTripPaths));
   return anomalies;
 }
 
 export function getM3eCompatibilityAnomalies(report: M3eCompatibilityReport | M3eExportCompatibilityReport): M3eCompatibilityAnomaly[] {
   return 'invalidFrameCount' in report ? importCompatibilityAnomalies(report) : exportCompatibilityAnomalies(report);
+}
+
+export interface M3eCompatibilityTarget {
+  screenId: string;
+  nodeId?: string;
+  scope?: 'document';
+}
+
+function findExportedNodeTarget(document: CanvasDocument, id: string): M3eCompatibilityTarget | null {
+  const semanticId = id.endsWith('-container') ? id.slice(0, -'-container'.length) : id;
+  for (const screen of document.screens) {
+    const visit = (node: CanvasNode): M3eCompatibilityTarget | null => {
+      if (node.id === id || node.id === semanticId) return { screenId: screen.id, nodeId: node.id };
+      if (!isContainerNode(node)) return null;
+      for (const child of node.children) {
+        const target = visit(child);
+        if (target) return target;
+      }
+      return null;
+    };
+    const target = visit(screen.root);
+    if (target) return target;
+  }
+  return null;
+}
+
+function exportedScreenForGroup(document: CanvasDocument, exported: M3eExportDocument, groupIndex: number): CanvasScreen | undefined {
+  const group = exported.groups[groupIndex];
+  if (!group) return undefined;
+  return document.screens.find((screen) => group.id.startsWith(`${screen.id}-group-`));
+}
+
+function documentCompatibilityTarget(document: CanvasDocument, path: string): M3eCompatibilityTarget | null {
+  if (path !== 'document' && path !== 'theme' && !path.startsWith('document.') && !path.startsWith('theme.')) return null;
+  const target = document.screens.find((candidate) => candidate.id === document.activeScreenId) ?? document.screens[0];
+  return target ? { screenId: target.id, scope: 'document' } : null;
+}
+
+/** Resolve an export diagnostic path back to the semantic node that produced it. */
+export function resolveM3eExportPath(document: CanvasDocument, path: string): M3eCompatibilityTarget | null {
+  const documentTarget = documentCompatibilityTarget(document, path);
+  if (documentTarget) return documentTarget;
+
+  const screen = document.screens.find((candidate) => path.startsWith(`screens[${candidate.id}]`));
+  if (screen) {
+    const rootPrefix = `screens[${screen.id}].root`;
+    if (!path.startsWith(rootPrefix)) return { screenId: screen.id };
+
+    let node: CanvasNode = screen.root;
+    const childPath = path.slice(rootPrefix.length);
+    for (const match of childPath.matchAll(/\.children\[(\d+)\]/g)) {
+      if (!isContainerNode(node)) return null;
+      const child: CanvasNode | undefined = node.children[Number(match[1])];
+      if (!child) return null;
+      node = child;
+    }
+
+    return node.id === screen.root.id
+      ? { screenId: screen.id }
+      : { screenId: screen.id, nodeId: node.id };
+  }
+
+  const exported = exportM3eDocument(document);
+  const frameMatch = path.match(/^frames\[(\d+)\]/);
+  if (frameMatch) {
+    const frameIndex = Number(frameMatch[1]);
+    const target = document.screens[frameIndex];
+    return target ? { screenId: target.id } : null;
+  }
+
+  const groupMatch = path.match(/^groups\[(\d+)\](?:\.items\[(\d+)\])?/);
+  if (!groupMatch) return null;
+  const groupIndex = Number(groupMatch[1]);
+  const itemIndex = groupMatch[2] === undefined ? undefined : Number(groupMatch[2]);
+  const group = exported.groups[groupIndex];
+  if (!group) return null;
+  const item = itemIndex === undefined ? undefined : group.items[itemIndex];
+  const target = item ? findExportedNodeTarget(document, item.id) : null;
+  const screenTarget = exportedScreenForGroup(document, exported, groupIndex);
+  return target ?? (screenTarget ? { screenId: screenTarget.id } : null);
+}
+
+function importedScreenForFrame(document: CanvasDocument, frame: JsonObject | undefined, index: number): CanvasScreen | undefined {
+  const sourceId = frame && readFrame(frame)?.id;
+  if (!sourceId) return undefined;
+  const sourceMatch = document.screens.find((screen) => screen.m3eSourceId === sourceId);
+  if (sourceMatch) return sourceMatch;
+  const prefix = `screen-${readableM3eId(sourceId)}`;
+  const match = document.screens.find((screen) => screen.id.startsWith(prefix));
+  if (match) return match;
+  return document.screens[index];
+}
+
+function importedScreenForGroup(document: CanvasDocument, value: JsonObject, groupIndex: number): CanvasScreen | undefined {
+  const groups = Array.isArray(value.groups) ? value.groups : [];
+  const group = groups[groupIndex];
+  if (!isRecord(group)) return undefined;
+  const x = numberValue(group, 'x');
+  const y = numberValue(group, 'y');
+  if (x === undefined || y === undefined) return undefined;
+
+  const frames = Array.isArray(value.frames) ? value.frames : [];
+  const frameIndex = frames.findIndex((candidate) => {
+    if (!isRecord(candidate)) return false;
+    const frameX = numberValue(candidate, 'x');
+    const frameY = numberValue(candidate, 'y');
+    const width = Math.max(1, numberValue(candidate, 'w') ?? 412);
+    const height = Math.max(1, numberValue(candidate, 'h') ?? 892);
+    return frameX !== undefined && frameY !== undefined
+      && x >= frameX && x <= frameX + width
+      && y >= frameY && y <= frameY + height;
+  });
+  return frameIndex < 0 ? undefined : importedScreenForFrame(document, isRecord(frames[frameIndex]) ? frames[frameIndex] : undefined, frameIndex);
+}
+
+function importedNodeForSourceId(document: CanvasDocument, sourceId: string): { screenId: string; nodeId: string } | undefined {
+  const readable = readableM3eId(sourceId);
+  const prefixes = [
+    `m3e-link-m3e-${readable}`,
+    `m3e-back-m3e-${readable}`,
+    `m3e-row-${readable}`,
+    `m3e-card-${readable}`,
+    `m3e-tabview-${readable}`,
+    `m3e-rail-${readable}`,
+    `m3e-toolbar-${readable}`,
+    `m3e-bottom-nav-${readable}`,
+    `m3e-${readable}`,
+  ];
+  const nodes = document.screens.flatMap((screen) => {
+    const screenNodes: { screenId: string; node: CanvasNode }[] = [];
+    const visit = (node: CanvasNode): void => {
+      screenNodes.push({ screenId: screen.id, node });
+      if (isContainerNode(node)) node.children.forEach(visit);
+    };
+    visit(screen.root);
+    return screenNodes;
+  });
+  const sourceMatch = nodes.find((entry) => entry.node.m3eSourceId === sourceId);
+  if (sourceMatch) return { screenId: sourceMatch.screenId, nodeId: sourceMatch.node.id };
+  for (const prefix of prefixes) {
+    const match = nodes.find((entry) => entry.node.id.startsWith(prefix));
+    if (match) return { screenId: match.screenId, nodeId: match.node.id };
+  }
+  return undefined;
+}
+
+/** Resolve an imported M3E JSON path to the screen or semantic node it describes. */
+export function resolveM3eImportPath(document: CanvasDocument, value: unknown, path: string): M3eCompatibilityTarget | null {
+  if (!isM3eDocument(value) || !isRecord(value)) return null;
+  const documentTarget = documentCompatibilityTarget(document, path);
+  if (documentTarget) return documentTarget;
+
+  const frameMatch = path.match(/^frames\[(\d+)\]/);
+  if (frameMatch) {
+    const index = Number(frameMatch[1]);
+    const frames = Array.isArray(value.frames) ? value.frames : [];
+    const frame = isRecord(frames[index]) ? frames[index] : undefined;
+    const screen = importedScreenForFrame(document, frame, index);
+    return screen ? { screenId: screen.id } : null;
+  }
+
+  const groupMatch = path.match(/^groups\[(\d+)\](?:\.items\[(\d+)\])?/);
+  if (!groupMatch) return null;
+  const groupIndex = Number(groupMatch[1]);
+  const itemIndex = groupMatch[2] === undefined ? undefined : Number(groupMatch[2]);
+  const groups = Array.isArray(value.groups) ? value.groups : [];
+  const group = isRecord(groups[groupIndex]) ? groups[groupIndex] : undefined;
+  const item = group && Array.isArray(group.items) && itemIndex !== undefined && isRecord(group.items[itemIndex])
+    ? group.items[itemIndex]
+    : undefined;
+  const sourceId = item && stringValue(item, 'id');
+  const nodeTarget = sourceId ? importedNodeForSourceId(document, sourceId) : undefined;
+  if (nodeTarget) return nodeTarget;
+  const screen = importedScreenForGroup(document, value, groupIndex);
+  return screen ? { screenId: screen.id } : null;
 }
 
 const flattenedOnlyNodeKinds: ReadonlySet<NodeKind> = new Set([
@@ -524,8 +701,12 @@ function recordValue(record: JsonObject, key: string): JsonObject | undefined {
   return isRecord(record[key]) ? record[key] : undefined;
 }
 
+function readableM3eId(source: string): string {
+  return source.trim().replace(/[^A-Za-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '') || 'item';
+}
+
 function stableId(prefix: string, source: string, usedIds: Set<string>): string {
-  const readable = source.trim().replace(/[^A-Za-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '') || 'item';
+  const readable = readableM3eId(source);
   const base = `${prefix}-${readable}`;
   let id = base;
   let suffix = 2;
@@ -1266,6 +1447,8 @@ function appendNotes(node: CanvasNode, item: JsonObject, extra: string[] = []): 
     ...extra,
   ].filter(Boolean);
   if (notes.length > 0) node.notes = notes.join('\n');
+  const sourceId = stringValue(item, 'id');
+  if (sourceId) node.m3eSourceId = sourceId;
   const m3eKind = isOneOf(item.kind, [
     'box', 'button', 'iconButton', 'fab', 'extendedFab', 'chip', 'topAppBar', 'bottomNav', 'navRail', 'searchBar',
     'card', 'listItem', 'dialog', 'snackbar', 'textField', 'select', 'switch', 'checkbox', 'slider', 'text', 'image',
@@ -1311,6 +1494,7 @@ function linkM3eNode(node: CanvasNode, item: JsonObject, context: ConversionCont
       ...(node.kind === 'image' && node.systemName.trim() ? { systemName: node.systemName } : {}),
       ...(annotated.m3eKind === undefined ? {} : { m3eKind: annotated.m3eKind }),
       ...(annotated.m3eVariant === undefined ? {} : { m3eVariant: annotated.m3eVariant }),
+      ...(annotated.m3eSourceId === undefined ? {} : { m3eSourceId: annotated.m3eSourceId }),
       ...(annotated.m3eMetadata === undefined ? {} : { m3eMetadata: annotated.m3eMetadata }),
       navigationAction: 'back',
       ...(action.transition === undefined ? {} : { navigationTransition: action.transition }),
@@ -1328,6 +1512,7 @@ function linkM3eNode(node: CanvasNode, item: JsonObject, context: ConversionCont
     children: [annotated],
     ...(annotated.m3eKind === undefined ? {} : { m3eKind: annotated.m3eKind }),
     ...(annotated.m3eVariant === undefined ? {} : { m3eVariant: annotated.m3eVariant }),
+    ...(annotated.m3eSourceId === undefined ? {} : { m3eSourceId: annotated.m3eSourceId }),
     ...(annotated.m3eMetadata === undefined ? {} : { m3eMetadata: annotated.m3eMetadata }),
     ...(action.transition === undefined ? {} : { navigationTransition: action.transition }),
     notes: 'タップで画面へ遷移',
@@ -1944,6 +2129,7 @@ function convertScreen(frame: M3eFrame, groups: M3eGroup[], frames: M3eFrame[], 
 
   return {
     id: context.frameIds.get(frame.id) ?? stableId('m3e-screen', frame.id, context.usedIds),
+    m3eSourceId: frame.id,
     name: frame.name,
     navigationTitle,
     ...(frame.background === undefined ? {} : { background: frame.background }),
@@ -2862,7 +3048,16 @@ function canonicalJson(value: unknown): string {
   return JSON.stringify(value) ?? 'null';
 }
 
-function exportMeaningfulSignatures(document: M3eExportDocument): string[] {
+type MeaningfulExportEntryKind = 'document' | 'frame' | 'item';
+
+interface MeaningfulExportEntry {
+  kind: MeaningfulExportEntryKind;
+  id?: string;
+  path: string;
+  signature: string;
+}
+
+function exportMeaningfulEntries(document: M3eExportDocument): MeaningfulExportEntry[] {
   const frameReferences = new Map(document.frames.map((frame, index) => [frame.id, `frame-${index}`]));
   const frameReference = (id: string): string => frameReferences.get(id) ?? id;
   const normalizeAction = (action: M3eExportAction): M3eExportAction => ({ ...action, to: frameReference(action.to) });
@@ -2883,22 +3078,103 @@ function exportMeaningfulSignatures(document: M3eExportDocument): string[] {
     ...(document.brief === undefined ? {} : { brief: document.brief }),
     ...(document.promptEdit === undefined ? {} : { promptEdit: document.promptEdit }),
   });
-  const frameSignatures = document.frames.map((frame) => {
+  const frameEntries = document.frames.map((frame, index) => {
     const swipe = frame.swipe;
     const frameWithoutId = Object.fromEntries(Object.entries(frame).filter(([key]) => key !== 'id' && key !== 'swipe'));
-    return `frame:${canonicalJson({
-      ...frameWithoutId,
-      ...(swipe ? { swipe: Object.fromEntries(Object.entries(swipe).map(([direction, destination]) => [direction, frameReference(destination)])) } : {}),
-    })}`;
+    return {
+      kind: 'frame' as const,
+      id: frame.id,
+      path: `frames[${index}]`,
+      signature: `frame:${canonicalJson({
+        ...frameWithoutId,
+        ...(swipe ? { swipe: Object.fromEntries(Object.entries(swipe).map(([direction, destination]) => [direction, frameReference(destination)])) } : {}),
+      })}`,
+    };
   });
-  const itemSignatures = document.groups
-    .flatMap((group) => group.items)
-    .map((item) => `item:${canonicalJson(Object.fromEntries(
+  const itemEntries = document.groups.flatMap((group, groupIndex) => group.items.map((item, itemIndex) => ({
+    kind: 'item' as const,
+    id: item.id,
+    path: `groups[${groupIndex}].items[${itemIndex}]`,
+    signature: `item:${canonicalJson(Object.fromEntries(
       Object.entries(normalizeItem(item)).filter(([key]) => key !== 'id' && key !== 'note' && key !== 'noteHistory'),
-    ))}`);
+    ))}`,
+  })));
   // Keep frame and item order meaningful. Sorting these signatures would make a
   // reordered rail or list look lossless even when the M3E projection changed it.
-  return [`document:${documentSignature}`, ...frameSignatures, ...itemSignatures];
+  return [
+    { kind: 'document', id: 'document', path: 'document', signature: `document:${documentSignature}` },
+    ...frameEntries,
+    ...itemEntries,
+  ];
+}
+
+function exportMeaningfulSignatures(document: M3eExportDocument): string[] {
+  return exportMeaningfulEntries(document).map((entry) => entry.signature);
+}
+
+function roundTripEntryDifferences(
+  original: M3eExportDocument,
+  roundTripped: M3eExportDocument,
+  kind: MeaningfulExportEntryKind,
+): string[] {
+  const originalEntries = exportMeaningfulEntries(original).filter((entry) => entry.kind === kind);
+  const roundTripEntries = exportMeaningfulEntries(roundTripped).filter((entry) => entry.kind === kind);
+  const matched = new Map<number, number>();
+  const usedRoundTripEntries = new Set<number>();
+
+  for (const [originalIndex, entry] of originalEntries.entries()) {
+    if (!entry.id) continue;
+    const roundTripIndex = roundTripEntries.findIndex((candidate, index) => !usedRoundTripEntries.has(index) && candidate.id === entry.id);
+    if (roundTripIndex < 0) continue;
+    matched.set(originalIndex, roundTripIndex);
+    usedRoundTripEntries.add(roundTripIndex);
+  }
+
+  for (const [originalIndex, entry] of originalEntries.entries()) {
+    if (matched.has(originalIndex)) continue;
+    const roundTripIndex = roundTripEntries.findIndex((candidate, index) => !usedRoundTripEntries.has(index) && candidate.signature === entry.signature);
+    if (roundTripIndex < 0) continue;
+    matched.set(originalIndex, roundTripIndex);
+    usedRoundTripEntries.add(roundTripIndex);
+  }
+
+  const differencePaths = new Set<string>();
+  for (const [originalIndex, entry] of originalEntries.entries()) {
+    const roundTripIndex = matched.get(originalIndex);
+    if (roundTripIndex === undefined || entry.signature !== roundTripEntries[roundTripIndex]?.signature) {
+      differencePaths.add(entry.path);
+    }
+  }
+
+  // ponytail: M3E projects are small; the O(n²) inversion scan keeps reorder diagnostics precise without a diff dependency.
+  const matchedEntries = [...matched.entries()].sort(([left], [right]) => left - right);
+  for (let left = 0; left < matchedEntries.length; left += 1) {
+    for (let right = left + 1; right < matchedEntries.length; right += 1) {
+      const leftEntry = matchedEntries[left];
+      const rightEntry = matchedEntries[right];
+      if (!leftEntry || !rightEntry || leftEntry[1] <= rightEntry[1]) continue;
+      differencePaths.add(originalEntries[leftEntry[0]]?.path ?? 'document');
+      differencePaths.add(originalEntries[rightEntry[0]]?.path ?? 'document');
+    }
+  }
+
+  if (differencePaths.size === 0 && usedRoundTripEntries.size < roundTripEntries.length) {
+    differencePaths.add(originalEntries[0]?.path ?? 'document');
+  }
+  return originalEntries.filter((entry) => differencePaths.has(entry.path)).map((entry) => entry.path);
+}
+
+function roundTripDifferencePaths(original: M3eExportDocument, roundTripped: M3eExportDocument | null): string[] {
+  if (!roundTripped) return ['document'];
+  const originalSignatures = exportMeaningfulSignatures(original);
+  const roundTripSignatures = exportMeaningfulSignatures(roundTripped);
+  if (JSON.stringify(originalSignatures) === JSON.stringify(roundTripSignatures)) return [];
+
+  return [
+    ...roundTripEntryDifferences(original, roundTripped, 'document'),
+    ...roundTripEntryDifferences(original, roundTripped, 'frame'),
+    ...roundTripEntryDifferences(original, roundTripped, 'item'),
+  ];
 }
 
 function exportTopBar(screen: CanvasScreen, frameIds: Map<string, string>): M3eExportItem | null {
@@ -2965,6 +3241,26 @@ function exportGroupsForScreen(screen: CanvasScreen, frameIds: Map<string, strin
   return groups;
 }
 
+function normalizeExportedActionTargets(
+  groups: M3eExportGroup[],
+  sourceFrameIds: Map<string, string>,
+): M3eExportGroup[] {
+  const normalizeAction = (action: M3eExportAction): M3eExportAction => {
+    const target = sourceFrameIds.get(action.to);
+    return target ? { ...action, to: target } : action;
+  };
+  return groups.map((group) => ({
+    ...group,
+    items: group.items.map((item) => ({
+      ...item,
+      ...(item.action ? { action: normalizeAction(item.action) } : {}),
+      ...(item.actions ? {
+        actions: Object.fromEntries(Object.entries(item.actions).map(([slot, action]) => [slot, normalizeAction(action)])),
+      } : {}),
+    })),
+  }));
+}
+
 function exportPaletteKey(appearance: CanvasDocument['appearance'], metadata?: M3eDocumentMetadata): string {
   if (appearance.accentColor === 'custom' && metadata?.paletteKey === 'custom') return 'custom';
   if (appearance.accentColor === 'pink') return 'coral';
@@ -3006,7 +3302,11 @@ export function exportM3eDocument(document: CanvasDocument): M3eExportDocument {
     frameX += size.width + 120;
     return frame;
   });
-  const groups = document.screens.flatMap((screen, index) => exportGroupsForScreen(screen, frameIds, frameDimensions(screen), frames[index]?.x ?? 0));
+  const sourceFrameIds = new Map(document.screens.flatMap((screen) => screen.m3eSourceId ? [[screen.m3eSourceId, screen.id] as const] : []));
+  const groups = normalizeExportedActionTargets(
+    document.screens.flatMap((screen, index) => exportGroupsForScreen(screen, frameIds, frameDimensions(screen), frames[index]?.x ?? 0)),
+    sourceFrameIds,
+  );
   const metadata = document.m3eMetadata;
   const paletteKey = exportPaletteKey(document.appearance, metadata);
   const sourceTheme = metadata?.theme;
@@ -3086,7 +3386,9 @@ export function inspectM3eExportCompatibility(document: CanvasDocument): M3eExpo
   const exported = exportM3eDocument(document);
   const roundTripped = convertM3eDocument(exported);
   const roundTripExport = roundTripped ? exportM3eDocument(roundTripped) : null;
+  const roundTripPaths = roundTripDifferencePaths(exported, roundTripExport);
   const frameIds = new Map(document.screens.map((screen) => [screen.id, screen.id]));
+  const sourceFrameIds = new Map(document.screens.flatMap((screen) => screen.m3eSourceId ? [[screen.m3eSourceId, screen.id] as const] : []));
   const unsupportedNodeKinds = new Set<string>();
   const unsupportedPaths = new Set<string>();
   const flattenedNodeKinds = new Set<string>();
@@ -3100,6 +3402,18 @@ export function inspectM3eExportCompatibility(document: CanvasDocument): M3eExpo
   const unresolvedDestinations = new Set<string>();
   let unresolvedActionCount = 0;
   const unresolvedPaths = new Set<string>();
+
+  const collectDocumentMetadataFields = (metadata: M3eDocumentMetadata | undefined): void => {
+    if (!metadata) return;
+    const exportedFields = new Set(['frameMode', 'paletteKey', 'dynamicColor', 'platform', 'brief', 'promptEdit', 'theme']);
+    if (exported.customPalette !== undefined) exportedFields.add('customPalette');
+    for (const field of Object.keys(metadata)) {
+      const fieldPath = `document.m3eMetadata.${field}`;
+      if (exportedFields.has(field)) preservedFields.add(fieldPath);
+      else lostFields.add(fieldPath);
+    }
+  };
+  collectDocumentMetadataFields(document.m3eMetadata);
 
   const collectMetadataFields = (metadata: M3eItemMetadata | undefined, path: string, exportedFields: ReadonlySet<string> | null): void => {
     for (const field of Object.keys(metadata ?? {})) {
@@ -3121,8 +3435,9 @@ export function inspectM3eExportCompatibility(document: CanvasDocument): M3eExpo
       return 'not-exported';
     }
     if (exportSnackbarNode(node, frameIds, '') !== null) return 'action-only';
-    if (node.kind === 'navigation-split-view') return index === 0 ? 'tab-container' : 'normal';
-    if (node.m3eKind === 'fabMenu' || node.kind === 'tabview' || exportToolbarNode(node, frameIds, '') !== null) {
+    if (node.kind === 'navigation-split-view') return index === 0 ? 'tab-container' : index === 1 ? 'normal' : 'not-exported';
+    if (node.m3eKind === 'fabMenu') return node.children[index]?.kind === 'button' ? 'tab-item' : 'not-exported';
+    if (node.kind === 'tabview' || exportToolbarNode(node, frameIds, '') !== null) {
       return 'tab-item';
     }
     return 'normal';
@@ -3145,10 +3460,101 @@ export function inspectM3eExportCompatibility(document: CanvasDocument): M3eExpo
       }),
     ];
     for (const { path: actionPath, action } of actions) {
-      if (action.to !== 'back' && !frameIds.has(action.to)) {
-        unresolvedDestinations.add(action.to);
+      const destination = sourceFrameIds.get(action.to) ?? action.to;
+      if (destination !== 'back' && !frameIds.has(destination)) {
+        unresolvedDestinations.add(destination);
         unresolvedActionCount += 1;
         unresolvedPaths.add(actionPath);
+      }
+    }
+  };
+  const hasSemanticAction = (node: CanvasNode): boolean => node.navigationAction === 'back'
+    || ((node.kind === 'button' || node.kind === 'navigation-link') && Boolean(node.destinationScreenId));
+  const addLostActionPath = (path: string, actionIsResolvable: boolean): void => {
+    if (actionIsResolvable) lostActionPaths.add(path);
+  };
+  const addLostNodeAction = (
+    current: CanvasNode,
+    path: string,
+    mode: MetadataExportMode,
+    exportedItem: M3eExportItem | null,
+  ): void => {
+    if (!hasSemanticAction(current)) return;
+    const projected = exportAction(current, frameIds);
+    if (!projected) return;
+    const exportedAction = mode === 'normal'
+      ? exportedItem?.action
+      : mode === 'tab-item' || (mode === 'action-only' && current.kind === 'button')
+        ? projected
+        : undefined;
+    if (exportedAction?.to === projected.to && exportedAction.transition === projected.transition) return;
+    addLostActionPath(`${path}.${current.navigationAction === 'back' ? 'navigationAction' : 'destinationScreenId'}`, true);
+  };
+  const addLostMenuActions = (
+    current: CanvasNode,
+    path: string,
+    mode: MetadataExportMode,
+    exportedItem: M3eExportItem | null,
+  ): void => {
+    const projectedActions = mode === 'normal' && current.kind === 'button' && current.m3eKind === 'splitButton'
+      ? exportedItem?.actions
+      : undefined;
+    for (const [slot, action] of Object.entries(current.m3eMenuActions ?? {})) {
+      const resolvable = action.navigationAction === 'back'
+        || (action.destinationScreenId !== undefined && frameIds.has(action.destinationScreenId));
+      addLostActionPath(
+        `${path}.m3eMenuActions.${slot}.${action.navigationAction === 'back' ? 'navigationAction' : 'destinationScreenId'}`,
+        resolvable && projectedActions?.[slot] === undefined,
+      );
+    }
+  };
+  const addLostMetadataActions = (
+    current: CanvasNode,
+    path: string,
+    mode: MetadataExportMode,
+    exportedItem: M3eExportItem | null,
+  ): void => {
+    const metadata = current.m3eMetadata;
+    if (!metadata) return;
+    const resolvable = (action: M3eAction): boolean => action.to === 'back' || frameIds.has(action.to) || sourceFrameIds.has(action.to);
+    const metadataActionExported = mode === 'normal' && exportedItem?.action !== undefined;
+    if (metadata.action && !hasSemanticAction(current) && !metadataActionExported && resolvable(metadata.action)) {
+      addLostActionPath(`${path}.m3eMetadata.action.to`, true);
+    }
+    for (const [slot, action] of Object.entries(metadata.actions ?? {})) {
+      const exportedAction = mode === 'normal' ? exportedItem?.actions?.[slot] : undefined;
+      addLostActionPath(`${path}.m3eMetadata.actions.${slot}.to`, resolvable(action) && exportedAction === undefined);
+    }
+  };
+  const addLostAlertActions = (
+    current: CanvasNode,
+    path: string,
+    mode: MetadataExportMode,
+    exportedItem: M3eExportItem | null,
+  ): void => {
+    if (current.kind !== 'alert') return;
+    for (const [index, action] of (current.actions ?? []).entries()) {
+      const hasAction = action.navigationAction === 'back' || Boolean(action.destinationScreenId);
+      const projected = mode === 'normal' ? exportedItem?.actions?.[`tab:${index}`] : undefined;
+      addLostActionPath(
+        `${path}.actions[${index}].${action.navigationAction === 'back' ? 'navigationAction' : 'destinationScreenId'}`,
+        hasAction && exportAlertAction(action, frameIds) !== undefined && projected === undefined,
+      );
+    }
+  };
+  const addLostScreenMetadataActions = (
+    metadata: M3eItemMetadata | undefined,
+    path: string,
+    exportedItem: M3eExportItem | null,
+  ): void => {
+    if (!metadata) return;
+    const resolvable = (action: M3eAction): boolean => action.to === 'back' || frameIds.has(action.to) || sourceFrameIds.has(action.to);
+    if (metadata.action && exportedItem?.action === undefined && resolvable(metadata.action)) {
+      addLostActionPath(`${path}.action.to`, true);
+    }
+    for (const [slot, action] of Object.entries(metadata.actions ?? {})) {
+      if (exportedItem?.actions?.[slot] === undefined && resolvable(action)) {
+        addLostActionPath(`${path}.actions.${slot}.to`, true);
       }
     }
   };
@@ -3158,6 +3564,8 @@ export function inspectM3eExportCompatibility(document: CanvasDocument): M3eExpo
     const bottomBar = exportBottomBar(screen, frameIds);
     collectMetadataFields(screen.m3eTopAppBar, `screens[${screen.id}].m3eTopAppBar`, topBar ? new Set(Object.keys(topBar)) : null);
     collectMetadataFields(screen.m3eBottomNav, `screens[${screen.id}].m3eBottomNav`, bottomBar ? new Set(Object.keys(bottomBar)) : null);
+    addLostScreenMetadataActions(screen.m3eTopAppBar, `screens[${screen.id}].m3eTopAppBar`, topBar);
+    addLostScreenMetadataActions(screen.m3eBottomNav, `screens[${screen.id}].m3eBottomNav`, bottomBar);
     collectUnresolvedMetadataActions(screen.m3eTopAppBar, `screens[${screen.id}].m3eTopAppBar`, topBar ?? undefined);
     collectUnresolvedMetadataActions(screen.m3eBottomNav, `screens[${screen.id}].m3eBottomNav`, bottomBar ?? undefined);
     for (const [index, node] of screen.root.children.entries()) {
@@ -3169,6 +3577,10 @@ export function inspectM3eExportCompatibility(document: CanvasDocument): M3eExpo
             ? new Set(Object.keys(exportedItem))
             : null;
         collectMetadataFields(current.m3eMetadata, `${path}.m3eMetadata`, exportedFields);
+        addLostNodeAction(current, path, mode, exportedItem);
+        addLostMenuActions(current, path, mode, exportedItem);
+        addLostMetadataActions(current, path, mode, exportedItem);
+        addLostAlertActions(current, path, mode, exportedItem);
         if ((current.kind === 'button' || current.kind === 'navigation-link')
           && current.navigationAction !== 'back'
           && current.destinationScreenId
@@ -3176,22 +3588,6 @@ export function inspectM3eExportCompatibility(document: CanvasDocument): M3eExpo
           unresolvedDestinations.add(current.destinationScreenId);
           unresolvedActionCount += 1;
           unresolvedPaths.add(`${path}.destinationScreenId`);
-        }
-        if (mode === 'not-exported') {
-          if (current.navigationAction === 'back') lostActionPaths.add(`${path}.navigationAction`);
-          if ((current.kind === 'button' || current.kind === 'navigation-link') && current.destinationScreenId) {
-            lostActionPaths.add(`${path}.destinationScreenId`);
-          }
-          for (const [slot, action] of Object.entries(current.m3eMenuActions ?? {})) {
-            lostActionPaths.add(`${path}.m3eMenuActions.${slot}.${action.navigationAction === 'back' ? 'navigationAction' : 'destinationScreenId'}`);
-          }
-          if (current.kind === 'alert') {
-            for (const [actionIndex, action] of (current.actions ?? []).entries()) {
-              if (action.navigationAction === 'back' || action.destinationScreenId) {
-                lostActionPaths.add(`${path}.actions[${actionIndex}].${action.navigationAction === 'back' ? 'navigationAction' : 'destinationScreenId'}`);
-              }
-            }
-          }
         }
         if (current.kind === 'alert') {
           for (const [actionIndex, action] of (current.actions ?? []).entries()) {
@@ -3234,6 +3630,25 @@ export function inspectM3eExportCompatibility(document: CanvasDocument): M3eExpo
         unresolvedPaths.add(`${path}.destinationScreenId`);
       }
     }
+    const topBarItems = (screen.toolbarItems ?? []).filter((item) => item.placement === 'topBarLeading' || item.placement === 'topBarTrailing');
+    const exportedTopBarItems = new Set<ToolbarItem>([
+      topBarItems.find((item) => item.placement === 'topBarLeading'),
+      topBarItems.find((item) => item.placement === 'topBarTrailing'),
+    ].filter((item): item is ToolbarItem => item !== undefined));
+    (screen.toolbarItems ?? []).forEach((item, index) => {
+      if (topBarItems.includes(item) && !exportedTopBarItems.has(item) && exportToolbarAction(item, frameIds) !== undefined) {
+        lostActionPaths.add(`screens[${screen.id}].toolbarItems[${index}].${item.navigationAction === 'back' ? 'navigationAction' : 'destinationScreenId'}`);
+      }
+    });
+    const bottomBarItems = screen.tabBarItems?.length
+      ? screen.tabBarItems
+      : (screen.toolbarItems ?? []).filter((item) => item.placement === 'bottomBar');
+    const exportedBottomBarItems = new Set(bottomBarItems);
+    (screen.toolbarItems ?? []).forEach((item, index) => {
+      if (item.placement === 'bottomBar' && !exportedBottomBarItems.has(item) && exportToolbarAction(item, frameIds) !== undefined) {
+        lostActionPaths.add(`screens[${screen.id}].toolbarItems[${index}].${item.navigationAction === 'back' ? 'navigationAction' : 'destinationScreenId'}`);
+      }
+    });
     for (const [direction, destination] of Object.entries(screen.swipe ?? {})) {
       if (destination && !frameIds.has(destination)) {
         unresolvedDestinations.add(destination);
@@ -3265,6 +3680,7 @@ export function inspectM3eExportCompatibility(document: CanvasDocument): M3eExpo
     duplicateIdFields: collectM3eDuplicateIdFields(exported),
     unknownFields: collectM3eUnknownFields(exported),
     normalizedScreenCount: exported.frames.length,
+    roundTripPaths,
     roundTripValid: roundTripped !== null
       && roundTripped.screens.length === exported.frames.length
       && roundTripExport !== null

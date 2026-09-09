@@ -1,6 +1,6 @@
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { parseCanvasDocument } from '../lib/document';
-import { convertM3eDocument, describeM3eCompatibilityFields, describeM3eCompatibilityKinds, describeM3eCompatibilityStatus, getM3eCompatibilityAnomalies, inspectM3eCompatibility, type M3eCompatibilityAnomaly } from '../lib/m3e';
+import { convertM3eDocument, describeM3eCompatibilityFields, describeM3eCompatibilityKinds, describeM3eCompatibilityStatus, getM3eCompatibilityAnomalies, inspectM3eCompatibility, inspectM3eExportCompatibility, resolveM3eImportPath, type M3eCompatibilityAnomaly } from '../lib/m3e';
 import { lintDocument } from '../lib/hig';
 import { findNode } from '../lib/nodes';
 import { copyText, createShareUrl } from '../lib/share';
@@ -15,6 +15,7 @@ export function TopBar() {
   const loadDocument = useEditorStore((state) => state.loadDocument);
   const resetDocument = useEditorStore((state) => state.resetDocument);
   const setExportOpen = useEditorStore((state) => state.setExportOpen);
+  const setExportTab = useEditorStore((state) => state.setExportTab);
   const undo = useEditorStore((state) => state.undo);
   const redo = useEditorStore((state) => state.redo);
   const canUndo = useEditorStore((state) => state.past.length > 0);
@@ -27,10 +28,15 @@ export function TopBar() {
   const [fileError, setFileError] = useState<string | null>(null);
   const [fileNotice, setFileNotice] = useState<string | null>(null);
   const [fileAnomalies, setFileAnomalies] = useState<M3eCompatibilityAnomaly[]>([]);
+  const [fileImportSource, setFileImportSource] = useState<unknown>(null);
   const [shareState, setShareState] = useState<'idle' | 'copied' | 'error'>('idle');
   const issues = lintDocument(document);
   const warnings = issues.filter((issue) => issue.severity === 'warning').length;
   const notes = issues.length - warnings;
+  const m3eReport = useMemo(() => inspectM3eExportCompatibility(document), [document]);
+  const m3eAnomalies = useMemo(() => getM3eCompatibilityAnomalies(m3eReport), [m3eReport]);
+  const m3eActionableAnomalies = m3eAnomalies.filter((anomaly) => anomaly.status !== 'approximated');
+  const m3eApproximationCount = m3eAnomalies.filter((anomaly) => anomaly.status === 'approximated').length;
 
   const focusFirstIssue = () => {
     const issue = issues[0];
@@ -70,6 +76,7 @@ export function TopBar() {
         if (report) {
           const anomalies = getM3eCompatibilityAnomalies(report);
           setFileAnomalies(anomalies);
+          setFileImportSource(raw);
           setFileNotice(`M3E互換確認: ${anomalies.map((anomaly) => `${anomaly.label}: ${anomaly.detail}`).join(' / ') || '変換できる画面がありません。'}`);
           setFileError('プロジェクトファイルを開けませんでした。互換診断を確認してください。');
           return;
@@ -80,6 +87,7 @@ export function TopBar() {
       if (report) {
         const anomalies = getM3eCompatibilityAnomalies(report);
         setFileAnomalies(anomalies);
+        setFileImportSource(raw);
         const details = [
           anomalies.length > 0 ? `互換異常${anomalies.length}件` : '',
           report.invalidFrameCount > 0 ? `無効な画面${report.invalidFrameCount}件` : '',
@@ -102,12 +110,14 @@ export function TopBar() {
       } else {
         setFileNotice(null);
         setFileAnomalies([]);
+        setFileImportSource(null);
       }
       setFileError(null);
     } catch {
       setFileError('プロジェクトファイルを開けませんでした。');
       setFileNotice(null);
       setFileAnomalies([]);
+      setFileImportSource(null);
     }
   };
 
@@ -128,7 +138,7 @@ export function TopBar() {
   return (
     <header className="topbar">
       <div className="topbar-brand">
-        <div className="brand-mark" aria-label="S3E Canvas">S3E Canvas</div>
+        <h1 className="brand-mark">S3E Canvas</h1>
         <span className="brand-divider" aria-hidden="true" />
         <div className="topbar-document">
           <span className="topbar-eyebrow">プロジェクト</span>
@@ -160,12 +170,18 @@ export function TopBar() {
           <span>{warnings === 0 ? '問題なし' : `${warnings}件の警告`}</span>
           {notes > 0 && <span className="status-notes">補足 {notes}</span>}
         </button>
+        <button className={`lint-status m3e-status ${m3eActionableAnomalies.length > 0 ? 'has-issues' : m3eApproximationCount > 0 ? 'has-approximation' : ''}`} type="button" onClick={() => { setExportTab('m3e'); setExportOpen(true); }} aria-label="M3E互換診断を表示">
+          <span className="status-label">M3E</span>
+          <span>{m3eActionableAnomalies.length > 0 ? `要確認 ${m3eActionableAnomalies.length}件` : m3eApproximationCount > 0 ? `近似 ${m3eApproximationCount}件` : '問題なし'}</span>
+          {m3eActionableAnomalies.length > 0 && m3eApproximationCount > 0 && <span className="status-notes">近似 {m3eApproximationCount}件</span>}
+          {!m3eReport.roundTripValid && <span className="status-notes">再読込要確認</span>}
+        </button>
         {fileError && <span className="project-error" role="status">{fileError}</span>}
         {fileNotice && (
           <details className="project-notice-details">
             <summary className="project-notice">{fileNotice}</summary>
             {fileAnomalies.length > 0 && (
-              <div className="project-anomaly-popover" aria-label="読み込み時の互換異常">
+              <div className="project-anomaly-popover" role="region" aria-label="読み込み時の互換異常">
                 <strong>読み込み時の互換異常</strong>
                 <ul className="m3e-anomaly-list">
                   {fileAnomalies.map((anomaly) => (
@@ -176,6 +192,27 @@ export function TopBar() {
                       </div>
                       <span>{anomaly.detail}</span>
                       <small>{anomaly.guidance}</small>
+                      {anomaly.paths.length > 0 && (
+                        <div className="m3e-anomaly-targets">
+                          {anomaly.paths.map((path) => {
+                            const target = fileImportSource
+                              ? resolveM3eImportPath(document, fileImportSource, path)
+                              : null;
+                            return target ? (
+                              <button
+                                type="button"
+                                key={path}
+                                onClick={() => {
+                                  selectScreen(target.screenId);
+                                  selectNode(target.nodeId ?? null);
+                                }}
+                              >
+                                {target.scope === 'document' ? 'メタデータを確認' : target.nodeId ? '要素を選択' : '画面を表示'} <code>{path}</code>
+                              </button>
+                            ) : <code key={path} className="m3e-anomaly-path">{path}</code>;
+                          })}
+                        </div>
+                      )}
                     </li>
                   ))}
                 </ul>
@@ -186,7 +223,7 @@ export function TopBar() {
       </div>
 
       <div className="topbar-actions">
-        <input ref={fileInput} className="visually-hidden" type="file" accept=".json,.ioscanvas,application/json" onChange={openProject} />
+        <input ref={fileInput} className="visually-hidden" type="file" accept=".json,.ioscanvas,application/json" aria-label="プロジェクトファイル" onChange={openProject} />
         <button className="toolbar-button" type="button" onClick={() => fileInput.current?.click()}>開く</button>
         <button className="toolbar-button" type="button" onClick={saveProject}>保存</button>
         <button className="toolbar-button" type="button" onClick={shareProject} aria-label="共有リンクをコピー">
@@ -194,7 +231,7 @@ export function TopBar() {
         </button>
         <span className="toolbar-divider" aria-hidden="true" />
         <button className="toolbar-button" type="button" onClick={resetProject}>リセット</button>
-        <button className="primary-toolbar-button" type="button" onClick={() => setExportOpen(true)}>書き出す</button>
+        <button className="primary-toolbar-button" type="button" onClick={() => { setExportTab('swiftui'); setExportOpen(true); }}>書き出す</button>
       </div>
     </header>
   );

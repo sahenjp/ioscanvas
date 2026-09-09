@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { findNode } from '../lib/nodes';
-import { convertM3eDocument, describeM3eCompatibilityFields, describeM3eCompatibilityKinds, exportM3eDocument, generateM3eJson, getM3eCompatibilityAnomalies, inspectM3eCompatibility, inspectM3eExportCompatibility, isM3eDocument } from '../lib/m3e';
+import { convertM3eDocument, describeM3eCompatibilityFields, describeM3eCompatibilityKinds, exportM3eDocument, generateM3eJson, getM3eCompatibilityAnomalies, inspectM3eCompatibility, inspectM3eExportCompatibility, isM3eDocument, resolveM3eExportPath, resolveM3eImportPath } from '../lib/m3e';
 import { defaultDocument } from '../lib/defaultDocument';
 import { parseCanvasDocument } from '../lib/document';
 import { generateSwiftUI } from '../lib/swiftui';
@@ -59,6 +59,102 @@ describe('M3E compatibility importer', () => {
   it('explains approximate mappings in compatibility diagnostics', () => {
     expect(describeM3eCompatibilityKinds(['securefield', 'gauge'])).toContain('securefield（textFieldへ投影するため');
     expect(describeM3eCompatibilityFields(['size', 'src'])).toContain('src（SwiftUIのAssetまたはURLへ差し替え）');
+  });
+
+  it('resolves export diagnostics to semantic nodes or their screen', () => {
+    const document: CanvasDocument = {
+      version: 1,
+      name: '診断対象',
+      platform: 'iOS',
+      minimumOS: '26.0',
+      appearance: { colorScheme: 'system', accentColor: 'blue' },
+      activeScreenId: 'home',
+      screens: [{
+        id: 'home',
+        name: 'ホーム',
+        navigationTitle: 'ホーム',
+        root: {
+          id: 'root',
+          kind: 'vstack',
+          children: [
+            { id: 'title', kind: 'text', text: '見出し', fontSize: 28, weight: 'bold' },
+            { id: 'row', kind: 'hstack', children: [{ id: 'row-label', kind: 'text', text: '操作', fontSize: 17, weight: 'regular' }, { id: 'save', kind: 'button', label: '保存', role: 'normal', minHeight: 44 }] },
+          ],
+        },
+      }],
+    };
+
+    expect(resolveM3eExportPath(document, 'screens[home].root.children[1].children[1].m3eMetadata.fill')).toEqual({ screenId: 'home', nodeId: 'save' });
+    expect(resolveM3eExportPath(document, 'screens[home].root.kind')).toEqual({ screenId: 'home' });
+    expect(resolveM3eExportPath(document, 'screens[home].swipe.right')).toEqual({ screenId: 'home' });
+    expect(resolveM3eExportPath(document, 'document.paletteKey')).toEqual({ screenId: 'home', scope: 'document' });
+    expect(resolveM3eExportPath(document, 'theme')).toEqual({ screenId: 'home', scope: 'document' });
+    expect(resolveM3eExportPath(document, 'theme.font')).toEqual({ screenId: 'home', scope: 'document' });
+    expect(resolveM3eExportPath(document, 'frames[0].name')).toEqual({ screenId: 'home' });
+    expect(resolveM3eExportPath(document, 'groups[1].x')).toEqual({ screenId: 'home' });
+    expect(resolveM3eExportPath(document, 'groups[2].items[1].minimum')).toEqual({ screenId: 'home', nodeId: 'save' });
+    expect(resolveM3eExportPath(document, 'groups[2].items[1].unknownField')).toEqual({ screenId: 'home', nodeId: 'save' });
+    expect(resolveM3eExportPath(document, 'screens[home].root.children[9].kind')).toBeNull();
+  });
+
+  it('resolves imported M3E diagnostics to converted nodes', () => {
+    const source = {
+      frames: [{ id: 'home', name: 'ホーム', x: 0, y: 0 }],
+      groups: [{
+        id: 'body',
+        x: 16,
+        y: 80,
+        axis: 'y',
+        items: [{ id: 'save', kind: 'button', label: '保存', variant: 'filled' }],
+      }],
+    };
+    const document = convertM3eDocument(source);
+    if (!document) throw new Error('Import fixture was not converted');
+
+    expect(resolveM3eImportPath(document, source, 'groups[0].items[0].label')).toEqual({ screenId: 'screen-home', nodeId: 'm3e-save' });
+    expect(resolveM3eImportPath(document, source, 'groups[0].x')).toEqual({ screenId: 'screen-home' });
+    expect(resolveM3eImportPath(document, source, 'frames[0].name')).toEqual({ screenId: 'screen-home' });
+    expect(resolveM3eImportPath(document, source, 'document.paletteKey')).toEqual({ screenId: 'screen-home', scope: 'document' });
+    expect(resolveM3eImportPath(document, source, 'theme')).toEqual({ screenId: 'screen-home', scope: 'document' });
+    expect(resolveM3eImportPath(document, source, 'theme.font')).toEqual({ screenId: 'screen-home', scope: 'document' });
+  });
+
+  it('does not target a different screen for an invalid imported frame', () => {
+    const source = {
+      frames: [{ id: 'broken', x: 0, y: 0 }, { id: 'home', name: 'ホーム', x: 532, y: 0 }],
+      groups: [{ id: 'body', x: 532, y: 80, axis: 'y', items: [{ id: 'text', kind: 'text', label: '本文' }] }],
+    };
+    const document = convertM3eDocument(source);
+    if (!document) throw new Error('Import fixture was not converted');
+
+    expect(document.screens).toHaveLength(1);
+    expect(resolveM3eImportPath(document, source, 'frames[0].name')).toBeNull();
+    expect(resolveM3eImportPath(document, source, 'frames[1].name')).toEqual({ screenId: document.screens[0]?.id });
+  });
+
+  it('keeps imported diagnostics targetable when M3E IDs are not ASCII', () => {
+    const source = {
+      frames: [{ id: 'home', name: 'ホーム', x: 0, y: 0 }],
+      groups: [{
+        id: 'body',
+        x: 16,
+        y: 80,
+        axis: 'y',
+        items: [
+          { id: '保存', kind: 'button', label: '保存', variant: 'filled' },
+          { id: '設定', kind: 'button', label: '設定', variant: 'outlined' },
+        ],
+      }],
+    };
+    const document = convertM3eDocument(source);
+    if (!document) throw new Error('Import fixture was not converted');
+
+    const target = resolveM3eImportPath(document, source, 'groups[0].items[1].label');
+    expect(target?.screenId).toBe('screen-home');
+    expect(target?.nodeId).toBeTruthy();
+    const node = target?.nodeId ? findNode(document.screens[0]?.root.children ?? [], target.nodeId) : undefined;
+    expect(node?.m3eSourceId).toBe('設定');
+    expect(JSON.stringify(exportM3eDocument(document))).not.toContain('m3eSourceId');
   });
 
   it('exports the semantic iOS document to a readable M3E project and imports it again', () => {
@@ -128,6 +224,7 @@ describe('M3E compatibility importer', () => {
       duplicateIdFields: [],
       unknownFields: [],
       normalizedScreenCount: 1,
+      roundTripPaths: [],
       roundTripValid: true,
     });
     expect(getM3eCompatibilityAnomalies(report)).toEqual(expect.arrayContaining([
@@ -270,8 +367,9 @@ describe('M3E compatibility importer', () => {
 
     expect(report.approximatedKinds).toContain('navigation-split-view');
     expect(report.roundTripValid).toBe(false);
+    expect(report.roundTripPaths).toEqual(['groups[1].items[0]', 'groups[2].items[0]']);
     expect(getM3eCompatibilityAnomalies(report)).toEqual(expect.arrayContaining([
-      expect.objectContaining({ code: 'ROUND_TRIP', status: 'lost' }),
+      expect.objectContaining({ code: 'ROUND_TRIP', status: 'lost', paths: expect.arrayContaining(['groups[1].items[0]']) }),
     ]));
   });
 
@@ -412,6 +510,36 @@ describe('M3E compatibility importer', () => {
 
     expect(document).not.toBeNull();
     if (!document) throw new Error('Tab compatibility fixture was not converted');
+    expect(inspectM3eExportCompatibility(document)).toMatchObject({
+      unresolvedDestinationCount: 0,
+      unresolvedActionCount: 0,
+      unresolvedPaths: [],
+    });
+  });
+
+  it('resolves retained actions through original non-ASCII M3E frame IDs', () => {
+    const source = {
+      frames: [
+        { id: 'ホーム画面', name: 'ホーム', x: 0, y: 0 },
+        { id: '詳細画面', name: '詳細', x: 532, y: 0 },
+      ],
+      groups: [{
+        id: 'notice',
+        x: 16,
+        y: 80,
+        axis: 'y',
+        items: [{ id: 'notice', kind: 'snackbar', label: '保存しました', icon: null, variant: 'filled', action: { to: '詳細画面', transition: 'fade' } }],
+      }],
+    };
+    const document = convertM3eDocument(source);
+
+    expect(document).not.toBeNull();
+    if (!document) throw new Error('Non-ASCII M3E frame fixture was not converted');
+    expect(document.screens.map((screen) => screen.m3eSourceId)).toEqual(['ホーム画面', '詳細画面']);
+    expect(resolveM3eImportPath(document, source, 'groups[0].items[0].action.to')).toEqual({ screenId: document.screens[0]?.id, nodeId: 'm3e-notice' });
+
+    const exported = exportM3eDocument(document).groups.flatMap((group) => group.items).find((item) => item.kind === 'snackbar');
+    expect(exported?.action).toEqual({ to: document.screens[1]?.id, transition: 'fade' });
     expect(inspectM3eExportCompatibility(document)).toMatchObject({
       unresolvedDestinationCount: 0,
       unresolvedActionCount: 0,
@@ -1389,6 +1517,34 @@ describe('M3E compatibility importer', () => {
     });
   });
 
+  it('reports a custom palette that is omitted by the current export projection', () => {
+    const document: CanvasDocument = {
+      version: 1,
+      name: '配色互換診断',
+      platform: 'iOS',
+      minimumOS: '26.0',
+      appearance: { colorScheme: 'system', accentColor: 'blue' },
+      m3eMetadata: {
+        paletteKey: 'custom',
+        customPalette: { key: 'custom', primary: '#123456' },
+      },
+      activeScreenId: 'home',
+      screens: [{
+        id: 'home',
+        name: 'ホーム',
+        navigationTitle: 'ホーム',
+        root: { id: 'root', kind: 'vstack', children: [] },
+      }],
+    };
+
+    const report = inspectM3eExportCompatibility(document);
+
+    expect(report.lostFields).toContain('document.m3eMetadata.customPalette');
+    expect(getM3eCompatibilityAnomalies(report)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'LOST_FIELD', status: 'lost', detail: expect.stringContaining('document.m3eMetadata.customPalette') }),
+    ]));
+  });
+
   it('accepts the canonical M3E frame mode without losing the selected screen', () => {
     const source = {
       frame: 'phone',
@@ -1894,6 +2050,122 @@ describe('M3E compatibility importer', () => {
     expect(getM3eCompatibilityAnomalies(report)).toEqual(expect.arrayContaining([
       expect.objectContaining({ code: 'LOST_ACTION', status: 'lost', detail: expect.stringContaining('screens[home].root.children[0].children[0]') }),
     ]));
+  });
+
+  it('reports navigation actions lost by tab, FAB, toolbar, and split projections', () => {
+    const document: CanvasDocument = {
+      version: 1,
+      name: '遷移射影診断',
+      platform: 'iOS',
+      minimumOS: '26.0',
+      appearance: { colorScheme: 'system', accentColor: 'blue' },
+      activeScreenId: 'home',
+      screens: [
+        {
+          id: 'home',
+          name: 'ホーム',
+          navigationTitle: 'ホーム',
+          root: {
+            id: 'root',
+            kind: 'vstack',
+            children: [
+              {
+                id: 'tabs',
+                kind: 'tabview',
+                children: [
+                  { id: 'tab-open', kind: 'button', label: '開く', role: 'normal', minHeight: 44, destinationScreenId: 'detail' },
+                  { id: 'tab-missing', kind: 'button', label: '未解決', role: 'normal', minHeight: 44, destinationScreenId: 'missing' },
+                  { id: 'tab-menu', kind: 'button', label: 'メニュー', role: 'normal', minHeight: 44, m3eMenuActions: { detail: { destinationScreenId: 'detail' } } },
+                  { id: 'tab-alert', kind: 'alert', label: '確認', title: '確認', message: '続けますか？', primaryButton: '続ける', primaryRole: 'normal', actions: [{ label: '詳細', role: 'normal', destinationScreenId: 'detail' }], minHeight: 44 },
+                  { id: 'tab-metadata', kind: 'button', label: '補足操作', role: 'normal', minHeight: 44, m3eMetadata: { action: { to: 'detail', transition: 'fade' } } },
+                ],
+              },
+              {
+                id: 'fab',
+                kind: 'vstack',
+                m3eKind: 'fabMenu',
+                children: [
+                  { id: 'fab-menu', kind: 'button', label: 'メニュー', role: 'normal', minHeight: 44, m3eMenuActions: { detail: { destinationScreenId: 'detail' } } },
+                  { id: 'fab-text', kind: 'text', text: '落ちる操作', fontSize: 17, weight: 'regular', navigationAction: 'back' },
+                ],
+              },
+              {
+                id: 'toolbar',
+                kind: 'hstack',
+                children: [{ id: 'toolbar-menu', kind: 'button', label: '操作', role: 'normal', minHeight: 44, m3eMenuActions: { detail: { destinationScreenId: 'detail' } } }],
+              },
+              {
+                id: 'rail',
+                kind: 'navigation-split-view',
+                m3eKind: 'navRail',
+                children: [
+                  { id: 'sidebar', kind: 'list', children: [] },
+                  { id: 'detail-pane', kind: 'vstack', children: [] },
+                  { id: 'extra-pane', kind: 'button', label: '余分な列', role: 'normal', minHeight: 44, destinationScreenId: 'detail' },
+                ],
+              },
+            ],
+          },
+        },
+        { id: 'detail', name: '詳細', navigationTitle: '詳細', root: { id: 'detail-root', kind: 'vstack', children: [] } },
+      ],
+    };
+    const report = inspectM3eExportCompatibility(document);
+
+    expect(report.unresolvedPaths).toEqual(['screens[home].root.children[0].children[1].destinationScreenId']);
+    expect(report.lostActionPaths).toEqual([
+      'screens[home].root.children[0].children[2].m3eMenuActions.detail.destinationScreenId',
+      'screens[home].root.children[0].children[3].actions[0].destinationScreenId',
+      'screens[home].root.children[0].children[4].m3eMetadata.action.to',
+      'screens[home].root.children[1].children[0].m3eMenuActions.detail.destinationScreenId',
+      'screens[home].root.children[1].children[1].navigationAction',
+      'screens[home].root.children[2].children[0].m3eMenuActions.detail.destinationScreenId',
+      'screens[home].root.children[3].children[2].destinationScreenId',
+    ]);
+    report.lostActionPaths.forEach((path) => {
+      expect(resolveM3eExportPath(document, path)).not.toBeNull();
+    });
+    expect(getM3eCompatibilityAnomalies(report)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'LOST_ACTION', status: 'lost' }),
+      expect.objectContaining({ code: 'UNRESOLVED_NAVIGATION', status: 'unresolved' }),
+    ]));
+  });
+
+  it('reports actions omitted when top and bottom bar items are normalized', () => {
+    const report = inspectM3eExportCompatibility({
+      version: 1,
+      name: 'バー操作診断',
+      platform: 'iOS',
+      minimumOS: '26.0',
+      appearance: { colorScheme: 'system', accentColor: 'blue' },
+      activeScreenId: 'home',
+      screens: [
+        {
+          id: 'home',
+          name: 'ホーム',
+          navigationTitle: 'ホーム',
+          toolbarItems: [
+            { id: 'leading', title: '開く', systemName: 'folder', placement: 'topBarLeading', destinationScreenId: 'detail' },
+            { id: 'extra-leading', title: '別の開く', systemName: 'plus', placement: 'topBarLeading', destinationScreenId: 'detail' },
+            { id: 'trailing', title: '設定', systemName: 'gearshape', placement: 'topBarTrailing', destinationScreenId: 'detail' },
+            { id: 'extra-bottom', title: '追加', systemName: 'plus', placement: 'bottomBar', destinationScreenId: 'detail' },
+          ],
+          tabBarItems: [{ id: 'home-tab', title: 'ホーム', systemName: 'house', placement: 'bottomBar', destinationScreenId: 'detail' }],
+          m3eTopAppBar: { actions: { extra: { to: 'detail', transition: 'fade' } } },
+          m3eBottomNav: { actions: { extra: { to: 'detail', transition: 'fade' } } },
+          root: { id: 'root', kind: 'vstack', children: [] },
+        },
+        { id: 'detail', name: '詳細', navigationTitle: '詳細', root: { id: 'detail-root', kind: 'vstack', children: [] } },
+      ],
+    });
+
+    expect(report.unresolvedActionCount).toBe(0);
+    expect(report.lostActionPaths).toEqual([
+      'screens[home].m3eBottomNav.actions.extra.to',
+      'screens[home].m3eTopAppBar.actions.extra.to',
+      'screens[home].toolbarItems[1].destinationScreenId',
+      'screens[home].toolbarItems[3].destinationScreenId',
+    ]);
   });
 
   it('retains typed M3E presentation fields through an editable round trip', () => {

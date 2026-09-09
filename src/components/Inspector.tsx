@@ -1,7 +1,7 @@
 import { createId, findNode, findNodeLocation, isContainerNode } from '../lib/nodes';
 import { lintDocument } from '../lib/hig';
 import { useEditorStore } from '../store/editor';
-import type { AccentColor, BackgroundStyle, CanvasNode, CanvasScreen, ContentPlacement, FontDesign, FrameWidth, GlassShape, GlassStyle, ImageSource, M3eAction, M3eItemMetadata, M3eMenuAction, M3eTab, M3eTextColor, M3eVariant, NavigationTitleDisplayMode, NavigationTransition, ScreenBackground, ScreenDevice, ScreenOrientation, ShadowStyle, StackAlignment, SwipeDirection, TextAlignment, TextStyle, ToolbarItem, ToolbarPlacement } from '../types/document';
+import type { AccentColor, BackgroundStyle, CanvasNode, CanvasScreen, ContentPlacement, FontDesign, FrameWidth, GlassShape, GlassStyle, ImageSource, M3eAction, M3eDocumentMetadata, M3eItemMetadata, M3eMenuAction, M3eTab, M3eTextColor, M3eVariant, NavigationTitleDisplayMode, NavigationTransition, ScreenBackground, ScreenDevice, ScreenOrientation, ShadowStyle, StackAlignment, SwipeDirection, TextAlignment, TextStyle, ToolbarItem, ToolbarPlacement } from '../types/document';
 
 const swipeDirections: { key: SwipeDirection; label: string }[] = [
   { key: 'left', label: '左へスワイプ' },
@@ -54,6 +54,7 @@ export function Inspector() {
   const updateAppearance = useEditorStore((state) => state.updateAppearance);
   const updateSelectedNodes = useEditorStore((state) => state.updateSelectedNodes);
   const updateDocumentName = useEditorStore((state) => state.updateDocumentName);
+  const updateM3eDocumentMetadata = useEditorStore((state) => state.updateM3eDocumentMetadata);
   const selectNode = useEditorStore((state) => state.selectNode);
   const moveSelectedNode = useEditorStore((state) => state.moveSelectedNode);
   const duplicateSelectedNode = useEditorStore((state) => state.duplicateSelectedNode);
@@ -88,6 +89,10 @@ export function Inspector() {
     ? allIssues.filter((issue) => issue.nodeId === screen.root.id || Boolean(findNode(screen.root.children, issue.nodeId)))
     : [];
   const screenWarnings = screenIssues.filter((issue) => issue.severity === 'warning');
+  const sourcePalettePrimary = document.m3eMetadata?.customPalette?.primary;
+  const customPalettePrimary = typeof sourcePalettePrimary === 'string' && /^#[0-9a-f]{6}$/i.test(sourcePalettePrimary)
+    ? sourcePalettePrimary
+    : '#007AFF';
   const updateM3eMetadata = (patch: Partial<M3eItemMetadata>) => {
     if (!node) return;
     const hasFillPatch = Object.prototype.hasOwnProperty.call(patch, 'fill');
@@ -95,6 +100,9 @@ export function Inspector() {
       m3eMetadata: { ...node.m3eMetadata, ...patch },
       ...(hasFillPatch ? { background: m3eBackgroundStyle(patch.fill) } : {}),
     } as Partial<CanvasNode>);
+  };
+  const updateM3eTheme = (patch: Partial<NonNullable<M3eDocumentMetadata['theme']>>) => {
+    updateM3eDocumentMetadata({ theme: { ...document.m3eMetadata?.theme, ...patch } });
   };
   const updateSplitMenuActions = (actions: Record<string, M3eMenuAction> | undefined) => {
     if (!node || node.kind !== 'button') return;
@@ -340,6 +348,118 @@ export function Inspector() {
                 <option value="monospaced">等幅</option>
               </select>
             </Field>
+          </section>
+          <section className="inspector-section">
+            <details className="inspector-disclosure">
+              <summary>
+                <span>M3E互換メタデータ</span>
+                <span className="inspector-disclosure-meta">{document.m3eMetadata ? '保持中' : '未設定'}</span>
+              </summary>
+              <div className="inspector-disclosure-body">
+                <p className="inspector-help">M3E JSONへ戻すための設定です。SwiftUIの意味構造や外観設定とは別に保持されます。</p>
+                <Field label="射影パレット">
+                  <select
+                    value={document.m3eMetadata?.paletteKey ?? ''}
+                    onChange={(event) => updateM3eDocumentMetadata({ paletteKey: event.target.value || undefined })}
+                  >
+                    <option value="">自動</option>
+                    <option value="blue">Blue</option>
+                    <option value="purple">Purple</option>
+                    <option value="green">Green</option>
+                    <option value="coral">Coral</option>
+                    <option value="amber">Amber</option>
+                    <option value="teal">Teal</option>
+                    <option value="mono">Mono</option>
+                    <option value="custom">Custom</option>
+                  </select>
+                </Field>
+                <Field label="フレームモード">
+                  <select
+                    value={document.m3eMetadata?.frameMode ?? ''}
+                    onChange={(event) => updateM3eDocumentMetadata({ frameMode: event.target.value ? event.target.value as NonNullable<M3eDocumentMetadata['frameMode']> : undefined })}
+                  >
+                    <option value="">自動</option>
+                    <option value="phone">Phone</option>
+                    <option value="blank">Blank</option>
+                  </select>
+                </Field>
+                <Field label="M3Eプラットフォーム">
+                  <select
+                    value={document.m3eMetadata?.platform ?? ''}
+                    onChange={(event) => updateM3eDocumentMetadata({ platform: event.target.value ? event.target.value as NonNullable<M3eDocumentMetadata['platform']> : undefined })}
+                  >
+                    <option value="">自動</option>
+                    <option value="android">Android</option>
+                    <option value="web">Web</option>
+                  </select>
+                </Field>
+                {document.m3eMetadata?.paletteKey === 'custom' && (
+                  <Field label="Custom primary">
+                    <input
+                      type="color"
+                      value={customPalettePrimary}
+                      onChange={(event) => updateM3eDocumentMetadata({
+                        paletteKey: 'custom',
+                        customPalette: { ...(document.m3eMetadata?.customPalette ?? {}), primary: event.target.value },
+                      })}
+                      aria-label="M3EカスタムPrimary色"
+                    />
+                  </Field>
+                )}
+                <Field label="Dynamic Color">
+                  <input className="toggle-input" type="checkbox" checked={document.m3eMetadata?.dynamicColor ?? false} onChange={(event) => updateM3eDocumentMetadata({ dynamicColor: event.target.checked })} />
+                </Field>
+                <Field label="コントラスト">
+                  <select
+                    value={document.m3eMetadata?.theme?.contrast ?? 'standard'}
+                    onChange={(event) => updateM3eTheme({ contrast: event.target.value as NonNullable<M3eDocumentMetadata['theme']>['contrast'] })}
+                  >
+                    <option value="standard">Standard</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                  </select>
+                </Field>
+                <Field label="形状">
+                  <select
+                    value={document.m3eMetadata?.theme?.shape ?? 'rounded'}
+                    onChange={(event) => updateM3eTheme({ shape: event.target.value as NonNullable<M3eDocumentMetadata['theme']>['shape'] })}
+                  >
+                    <option value="square">Square</option>
+                    <option value="rounded">Rounded</option>
+                    <option value="full">Full</option>
+                  </select>
+                </Field>
+                <Field label="M3Eフォント">
+                  <select
+                    value={document.m3eMetadata?.theme?.font ?? 'system'}
+                    onChange={(event) => updateM3eTheme({ font: event.target.value as NonNullable<M3eDocumentMetadata['theme']>['font'] })}
+                  >
+                    <option value="system">System</option>
+                    <option value="roboto">Roboto</option>
+                    <option value="robotoFlex">Roboto Flex</option>
+                    <option value="robotoSerif">Roboto Serif</option>
+                  </select>
+                </Field>
+                <Field label="モーション">
+                  <select
+                    value={document.m3eMetadata?.theme?.motion ?? 'standard'}
+                    onChange={(event) => updateM3eTheme({ motion: event.target.value as NonNullable<M3eDocumentMetadata['theme']>['motion'] })}
+                  >
+                    <option value="standard">Standard</option>
+                    <option value="expressive">Expressive</option>
+                  </select>
+                </Field>
+                <Field label="強調表示">
+                  <input className="toggle-input" type="checkbox" checked={document.m3eMetadata?.theme?.emphasized ?? false} onChange={(event) => updateM3eTheme({ emphasized: event.target.checked })} />
+                </Field>
+                <Field label="M3E概要">
+                  <DraftTextarea key={`m3e-brief-${document.m3eMetadata?.brief ?? ''}`} value={document.m3eMetadata?.brief ?? ''} onCommit={(value) => updateM3eDocumentMetadata({ brief: value.trim() || undefined })} />
+                </Field>
+                <Field label="編集メモ">
+                  <DraftTextarea key={`m3e-prompt-${document.m3eMetadata?.promptEdit ?? ''}`} value={document.m3eMetadata?.promptEdit ?? ''} onCommit={(value) => updateM3eDocumentMetadata({ promptEdit: value.trim() || undefined })} />
+                </Field>
+              </div>
+            </details>
           </section>
           {screen && (
             <section className="inspector-section">

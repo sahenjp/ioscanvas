@@ -1,17 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
 import { generateImplementationPrompt, type PromptScope } from '../lib/prompt';
-import { describeM3eCompatibilityFields, describeM3eCompatibilityKinds, describeM3eCompatibilityStatus, generateM3eJson, getM3eCompatibilityAnomalies, inspectM3eExportCompatibility } from '../lib/m3e';
+import { describeM3eCompatibilityFields, describeM3eCompatibilityKinds, describeM3eCompatibilityStatus, generateM3eJson, getM3eCompatibilityAnomalies, inspectM3eExportCompatibility, resolveM3eExportPath } from '../lib/m3e';
 import { copyText } from '../lib/share';
 import { generateSwiftUI } from '../lib/swiftui';
-import { useEditorStore } from '../store/editor';
-
-type ExportTab = 'swiftui' | 'prompt' | 'm3e';
+import { useEditorStore, type ExportTab } from '../store/editor';
 
 export function ExportPanel() {
   const open = useEditorStore((state) => state.exportOpen);
   const setOpen = useEditorStore((state) => state.setExportOpen);
+  const tab = useEditorStore((state) => state.exportTab);
+  const setExportTab = useEditorStore((state) => state.setExportTab);
   const document = useEditorStore((state) => state.document);
-  const [tab, setTab] = useState<ExportTab>('swiftui');
+  const selectScreen = useEditorStore((state) => state.selectScreen);
+  const selectNode = useEditorStore((state) => state.selectNode);
   const [promptScope, setPromptScope] = useState<PromptScope>('active');
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState(false);
@@ -58,6 +59,18 @@ export function ExportPanel() {
     window.setTimeout(() => URL.revokeObjectURL(url), 0);
   };
 
+  const selectDiagnosticTarget = (path: string) => {
+    const target = resolveM3eExportPath(document, path);
+    if (!target) return;
+    selectScreen(target.screenId);
+    selectNode(target.nodeId ?? null);
+    setOpen(false);
+  };
+
+  const changeTab = (nextTab: ExportTab) => {
+    setExportTab(nextTab);
+  };
+
   return (
     <div className="modal-backdrop" role="presentation" onMouseDown={() => setOpen(false)}>
       <section className={`export-panel ${tab === 'm3e' ? 'has-compatibility' : ''}`} role="dialog" aria-modal="true" aria-label="設計を書き出す" onMouseDown={(event) => event.stopPropagation()}>
@@ -69,9 +82,9 @@ export function ExportPanel() {
           <button type="button" className="icon-button" onClick={() => setOpen(false)} aria-label="閉じる">×</button>
         </header>
         <div className="export-tabs">
-          <button type="button" className={tab === 'swiftui' ? 'active' : ''} onClick={() => setTab('swiftui')}>SwiftUIコード</button>
-          <button type="button" className={tab === 'prompt' ? 'active' : ''} onClick={() => setTab('prompt')}>実装の説明</button>
-          <button type="button" className={tab === 'm3e' ? 'active' : ''} onClick={() => setTab('m3e')}>M3E JSON</button>
+          <button type="button" className={tab === 'swiftui' ? 'active' : ''} onClick={() => changeTab('swiftui')}>SwiftUIコード</button>
+          <button type="button" className={tab === 'prompt' ? 'active' : ''} onClick={() => changeTab('prompt')}>実装の説明</button>
+          <button type="button" className={tab === 'm3e' ? 'active' : ''} onClick={() => changeTab('m3e')}>M3E JSON</button>
           {tab === 'prompt' && (
             <label className="export-scope">
               <span>対象</span>
@@ -117,6 +130,18 @@ export function ExportPanel() {
                       </div>
                       <span>{anomaly.detail}</span>
                       <small>{anomaly.guidance}</small>
+                      {anomaly.paths.length > 0 && (
+                        <div className="m3e-anomaly-targets">
+                          {anomaly.paths.map((path) => {
+                            const target = resolveM3eExportPath(document, path);
+                            return target ? (
+                              <button type="button" key={path} onClick={() => selectDiagnosticTarget(path)}>
+                                {target.scope === 'document' ? 'メタデータを確認' : target.nodeId ? '要素を選択' : '画面を表示'} <code>{path}</code>
+                              </button>
+                            ) : <code key={path} className="m3e-anomaly-path">{path}</code>;
+                          })}
+                        </div>
+                      )}
                     </li>
                   ))}
                 </ul>
@@ -124,7 +149,7 @@ export function ExportPanel() {
             )}
           </div>
         )}
-        <pre className="export-code"><code>{value}</code></pre>
+        <pre className="export-code" tabIndex={0} role="region" aria-label="生成されたコード"><code>{value}</code></pre>
         <footer className="export-footer">
           <span>{copyError ? 'コピーできません。テキストを手動で選択してください。' : tab === 'swiftui' ? 'ドキュメントの意味構造から生成' : tab === 'prompt' ? '実装条件と現在のHIGチェックを含みます。' : 'M3E Canvasで開ける座標射影データとして生成'}</span>
           {tab === 'm3e' && <button type="button" onClick={saveM3e}>M3Eとして保存</button>}
