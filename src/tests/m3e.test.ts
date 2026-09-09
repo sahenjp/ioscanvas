@@ -728,6 +728,7 @@ describe('M3E compatibility importer', () => {
     expect(output).toContain('import MapKit');
     expect(output).toContain('Map()');
     expect(output).toContain('Button("元に戻す")');
+    expect(output).toContain('.accessibilityElement(children: .contain)');
     expect(output).toContain('List(selection: $selected_m3e_rail)');
     const exportedItems = exportM3eDocument(document).groups.flatMap((group) => group.items);
     expect(exportedItems).toEqual(expect.arrayContaining([

@@ -307,6 +307,15 @@ function lintNode(
     });
   }
 
+  if (node.kind === 'groupbox' && node.isBottomSheet && node.children.length === 0) {
+    issues.push({
+      nodeId: node.id,
+      severity: 'warning',
+      code: 'EMPTY_SHEET',
+      message: 'ボトムシートに表示する内容がありません。実際のシート内容を追加してください。',
+    });
+  }
+
   if (node.kind === 'tabview' && node.children.length === 0) {
     issues.push({
       nodeId: node.id,

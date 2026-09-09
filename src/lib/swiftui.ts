@@ -815,7 +815,7 @@ function renderNodeContent(node: CanvasNode, depth: number, context: RenderConte
     case 'camera':
       return `${pad}Button {\n${pad}    // AVFoundation: AVCaptureSessionをカメラプレビューへ接続する\n${pad}} label: {\n${pad}    Label(${quoted(node.label || 'カメラ')}, systemImage: "camera.fill")\n${pad}}\n${pad}.frame(minHeight: ${node.minHeight})\n${pad}.accessibilityLabel(${quoted(node.label || 'カメラ')})`;
     case 'map':
-      return `${pad}Map()\n${pad}    .frame(minHeight: 220)\n${pad}    .accessibilityLabel(${quoted(node.label || '地図')})`;
+      return `${pad}Map()\n${pad}    .mapControls {\n${pad}        MapCompass()\n${pad}        MapScaleView()\n${pad}    }\n${pad}    .frame(minHeight: 220)\n${pad}    .accessibilityLabel(${quoted(node.label || '地図')})`;
     case 'label': {
       const accessibility = node.accessibilityLabel.trim().length > 0
         ? `\n${pad}    .accessibilityLabel(${quoted(node.accessibilityLabel)})`
@@ -871,6 +871,9 @@ function renderNodeContent(node: CanvasNode, depth: number, context: RenderConte
     case 'list':
     case 'form': {
       const children = node.children.map((child) => renderNode(child, depth + 1, context)).join('\n');
+      if (node.kind === 'hstack' && node.m3eKind === 'snackbar') {
+        return `${pad}HStack(spacing: ${node.spacing ?? 8}) {\n${children}\n${pad}}\n${pad}.accessibilityElement(children: .contain)`;
+      }
       if (node.kind === 'scrollview') return `${pad}ScrollView {\n${children}\n${pad}}`;
       if (node.kind === 'list') return `${pad}List {\n${children}\n${pad}}`;
       if (node.kind === 'form') return `${pad}Form {\n${children}\n${pad}}`;

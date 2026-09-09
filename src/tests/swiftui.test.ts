@@ -622,4 +622,15 @@ describe('SwiftUI generator', () => {
     expect(output).toContain('ContentUnavailableView("項目なし", systemImage: "tray"');
     expect(output).toContain('Text("まだ項目がありません。")');
   });
+
+  it('exports a Map with native map controls and an accessibility label', () => {
+    const document = structuredClone(defaultDocument);
+    document.screens[0]?.root.children.push({ id: 'map-test', kind: 'map', label: '現在地' });
+
+    const output = generateSwiftUI(document);
+
+    expect(output).toContain('MapCompass()');
+    expect(output).toContain('MapScaleView()');
+    expect(output).toContain('.accessibilityLabel("現在地")');
+  });
 });

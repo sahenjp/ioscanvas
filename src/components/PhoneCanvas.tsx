@@ -811,6 +811,16 @@ function renderNodeContent(
     case 'list':
     case 'form':
     case 'section': {
+      if (node.kind === 'hstack' && node.m3eKind === 'snackbar' && controls) {
+        const message = node.children.find((child): child is Extract<CanvasNode, { kind: 'text' }> => child.kind === 'text');
+        const action = node.children.find((child): child is Extract<CanvasNode, { kind: 'button' }> => child.kind === 'button');
+        const actionNavigate = action?.navigationAction === 'back'
+          ? () => onNavigateBack?.(action.navigationTransition)
+          : action?.destinationScreenId
+            ? () => onNavigateScreen?.(action.destinationScreenId as string, action.navigationTransition)
+            : undefined;
+        return <SnackbarPreview message={message?.text || '通知'} actionLabel={action?.label} onAction={actionNavigate} />;
+      }
       if (node.m3eKind === 'fabMenu') {
         return (
           <div className="canvas-fab-menu-preview" aria-label={node.label || 'FABメニュー'}>
@@ -1284,6 +1294,29 @@ function ConfirmationDialogPreview({ node, onClose }: { node: ConfirmationDialog
           {node.cancelButton && <button className="ios-confirmation-action cancel" type="button" onClick={onClose}>{node.cancelButton}</button>}
         </div>
       </section>
+    </div>
+  );
+}
+
+function SnackbarPreview({ message, actionLabel, onAction }: { message: string; actionLabel?: string; onAction?: () => void }) {
+  const [visible, setVisible] = useState(true);
+
+  if (!visible) {
+    return (
+      <button className="ios-snackbar-reopen" type="button" onClick={(event) => { event.stopPropagation(); setVisible(true); }}>
+        通知を再表示
+      </button>
+    );
+  }
+
+  return (
+    <div className="ios-snackbar-preview" role="status" aria-live="polite">
+      <span className="ios-snackbar-preview-message">{message}</span>
+      {actionLabel && (
+        <button className="ios-snackbar-preview-action" type="button" onClick={(event) => { event.stopPropagation(); onAction?.(); setVisible(false); }}>
+          {actionLabel}
+        </button>
+      )}
     </div>
   );
 }

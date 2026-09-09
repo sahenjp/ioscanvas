@@ -188,6 +188,15 @@ describe('HIG linter', () => {
     ]));
   });
 
+  it('flags an empty imported bottom sheet', () => {
+    const document = structuredClone(defaultDocument);
+    document.screens[0]?.root.children.push({ id: 'sheet-test', kind: 'groupbox', title: 'メニュー', isBottomSheet: true, children: [] });
+
+    expect(lintDocument(document)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ nodeId: 'sheet-test', code: 'EMPTY_SHEET' }),
+    ]));
+  });
+
   it('flags a navigation link without a destination screen', () => {
     const document = structuredClone(defaultDocument);
     document.screens[0]?.root.children.push({

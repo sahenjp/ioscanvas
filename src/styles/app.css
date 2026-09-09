@@ -451,6 +451,11 @@ button.ios-navigation-link:hover { background: #f5f5f7; }
 .ios-confirmation-action:hover { background: rgba(120, 120, 128, .1); }
 .ios-confirmation-action.cancel { color: #3a3a3c; font-weight: 650; }
 .canvas-confirmation-dialog { gap: 7px; }
+.ios-snackbar-preview { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 48px; padding: 6px 8px 6px 12px; border: 1px solid rgba(120, 120, 128, .28); border-radius: 12px; background: rgba(255, 255, 255, .92); color: #111; box-shadow: 0 6px 18px rgba(0, 0, 0, .14); }
+.ios-snackbar-preview-message { min-width: 0; flex: 1; line-height: 1.35; }
+.ios-snackbar-preview-action, .ios-snackbar-reopen { min-width: 44px; min-height: 44px; padding: 6px 8px; border: 0; border-radius: 8px; background: transparent; color: var(--preview-accent); font: inherit; font-size: 13px; font-weight: 650; cursor: pointer; }
+.ios-snackbar-preview-action:hover, .ios-snackbar-reopen:hover { background: rgba(10, 132, 255, .1); }
+.ios-snackbar-reopen { width: 100%; border: 1px dashed rgba(120, 120, 128, .36); color: var(--preview-accent); }
 .ios-progress { display: flex; flex-direction: column; gap: 7px; padding: 9px 2px; }
 .ios-progress-label { display: flex; justify-content: space-between; gap: 12px; color: #3a3a3c; font-size: 12px; }
 .ios-progress-label span:last-child { color: #8e8e93; font-variant-numeric: tabular-nums; }
@@ -549,6 +554,9 @@ button.ios-navigation-link:hover { background: #f5f5f7; }
 .phone-screen.scheme-dark .ios-confirmation-copy p, .phone-screen.scheme-dark .ios-confirmation-action.cancel { color: #d1d1d6; }
 .phone-screen.scheme-dark .ios-confirmation-actions, .phone-screen.scheme-dark .ios-confirmation-action { border-color: rgba(255, 255, 255, .16); }
 .phone-screen.scheme-dark .ios-confirmation-action:hover { background: rgba(255, 255, 255, .1); }
+.phone-screen.scheme-dark .ios-snackbar-preview { border-color: rgba(255, 255, 255, .18); background: rgba(44, 44, 46, .94); color: #f5f5f7; box-shadow: 0 6px 18px rgba(0, 0, 0, .4); }
+.phone-screen.scheme-dark .ios-snackbar-preview-action:hover, .phone-screen.scheme-dark .ios-snackbar-reopen:hover { background: rgba(255, 255, 255, .1); }
+.phone-screen.scheme-dark .ios-snackbar-reopen { border-color: rgba(255, 255, 255, .24); }
 .phone-screen.scheme-dark .ios-secure-field span:last-child, .phone-screen.scheme-dark .ios-text-editor-label, .phone-screen.scheme-dark .ios-slider, .phone-screen.scheme-dark .ios-stepper-control { color: #f5f5f7; }
 .phone-screen.scheme-dark .ios-text-editor-placeholder, .phone-screen.scheme-dark .ios-slider-header span:last-child { color: #aeaeb2; }
 .phone-screen.scheme-dark .ios-preview-input::placeholder, .phone-screen.scheme-dark .ios-preview-text-editor::placeholder { color: #8e8e93; }
