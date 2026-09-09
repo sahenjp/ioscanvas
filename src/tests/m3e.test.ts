@@ -971,6 +971,33 @@ describe('M3E compatibility importer', () => {
     ]));
   });
 
+  it('validates free-placement position metadata before flattening it', () => {
+    const report = inspectM3eCompatibility({
+      frames: [{ id: 'home', name: 'ホーム', x: 0, y: 0 }],
+      groups: [{
+        id: 'content',
+        x: 0,
+        y: 0,
+        axis: 'y',
+        pos: { x: '12', y: 24, future: true },
+        items: [{ id: 'text', kind: 'text', label: '本文', pos: { x: 8, y: null, future: 'ignored' } }],
+      }],
+    });
+
+    expect(report?.invalidFields).toEqual(expect.arrayContaining([
+      'groups[0].pos.x',
+      'groups[0].items[0].pos.y',
+    ]));
+    expect(report?.unknownFields).toEqual(expect.arrayContaining([
+      'groups[0].pos.future',
+      'groups[0].items[0].pos.future',
+    ]));
+    expect(getM3eCompatibilityAnomalies(report!)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'INVALID_FIELD', status: 'lost' }),
+      expect.objectContaining({ code: 'UNKNOWN_FIELD', status: 'lost' }),
+    ]));
+  });
+
   it('reports duplicate frame, group, and item IDs before navigation becomes ambiguous', () => {
     const report = inspectM3eCompatibility({
       frames: [

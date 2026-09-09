@@ -774,6 +774,7 @@ const m3eDocumentFields = new Set(['title', 'paletteKey', 'theme', 'platform', '
 const m3eThemeFields = new Set(['dark', 'bothModes', 'font']);
 const m3eFrameFields = new Set(['id', 'name', 'x', 'y', 'w', 'h', 'bg', 'note', 'place', 'swipe']);
 const m3eGroupFields = new Set(['id', 'x', 'y', 'axis', 'items', 'free', 'locked', 'pos']);
+const m3ePositionFields = new Set(['x', 'y']);
 const m3eItemFields = new Set([
   'id', 'kind', 'label', 'icon', 'icon2', 'variant', 'supporting', 'size', 'size2', 'minimum', 'maximum', 'step',
   'radiusTop', 'radiusBottom', 'corners', 'bold', 'checked', 'value', 'tabs', 'selected', 'action', 'actions',
@@ -814,10 +815,12 @@ function collectM3eUnknownFields(value: unknown): string[] {
     const groupPath = `groups[${groupIndex}]`;
     collectUnknownObjectFields(group, m3eGroupFields, groupPath, unknownFields);
     if (!isRecord(group) || !Array.isArray(group.items)) return;
+    collectUnknownObjectFields(recordValue(group, 'pos'), m3ePositionFields, `${groupPath}.pos`, unknownFields);
     group.items.forEach((item, itemIndex) => {
       const itemPath = `${groupPath}.items[${itemIndex}]`;
       collectUnknownObjectFields(item, m3eItemFields, itemPath, unknownFields);
       if (!isRecord(item)) return;
+      collectUnknownObjectFields(recordValue(item, 'pos'), m3ePositionFields, `${itemPath}.pos`, unknownFields);
       collectUnknownObjectFields(recordValue(item, 'corners'), m3eCornersFields, `${itemPath}.corners`, unknownFields);
       collectUnknownObjectFields(recordValue(item, 'toggle'), m3eToggleFields, `${itemPath}.toggle`, unknownFields);
       collectUnknownObjectFields(recordValue(item, 'action'), m3eActionFields, `${itemPath}.action`, unknownFields);
@@ -854,6 +857,16 @@ function collectM3eInvalidFields(value: unknown): string[] {
   const positiveDimension = (record: JsonObject, key: 'w' | 'h', path: string): void => {
     const field = numericField(record, key, path);
     if (field !== undefined && field <= 0) invalidFields.add(path);
+  };
+  const position = (record: JsonObject, path: string): void => {
+    if (!hasField(record, 'pos')) return;
+    const value = record.pos;
+    if (!isRecord(value)) {
+      invalidFields.add(path);
+      return;
+    }
+    numericField(value, 'x', `${path}.x`);
+    numericField(value, 'y', `${path}.y`);
   };
   const selectionKinds = new Set(['select', 'tabs', 'bottomNav', 'navRail']);
   const validTransitions: readonly NavigationTransition[] = ['slide', 'slideLeft', 'slideUp', 'slideDown', 'fade', 'expand', 'none'];
@@ -919,6 +932,7 @@ function collectM3eInvalidFields(value: unknown): string[] {
     if (typeof group.id !== 'string' || !group.id.trim()) invalidFields.add(`${groupPath}.id`);
     numericField(group, 'x', `${groupPath}.x`);
     numericField(group, 'y', `${groupPath}.y`);
+    position(group, `${groupPath}.pos`);
     if (!isOneOf(group.axis, ['x', 'y'])) invalidFields.add(`${groupPath}.axis`);
     if (!Array.isArray(group.items)) {
       invalidFields.add(`${groupPath}.items`);
@@ -931,6 +945,7 @@ function collectM3eInvalidFields(value: unknown): string[] {
         invalidFields.add(itemPath);
         return;
       }
+      position(item, `${itemPath}.pos`);
       for (const key of ['size', 'size2', 'minimum', 'maximum', 'step', 'value', 'radiusTop', 'radiusBottom', 'imageSize'] as const) {
         const field = numericField(item, key, `${itemPath}.${key}`);
         if (field !== undefined && field < 0) invalidFields.add(`${itemPath}.${key}`);
