@@ -120,6 +120,12 @@ export interface M3eAction {
   transition: NavigationTransition;
 }
 
+export interface M3eMenuAction {
+  destinationScreenId?: string;
+  navigationAction?: 'back';
+  navigationTransition?: NavigationTransition;
+}
+
 export interface M3eToggleAppearance {
   icon?: string | null;
   variant?: M3eVariant;
@@ -206,6 +212,7 @@ export interface BaseNode {
   m3eIcon?: string;
   m3eIcon2?: string | null;
   m3eMetadata?: M3eItemMetadata;
+  m3eMenuActions?: Record<string, M3eMenuAction>;
 }
 
 export interface TextNode extends BaseNode {

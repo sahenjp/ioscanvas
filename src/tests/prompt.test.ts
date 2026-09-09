@@ -76,6 +76,24 @@ describe('implementation prompt generator', () => {
     expect(generateImplementationPrompt(document)).toContain('- button: 次へ / role=normal / style=bordered / symbol=arrow.right / trailingSymbol=chevron.right');
   });
 
+  it('includes resolved SplitButton menu actions in the implementation brief', () => {
+    const document = structuredClone(defaultDocument);
+    document.screens[0]?.root.children.push({
+      id: 'split-menu-prompt',
+      kind: 'button',
+      label: '送信',
+      role: 'normal',
+      minHeight: 44,
+      m3eKind: 'splitButton',
+      m3eMenuActions: {
+        'tab:0': { navigationAction: 'back', navigationTransition: 'slideLeft' },
+        'tab:1': { destinationScreenId: 'screen-settings', navigationTransition: 'fade' },
+      },
+    });
+
+    expect(generateImplementationPrompt(document)).toContain('menuActions=tab:0=back (slideLeft), tab:1=screen-settings (fade)');
+  });
+
   it('keeps M3E display attributes in the implementation brief', () => {
     const document = structuredClone(defaultDocument);
     const screen = document.screens[0];

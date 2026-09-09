@@ -1,7 +1,7 @@
 import { createId, findNode, findNodeLocation, isContainerNode } from '../lib/nodes';
 import { lintDocument } from '../lib/hig';
 import { useEditorStore } from '../store/editor';
-import type { AccentColor, BackgroundStyle, CanvasNode, CanvasScreen, ContentPlacement, FontDesign, FrameWidth, GlassShape, GlassStyle, ImageSource, M3eItemMetadata, M3eTextColor, M3eVariant, NavigationTitleDisplayMode, NavigationTransition, ScreenBackground, ScreenDevice, ScreenOrientation, ShadowStyle, StackAlignment, SwipeDirection, TextAlignment, TextStyle, ToolbarItem, ToolbarPlacement } from '../types/document';
+import type { AccentColor, BackgroundStyle, CanvasNode, CanvasScreen, ContentPlacement, FontDesign, FrameWidth, GlassShape, GlassStyle, ImageSource, M3eAction, M3eItemMetadata, M3eMenuAction, M3eTab, M3eTextColor, M3eVariant, NavigationTitleDisplayMode, NavigationTransition, ScreenBackground, ScreenDevice, ScreenOrientation, ShadowStyle, StackAlignment, SwipeDirection, TextAlignment, TextStyle, ToolbarItem, ToolbarPlacement } from '../types/document';
 
 const swipeDirections: { key: SwipeDirection; label: string }[] = [
   { key: 'left', label: '左へスワイプ' },
@@ -94,6 +94,20 @@ export function Inspector() {
     updateSelectedNode({
       m3eMetadata: { ...node.m3eMetadata, ...patch },
       ...(hasFillPatch ? { background: m3eBackgroundStyle(patch.fill) } : {}),
+    } as Partial<CanvasNode>);
+  };
+  const updateSplitMenuActions = (actions: Record<string, M3eMenuAction> | undefined) => {
+    if (!node || node.kind !== 'button') return;
+    const sourceActions = actions && Object.fromEntries(Object.entries(actions).map(([slot, action]) => [slot, {
+      to: action.navigationAction === 'back' ? 'back' : action.destinationScreenId ?? '',
+      transition: action.navigationTransition ?? (action.navigationAction === 'back' ? 'slideLeft' : 'slide'),
+    } satisfies M3eAction]));
+    updateSelectedNode({
+      m3eMenuActions: actions,
+      m3eMetadata: {
+        ...node.m3eMetadata,
+        actions: sourceActions && Object.keys(sourceActions).length > 0 ? sourceActions : undefined,
+      },
     } as Partial<CanvasNode>);
   };
 
@@ -552,6 +566,16 @@ export function Inspector() {
                   showSupporting={node.m3eKind === 'card' || node.m3eKind === 'listItem' || node.m3eKind === 'snackbar'}
                   onChange={updateM3eMetadata}
                 />
+                {node.m3eKind === 'splitButton' && (
+                  <M3eSplitButtonFields
+                    tabs={node.m3eMetadata?.tabs ?? []}
+                    actions={node.kind === 'button' ? node.m3eMenuActions : undefined}
+                    screens={document.screens}
+                    screenId={screen?.id ?? ''}
+                    onTabsChange={(tabs) => updateM3eMetadata({ tabs })}
+                    onActionsChange={updateSplitMenuActions}
+                  />
+                )}
               </section>
             )}
             {node.m3eKind === 'fabMenu' && (
@@ -1241,6 +1265,79 @@ export function Inspector() {
         </div>
       )}
     </aside>
+  );
+}
+
+function M3eSplitButtonFields({
+  tabs,
+  actions,
+  screens,
+  screenId,
+  onTabsChange,
+  onActionsChange,
+}: {
+  tabs: M3eTab[];
+  actions?: Record<string, M3eMenuAction>;
+  screens: CanvasScreen[];
+  screenId: string;
+  onTabsChange: (tabs: M3eTab[]) => void;
+  onActionsChange: (actions: Record<string, M3eMenuAction> | undefined) => void;
+}) {
+  const updateTab = (index: number, patch: Partial<M3eTab>) => {
+    onTabsChange(tabs.map((tab, tabIndex) => tabIndex === index ? { ...tab, ...patch } : tab));
+  };
+  const updateAction = (index: number, destination: string) => {
+    const key = `tab:${index}`;
+    const next = { ...(actions ?? {}) };
+    const current = next[key];
+    if (!destination) delete next[key];
+    else if (destination === '__back') {
+      next[key] = { navigationAction: 'back', navigationTransition: current?.navigationTransition ?? 'slideLeft' };
+    } else {
+      next[key] = { destinationScreenId: destination, navigationTransition: current?.navigationTransition ?? 'slide' };
+    }
+    onActionsChange(Object.keys(next).length > 0 ? next : undefined);
+  };
+
+  return (
+    <div className="m3e-menu-editor">
+      <div className="m3e-editor-label">メニュー項目と遷移</div>
+      {tabs.length === 0 && <p className="inspector-help">メニュー項目がありません。M3Eデータにtabsを追加してください。</p>}
+      {tabs.map((tab, index) => {
+        const action = actions?.[`tab:${index}`];
+        return (
+          <div className="toolbar-item-editor" key={`${index}-${tab.label}`}>
+            <div className="toolbar-item-editor-heading"><span>項目 {index + 1}</span></div>
+            <Field label="表示名">
+              <DraftInput key={`m3e-tab-label-${index}-${tab.label}`} value={tab.label} onCommit={(value) => updateTab(index, { label: value })} />
+            </Field>
+            <Field label="SF Symbol">
+              <SymbolInput key={`m3e-tab-icon-${index}-${tab.icon ?? ''}`} value={tab.icon ?? ''} onCommit={(value) => updateTab(index, { icon: value.trim() || null })} />
+            </Field>
+            <Field label="遷移先">
+              <select value={action?.navigationAction === 'back' ? '__back' : action?.destinationScreenId ?? ''} onChange={(event) => updateAction(index, event.target.value)}>
+                <option value="">なし（アクション）</option>
+                <option value="__back">前の画面へ戻る</option>
+                {screens.map((candidate) => <option value={candidate.id} key={candidate.id}>{candidate.id === screenId ? `${candidate.name}（現在）` : candidate.name}</option>)}
+              </select>
+            </Field>
+            {action && (
+              <Field label="遷移アニメーション">
+                <select value={action.navigationTransition ?? 'slide'} onChange={(event) => onActionsChange({ ...(actions ?? {}), [`tab:${index}`]: { ...action, navigationTransition: event.target.value as NavigationTransition } })}>
+                  <option value="slide">右からスライド</option>
+                  <option value="slideLeft">左からスライド</option>
+                  <option value="slideUp">下からスライド</option>
+                  <option value="slideDown">上からスライド</option>
+                  <option value="fade">フェード</option>
+                  <option value="expand">拡大</option>
+                  <option value="none">なし</option>
+                </select>
+              </Field>
+            )}
+          </div>
+        );
+      })}
+    </div>
   );
 }
 

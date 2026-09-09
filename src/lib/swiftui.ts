@@ -511,9 +511,19 @@ function renderM3eSplitButton(
   const destination = node.destinationScreenId ? context.viewNames.get(node.destinationScreenId) : undefined;
   const label = m3eButtonLabel(node);
   const labelBlock = indentBlock(label, depth + 2);
-  const menuItems = node.m3eMetadata?.tabs?.filter((item) => item.label.trim()) ?? [];
+  const menuItems = (node.m3eMetadata?.tabs ?? [])
+    .map((item, index) => ({ item, index }))
+    .filter(({ item }) => item.label.trim());
   const menuContent = menuItems.length > 0
-    ? menuItems.map((item) => `${contentPad}Button(${quoted(item.label)}) {\n${contentPad}    // M3E SplitButtonのメニュー項目\n${contentPad}}`).join('\n')
+    ? menuItems.map(({ item, index }) => {
+        const action = node.m3eMenuActions?.[`tab:${index}`];
+        const destination = action?.destinationScreenId ? context.viewNames.get(action.destinationScreenId) : undefined;
+        if (destination) return `${contentPad}NavigationLink(${quoted(item.label)}, destination: ${destination}())`;
+        if (action?.navigationAction === 'back') {
+          return `${contentPad}Button(${quoted(item.label)}) {\n${contentPad}    dismiss()\n${contentPad}}`;
+        }
+        return `${contentPad}Button(${quoted(item.label)}) {\n${contentPad}    // M3E SplitButtonのメニュー項目\n${contentPad}}`;
+      }).join('\n')
     : `${contentPad}Button("メニュー") {\n${contentPad}    // M3E SplitButtonのメニュー項目\n${contentPad}}`;
   const primary = node.navigationAction === 'back'
     ? `${innerPad}Button {\n${contentPad}dismiss()\n${innerPad}} label: {\n${labelBlock}\n${innerPad}}`
@@ -955,7 +965,9 @@ function screenBackgroundModifier(background: ScreenBackground | undefined, dept
 }
 
 function hasBackAction(nodes: CanvasNode[]): boolean {
-  return nodes.some((node) => node.navigationAction === 'back' || (node.children ? hasBackAction(node.children) : false));
+  return nodes.some((node) => node.navigationAction === 'back'
+    || Object.values(node.m3eMenuActions ?? {}).some((action) => action.navigationAction === 'back')
+    || (node.children ? hasBackAction(node.children) : false));
 }
 
 function renderScreen(

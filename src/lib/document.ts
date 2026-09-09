@@ -1,5 +1,5 @@
 import { isContainerNode } from './nodes';
-import type { AccentColor, AppearanceAccentColor, BackgroundStyle, ButtonStyle, ButtonToggle, CanvasDocument, CanvasNode, CanvasScreen, CardContentAlignment, CardImagePosition, ColorScheme, ContentPlacement, FontDesign, FrameWidth, GlassShape, GlassStyle, ImageSource, M3eAction, M3eItemMetadata, M3ePresentationKind, M3eTab, M3eTextColor, M3eToggleAppearance, M3eVariant, NavigationTitleDisplayMode, NavigationTransition, NodeKind, ProgressStyle, ScreenBackground, ScreenDevice, ScreenOrientation, ShadowStyle, StackAlignment, SwipeDirection, TextAlignment, TextStyle, ToolbarItem, ToolbarPlacement } from '../types/document';
+import type { AccentColor, AppearanceAccentColor, BackgroundStyle, ButtonStyle, ButtonToggle, CanvasDocument, CanvasNode, CanvasScreen, CardContentAlignment, CardImagePosition, ColorScheme, ContentPlacement, FontDesign, FrameWidth, GlassShape, GlassStyle, ImageSource, M3eAction, M3eItemMetadata, M3eMenuAction, M3ePresentationKind, M3eTab, M3eTextColor, M3eToggleAppearance, M3eVariant, NavigationTitleDisplayMode, NavigationTransition, NodeKind, ProgressStyle, ScreenBackground, ScreenDevice, ScreenOrientation, ShadowStyle, StackAlignment, SwipeDirection, TextAlignment, TextStyle, ToolbarItem, ToolbarPlacement } from '../types/document';
 
 type RecordValue = Record<string, unknown>;
 
@@ -48,6 +48,26 @@ function readButtonToggle(value: unknown): ButtonToggle | null | undefined {
 function readNavigationTransition(value: unknown): NavigationTransition | null | undefined {
   if (value === undefined) return undefined;
   return isOneOf(value, ['slide', 'slideLeft', 'slideUp', 'slideDown', 'fade', 'expand', 'none']) ? value : null;
+}
+
+function readM3eMenuActions(value: unknown): Record<string, M3eMenuAction> | null | undefined {
+  if (value === undefined) return undefined;
+  if (!isRecord(value)) return null;
+  const actions: Record<string, M3eMenuAction> = {};
+  for (const [slot, rawAction] of Object.entries(value)) {
+    if (!isRecord(rawAction)) return null;
+    if (rawAction.destinationScreenId !== undefined && !isString(rawAction.destinationScreenId)) return null;
+    if (rawAction.navigationAction !== undefined && rawAction.navigationAction !== 'back') return null;
+    if (rawAction.destinationScreenId === undefined && rawAction.navigationAction === undefined) return null;
+    const navigationTransition = readNavigationTransition(rawAction.navigationTransition);
+    if (navigationTransition === null) return null;
+    actions[slot] = {
+      ...(rawAction.destinationScreenId === undefined ? {} : { destinationScreenId: rawAction.destinationScreenId }),
+      ...(rawAction.navigationAction === undefined ? {} : { navigationAction: 'back' as const }),
+      ...(navigationTransition === undefined ? {} : { navigationTransition }),
+    };
+  }
+  return actions;
 }
 
 function readM3eKind(value: unknown): M3ePresentationKind | null | undefined {
@@ -207,6 +227,7 @@ function readNodeProperties(value: RecordValue): {
   m3eIcon?: string;
   m3eIcon2?: string | null;
   m3eMetadata?: M3eItemMetadata;
+  m3eMenuActions?: Record<string, M3eMenuAction>;
 } | null {
   const glass = readGlass(value.glass);
   if (glass === null) return null;
@@ -233,6 +254,8 @@ function readNodeProperties(value: RecordValue): {
   if (value.m3eIcon2 !== undefined && value.m3eIcon2 !== null && !isString(value.m3eIcon2)) return null;
   const m3eMetadata = readM3eMetadata(value.m3eMetadata);
   if (m3eMetadata === null) return null;
+  const m3eMenuActions = readM3eMenuActions(value.m3eMenuActions);
+  if (m3eMenuActions === null) return null;
 
   return {
     ...(value.tabTitle === undefined ? {} : { tabTitle: value.tabTitle }),
@@ -255,6 +278,7 @@ function readNodeProperties(value: RecordValue): {
     ...(value.m3eIcon === undefined ? {} : { m3eIcon: value.m3eIcon }),
     ...(value.m3eIcon2 === undefined ? {} : { m3eIcon2: value.m3eIcon2 === null ? null : value.m3eIcon2 }),
     ...(m3eMetadata === undefined ? {} : { m3eMetadata }),
+    ...(m3eMenuActions === undefined ? {} : { m3eMenuActions }),
   };
 }
 

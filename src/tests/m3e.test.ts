@@ -328,7 +328,7 @@ describe('M3E compatibility importer', () => {
 
   it('keeps expressive action kinds across the semantic iOS round trip', () => {
     const document = convertM3eDocument({
-      frames: [{ id: 'home', name: 'ホーム', x: 0, y: 0 }],
+      frames: [{ id: 'home', name: 'ホーム', x: 0, y: 0 }, { id: 'next', name: '次', x: 492, y: 0 }],
       groups: [{
         id: 'expressive',
         x: 16,
@@ -337,7 +337,15 @@ describe('M3E compatibility importer', () => {
         items: [
           { id: 'extended', kind: 'extendedFab', label: '作成', icon: 'add', variant: 'tonal' },
           { id: 'chip', kind: 'chip', label: 'お気に入り', icon: 'star', variant: 'outlined', checked: true },
-          { id: 'split', kind: 'splitButton', label: '送信', icon: 'send', variant: 'filled', tabs: [{ label: '下書き', icon: 'doc.fill' }, { label: '予約', icon: 'calendar' }] },
+          {
+            id: 'split',
+            kind: 'splitButton',
+            label: '送信',
+            icon: 'send',
+            variant: 'filled',
+            tabs: [{ label: '下書き', icon: 'doc.fill' }, { label: '予約', icon: 'calendar' }],
+            actions: { 'tab:0': { to: 'back', transition: 'slideLeft' }, 'tab:1': { to: 'next', transition: 'fade' } },
+          },
           { id: 'agree', kind: 'checkbox', label: '同意する', checked: true },
           { id: 'choice', kind: 'radio', label: '選択肢', checked: false },
           { id: 'dot', kind: 'badge', label: '', variant: 'filled' },
@@ -358,7 +366,14 @@ describe('M3E compatibility importer', () => {
     const nodes = document.screens[0]?.root.children ?? [];
     expect(findNode(nodes, 'm3e-extended')).toMatchObject({ kind: 'button', m3eKind: 'extendedFab' });
     expect(findNode(nodes, 'm3e-chip')).toMatchObject({ kind: 'button', m3eKind: 'chip', toggle: { isOn: true } });
-    expect(findNode(nodes, 'm3e-split')).toMatchObject({ kind: 'button', m3eKind: 'splitButton' });
+    expect(findNode(nodes, 'm3e-split')).toMatchObject({
+      kind: 'button',
+      m3eKind: 'splitButton',
+      m3eMenuActions: {
+        'tab:0': { navigationAction: 'back', navigationTransition: 'slideLeft' },
+        'tab:1': { destinationScreenId: 'screen-next', navigationTransition: 'fade' },
+      },
+    });
     expect(findNode(nodes, 'm3e-agree')).toMatchObject({ kind: 'toggle', m3eKind: 'checkbox', isOn: true });
     expect(findNode(nodes, 'm3e-choice')).toMatchObject({ kind: 'toggle', m3eKind: 'radio' });
     expect(findNode(nodes, 'm3e-dot')).toMatchObject({ kind: 'text', m3eKind: 'badge', text: '' });
@@ -368,7 +383,15 @@ describe('M3E compatibility importer', () => {
     expect(exported).toEqual(expect.arrayContaining([
       expect.objectContaining({ kind: 'extendedFab', label: '作成', icon: 'add' }),
       expect.objectContaining({ kind: 'chip', label: 'お気に入り', checked: true }),
-      expect.objectContaining({ kind: 'splitButton', label: '送信', icon: 'send' }),
+      expect.objectContaining({
+        kind: 'splitButton',
+        label: '送信',
+        icon: 'send',
+        actions: {
+          'tab:0': { to: 'back', transition: 'slideLeft' },
+          'tab:1': { to: 'screen-next', transition: 'fade' },
+        },
+      }),
       expect.objectContaining({ kind: 'checkbox', label: '同意する', checked: true }),
       expect.objectContaining({ kind: 'radio', label: '選択肢', checked: false }),
       expect.objectContaining({ kind: 'badge', label: '' }),
@@ -376,9 +399,10 @@ describe('M3E compatibility importer', () => {
     ]));
 
     const swiftui = generateSwiftUI(document);
-    expect(swiftui).toContain('M3E SplitButtonのメニュー項目');
-    expect(swiftui).toContain('Button("下書き")');
-    expect(swiftui).toContain('Button("予約")');
+    expect(parseCanvasDocument(document)).toEqual(document);
+    expect(swiftui).toContain('@Environment(\\.dismiss) private var dismiss');
+    expect(swiftui).toContain('Button("下書き") {');
+    expect(swiftui).toContain('NavigationLink("予約", destination: Screen2View())');
     expect(swiftui).toContain('Menu {');
     expect(swiftui).toContain('Circle()');
   });

@@ -324,7 +324,9 @@ function renderNodeContent(
         const systemName = node.toggle && toggleOn ? node.toggle.onSystemName ?? node.systemName : node.systemName;
         const trailingSystemName = node.m3eIcon2;
         const buttonStyle = node.toggle && toggleOn ? node.toggle.onButtonStyle ?? node.buttonStyle : node.buttonStyle;
-        const splitMenuItems = node.m3eMetadata?.tabs?.filter((item) => item.label.trim()) ?? [];
+        const splitMenuItems = (node.m3eMetadata?.tabs ?? [])
+          .map((item, index) => ({ item, index }))
+          .filter(({ item }) => item.label.trim());
         if (node.m3eKind === 'splitButton') {
           return (
             <div className="ios-split-button-wrap" style={{ minHeight: node.minHeight }}>
@@ -356,11 +358,23 @@ function renderNodeContent(
               </div>
               {splitMenuOpen && splitMenuItems.length > 0 && (
                 <div className="ios-split-menu" role="menu" aria-label={`${label || 'ボタン'}のメニュー項目`}>
-                  {splitMenuItems.map((item) => (
-                    <button key={item.label} type="button" role="menuitem" onClick={(event) => { event.stopPropagation(); onSplitMenuOpenChange?.(false); }}>
-                      {item.label}
-                    </button>
-                  ))}
+                  {splitMenuItems.map(({ item, index }) => {
+                    const menuAction = node.m3eMenuActions?.[`tab:${index}`];
+                    const menuNavigate = controls && menuAction?.navigationAction === 'back'
+                      ? () => onNavigateBack?.(menuAction.navigationTransition)
+                      : controls && menuAction?.destinationScreenId
+                        ? () => onNavigateScreen?.(menuAction.destinationScreenId as string, menuAction.navigationTransition)
+                        : undefined;
+                    return (
+                      <button key={`${item.label}-${index}`} type="button" role="menuitem" onClick={(event) => {
+                        event.stopPropagation();
+                        onSplitMenuOpenChange?.(false);
+                        menuNavigate?.();
+                      }}>
+                        {item.label}
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </div>

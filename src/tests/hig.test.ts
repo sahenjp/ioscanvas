@@ -221,6 +221,25 @@ describe('HIG linter', () => {
     ]));
   });
 
+  it('flags invalid or unlabeled SplitButton menu actions', () => {
+    const document = structuredClone(defaultDocument);
+    document.screens[0]?.root.children.push({
+      id: 'split-menu-test',
+      kind: 'button',
+      label: '送信',
+      role: 'normal',
+      minHeight: 44,
+      m3eKind: 'splitButton',
+      m3eMetadata: { tabs: [{ label: '', icon: null }] },
+      m3eMenuActions: { 'tab:0': { destinationScreenId: 'missing-screen' } },
+    });
+
+    expect(lintDocument(document)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ nodeId: 'split-menu-test', code: 'NAVIGATION_DESTINATION' }),
+      expect.objectContaining({ nodeId: 'split-menu-test', code: 'EMPTY_LABEL' }),
+    ]));
+  });
+
   it('flags self-referencing navigation and an unlabeled section', () => {
     const document = structuredClone(defaultDocument);
     const screen = document.screens[0];

@@ -177,6 +177,33 @@ function lintNode(
     });
   }
 
+  for (const [slot, action] of Object.entries(node.m3eMenuActions ?? {})) {
+    if (action.destinationScreenId !== undefined && !screenIds.has(action.destinationScreenId)) {
+      issues.push({
+        nodeId: node.id,
+        severity: 'warning',
+        code: 'NAVIGATION_DESTINATION',
+        message: `M3Eメニュー項目(${slot})の遷移先画面が未設定です。`,
+      });
+    } else if (action.destinationScreenId === screenId) {
+      issues.push({
+        nodeId: node.id,
+        severity: 'warning',
+        code: 'NAVIGATION_STRUCTURE',
+        message: `M3Eメニュー項目(${slot})が現在の画面自身を遷移先にしています。`,
+      });
+    }
+  }
+
+  if (node.kind === 'button' && node.m3eKind === 'splitButton' && node.m3eMetadata?.tabs?.some((tab) => tab.label.trim().length === 0)) {
+    issues.push({
+      nodeId: node.id,
+      severity: 'warning',
+      code: 'EMPTY_LABEL',
+      message: 'SplitButtonのメニュー項目にはVoiceOverで理解できる表示名を付けてください。',
+    });
+  }
+
   if (node.kind === 'text') {
     if (node.fontSize < 11) {
       issues.push({

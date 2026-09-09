@@ -618,6 +618,7 @@ button.ios-navigation-link:hover { background: #f5f5f7; }
 .inspector-kind { display: inline-flex; align-items: center; min-height: 28px; margin-bottom: 10px; padding: 0 9px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--panel-raised); color: var(--text-soft); font: 11px ui-monospace, SFMono-Regular, Menlo, monospace; }
 .inspector-subsection { margin: 12px -14px 0; padding: 12px 14px 2px; border-top: 1px solid var(--line); }
 .m3e-metadata-editor { margin-top: 8px; }
+.m3e-menu-editor { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
 .m3e-editor-label { margin: 0 0 2px; color: var(--text-soft); font-size: 11px; font-weight: 650; }
 .corner-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
 .corner-grid input { min-width: 0; padding-inline: 4px; text-align: center; }

@@ -14,6 +14,7 @@ import type {
   M3eAction,
   M3eCorners,
   M3eItemMetadata,
+  M3eMenuAction,
   NavigationTransition,
   ScreenBackground,
   ScreenDevice,
@@ -476,6 +477,21 @@ function m3eAction(value: unknown): M3eAction | undefined {
       : undefined;
 }
 
+function resolvedM3eMenuActions(item: JsonObject, context: ConversionContext): Record<string, M3eMenuAction> | undefined {
+  const rawActions = recordValue(item, 'actions');
+  if (!rawActions) return undefined;
+  const actions = Object.fromEntries(Object.entries(rawActions).flatMap(([slot, value]): [string, M3eMenuAction][] => {
+    const action = m3eAction(value);
+    if (!action) return [];
+    if (action.to === 'back') return [[slot, { navigationAction: 'back', navigationTransition: action.transition }]];
+    const destinationScreenId = context.frameIds.get(action.to);
+    return destinationScreenId
+      ? [[slot, { destinationScreenId, navigationTransition: action.transition }]]
+      : [];
+  }));
+  return Object.keys(actions).length > 0 ? actions : undefined;
+}
+
 function readM3eMetadata(item: JsonObject): M3eItemMetadata | undefined {
   const metadata: M3eItemMetadata = {};
   const copyNumber = (key: 'size' | 'size2' | 'minimum' | 'maximum' | 'step' | 'value' | 'radiusTop' | 'radiusBottom' | 'imageSize'): void => {
@@ -839,6 +855,12 @@ function mapItem(item: JsonObject, context: ConversionContext): CanvasNode | nul
         ...(rawIcon2 === null ? { m3eIcon2: null } : icon2 === undefined ? {} : { m3eIcon2: icon2 }),
         ...(style ? { buttonStyle: style } : {}),
         ...(presentationKind ? { m3eKind: presentationKind, m3eVariant: item.variant as M3eVariant } : {}),
+        ...(item.kind === 'splitButton'
+          ? (() => {
+              const actions = resolvedM3eMenuActions(item, context);
+              return actions ? { m3eMenuActions: actions } : {};
+            })()
+          : {}),
       };
       const toggle = recordValue(item, 'toggle');
       if (toggle || booleanValue(item, 'checked') !== undefined) {
@@ -1510,6 +1532,17 @@ function exportAction(node: CanvasNode, frameIds: Map<string, string>): M3eExpor
   };
 }
 
+function exportM3eMenuActions(node: Extract<CanvasNode, { kind: 'button' }>, frameIds: Map<string, string>): Record<string, M3eExportAction> | undefined {
+  const resolved = Object.fromEntries(Object.entries(node.m3eMenuActions ?? {}).flatMap(([slot, action]) => {
+    const target = action.navigationAction === 'back'
+      ? 'back'
+      : action.destinationScreenId ? frameIds.get(action.destinationScreenId) : undefined;
+    return target ? [[slot, { to: target, transition: action.navigationTransition ?? (target === 'back' ? 'slideLeft' : 'slide') }]] : [];
+  }));
+  const actions = { ...(node.m3eMetadata?.actions ?? {}), ...resolved };
+  return Object.keys(actions).length > 0 ? actions : undefined;
+}
+
 function exportToolbarAction(item: ToolbarItem, frameIds: Map<string, string>): M3eExportAction | undefined {
   const target = item.navigationAction === 'back'
     ? 'back'
@@ -1574,10 +1607,12 @@ function exportItem(node: CanvasNode, frameIds: Map<string, string>, inheritedNo
         ? node.m3eKind
         : node.label.trim() ? 'button' : node.systemName ? 'iconButton' : 'button';
       const action = exportAction(node, frameIds);
+      const menuActions = node.m3eKind === 'splitButton' ? exportM3eMenuActions(node, frameIds) : undefined;
       return base(buttonKind, node.label, node.systemName ?? null, {
         ...(node.m3eIcon2 === undefined ? {} : { icon2: node.m3eIcon2 }),
         ...(node.toggle ? { checked: node.toggle.isOn } : {}),
         ...(action ? { action } : {}),
+        ...(menuActions ? { actions: menuActions } : {}),
         ...(node.toggle ? {
           toggle: {
             ...(node.toggle.onSystemName === undefined ? {} : { icon: node.toggle.onSystemName }),
@@ -2051,6 +2086,12 @@ export function inspectM3eExportCompatibility(document: CanvasDocument): M3eExpo
           && !frameIds.has(current.destinationScreenId)) {
           unresolvedDestinationCount += 1;
           unresolvedActionCount += 1;
+        }
+        for (const action of Object.values(current.m3eMenuActions ?? {})) {
+          if (action.destinationScreenId && !frameIds.has(action.destinationScreenId)) {
+            unresolvedDestinationCount += 1;
+            unresolvedActionCount += 1;
+          }
         }
         if (Array.isArray(current.children)) {
           for (const child of current.children) visit(child);
