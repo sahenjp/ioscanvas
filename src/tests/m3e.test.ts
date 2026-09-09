@@ -337,7 +337,7 @@ describe('M3E compatibility importer', () => {
         items: [
           { id: 'extended', kind: 'extendedFab', label: '作成', icon: 'add', variant: 'tonal' },
           { id: 'chip', kind: 'chip', label: 'お気に入り', icon: 'star', variant: 'outlined', checked: true },
-          { id: 'split', kind: 'splitButton', label: '送信', icon: 'send', variant: 'filled' },
+          { id: 'split', kind: 'splitButton', label: '送信', icon: 'send', variant: 'filled', tabs: [{ label: '下書き', icon: 'doc.fill' }, { label: '予約', icon: 'calendar' }] },
           { id: 'agree', kind: 'checkbox', label: '同意する', checked: true },
           { id: 'choice', kind: 'radio', label: '選択肢', checked: false },
           { id: 'dot', kind: 'badge', label: '', variant: 'filled' },
@@ -377,6 +377,8 @@ describe('M3E compatibility importer', () => {
 
     const swiftui = generateSwiftUI(document);
     expect(swiftui).toContain('M3E SplitButtonのメニュー項目');
+    expect(swiftui).toContain('Button("下書き")');
+    expect(swiftui).toContain('Button("予約")');
     expect(swiftui).toContain('Menu {');
     expect(swiftui).toContain('Circle()');
   });

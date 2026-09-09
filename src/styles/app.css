@@ -330,9 +330,13 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .ios-button.ios-button-prominent { border: 1px solid rgba(255, 255, 255, .82); background: rgba(70, 120, 220, .62); background: color-mix(in srgb, var(--preview-accent) 42%, rgba(255, 255, 255, .72)); color: #fff; text-shadow: 0 1px 1px rgba(0, 0, 0, .16); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .62); backdrop-filter: blur(15px) saturate(1.12); }
 .ios-button.glass-interactive:hover { border-color: rgba(255, 255, 255, .94); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .84), 0 2px 7px rgba(80, 90, 100, .18); }
 .ios-split-button { display: inline-flex; width: 100%; gap: 2px; }
+.ios-split-button-wrap { position: relative; width: 100%; }
 .ios-split-button .ios-button { min-height: 44px; border-radius: 8px; }
 .ios-split-button-primary { border-radius: 22px 8px 8px 22px !important; }
 .ios-split-button-menu { width: 48px; flex: 0 0 48px; border-radius: 8px 22px 22px 8px !important; }
+.ios-split-menu { position: absolute; z-index: 5; top: calc(100% + 4px); right: 0; min-width: 160px; padding: 4px; border: 1px solid rgba(120, 120, 128, .28); border-radius: 10px; background: rgba(255, 255, 255, .96); box-shadow: 0 8px 24px rgba(0, 0, 0, .16); }
+.ios-split-menu button { display: block; width: 100%; min-height: 44px; padding: 0 12px; border: 0; border-radius: 7px; background: transparent; color: #111; text-align: left; cursor: pointer; }
+.ios-split-menu button:hover { background: rgba(10, 132, 255, .12); color: var(--preview-accent); }
 .ios-row { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 0 13px; border: 0; border-radius: 8px; background: #fff; color: #111; text-align: left; cursor: default; }
 .ios-camera { color: var(--preview-accent); font: inherit; cursor: default; }
 .ios-camera-symbol { display: inline-grid; width: 24px; place-items: center; color: currentColor; font-size: 18px; line-height: 1; }
@@ -525,6 +529,9 @@ button.ios-navigation-link:hover { background: #f5f5f7; }
 .phone-screen.scheme-dark .ios-field, .phone-screen.scheme-dark .ios-link-indicator, .phone-screen.scheme-dark .section-title { color: #aeaeb2; }
 .phone-screen.scheme-dark .ios-color-picker { color: #f5f5f7; }
 .phone-screen.scheme-dark .ios-sheet-trigger:hover { background: #2c2c2e; }
+.phone-screen.scheme-dark .ios-split-menu { border-color: rgba(255, 255, 255, .18); background: rgba(28, 28, 30, .98); box-shadow: 0 10px 28px rgba(0, 0, 0, .46); }
+.phone-screen.scheme-dark .ios-split-menu button { color: #f5f5f7; }
+.phone-screen.scheme-dark .ios-split-menu button:hover { background: rgba(255, 255, 255, .1); color: var(--preview-accent); }
 .phone-screen.scheme-dark .ios-sheet-dialog { background: rgba(28, 28, 30, .97); color: #f5f5f7; box-shadow: 0 -8px 28px rgba(0, 0, 0, .42); }
 .phone-screen.scheme-dark .ios-sheet-handle { background: #636366; }
 .phone-screen.scheme-dark .ios-sheet-close:hover { background: #2c2c2e; }

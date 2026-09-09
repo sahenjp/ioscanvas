@@ -93,6 +93,7 @@ function NodeView({
   const previewMode = useEditorStore((state) => state.previewMode);
   const [dropTarget, setDropTarget] = useState<CanvasDropTarget | null>(null);
   const [previewValue, setPreviewValue] = useState<PreviewValue>(() => initialPreviewValue(node));
+  const [splitMenuOpen, setSplitMenuOpen] = useState(false);
   const selected = !previewMode && selectedNodeIds.includes(node.id);
   const glassClass = [
     node.glass ? `glass-${node.glass}` : '',
@@ -220,6 +221,8 @@ function NodeView({
     onOpenSheet,
     onNavigateScreen,
     onNavigateBack,
+    splitMenuOpen,
+    setSplitMenuOpen,
   );
 
   return (
@@ -249,6 +252,8 @@ function renderNodeContent(
   onOpenSheet?: (nodeId: string) => void,
   onNavigateScreen?: (screenId: string, transition?: NavigationTransition) => void,
   onNavigateBack?: (transition?: NavigationTransition) => void,
+  splitMenuOpen = false,
+  onSplitMenuOpenChange?: (open: boolean) => void,
 ): React.ReactNode {
   switch (node.kind) {
     case 'text':
@@ -319,22 +324,45 @@ function renderNodeContent(
         const systemName = node.toggle && toggleOn ? node.toggle.onSystemName ?? node.systemName : node.systemName;
         const trailingSystemName = node.m3eIcon2;
         const buttonStyle = node.toggle && toggleOn ? node.toggle.onButtonStyle ?? node.buttonStyle : node.buttonStyle;
+        const splitMenuItems = node.m3eMetadata?.tabs?.filter((item) => item.label.trim()) ?? [];
         if (node.m3eKind === 'splitButton') {
           return (
-            <div className="ios-split-button" role="group" aria-label={node.label || 'スプリットボタン'} style={{ minHeight: node.minHeight }}>
-              <button
-                type="button"
-                className="ios-button ios-split-button-primary"
-                style={m3eContentStyle(node)}
-                onClick={onNavigate ? (event) => { event.stopPropagation(); onNavigate(); } : undefined}
-              >
-                {systemName && <span className="ios-button-symbol" style={m3eIconStyle(node)} aria-hidden="true">{symbolGlyph(systemName)}</span>}
-                <span>{label || 'Button'}</span>
-                {trailingSystemName && <span className="ios-button-symbol ios-button-symbol-trailing" style={m3eIconStyle(node)} aria-hidden="true">{symbolGlyph(trailingSystemName)}</span>}
-              </button>
-              <button type="button" className="ios-button ios-split-button-menu" style={m3eContentStyle(node)} aria-label={`${label || 'ボタン'}のメニュー`} onClick={(event) => event.stopPropagation()}>
-                <span aria-hidden="true">⌄</span>
-              </button>
+            <div className="ios-split-button-wrap" style={{ minHeight: node.minHeight }}>
+              <div className="ios-split-button" role="group" aria-label={node.label || 'スプリットボタン'}>
+                <button
+                  type="button"
+                  className="ios-button ios-split-button-primary"
+                  style={m3eContentStyle(node)}
+                  onClick={onNavigate ? (event) => { event.stopPropagation(); onNavigate(); } : undefined}
+                >
+                  {systemName && <span className="ios-button-symbol" style={m3eIconStyle(node)} aria-hidden="true">{symbolGlyph(systemName)}</span>}
+                  <span>{label || 'Button'}</span>
+                  {trailingSystemName && <span className="ios-button-symbol ios-button-symbol-trailing" style={m3eIconStyle(node)} aria-hidden="true">{symbolGlyph(trailingSystemName)}</span>}
+                </button>
+                <button
+                  type="button"
+                  className="ios-button ios-split-button-menu"
+                  style={m3eContentStyle(node)}
+                  aria-label={`${label || 'ボタン'}のメニュー`}
+                  aria-haspopup={splitMenuItems.length > 0 ? 'menu' : undefined}
+                  aria-expanded={splitMenuItems.length > 0 ? splitMenuOpen : undefined}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    if (splitMenuItems.length > 0) onSplitMenuOpenChange?.(!splitMenuOpen);
+                  }}
+                >
+                  <span aria-hidden="true">⌄</span>
+                </button>
+              </div>
+              {splitMenuOpen && splitMenuItems.length > 0 && (
+                <div className="ios-split-menu" role="menu" aria-label={`${label || 'ボタン'}のメニュー項目`}>
+                  {splitMenuItems.map((item) => (
+                    <button key={item.label} type="button" role="menuitem" onClick={(event) => { event.stopPropagation(); onSplitMenuOpenChange?.(false); }}>
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           );
         }

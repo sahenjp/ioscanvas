@@ -511,12 +511,16 @@ function renderM3eSplitButton(
   const destination = node.destinationScreenId ? context.viewNames.get(node.destinationScreenId) : undefined;
   const label = m3eButtonLabel(node);
   const labelBlock = indentBlock(label, depth + 2);
+  const menuItems = node.m3eMetadata?.tabs?.filter((item) => item.label.trim()) ?? [];
+  const menuContent = menuItems.length > 0
+    ? menuItems.map((item) => `${contentPad}Button(${quoted(item.label)}) {\n${contentPad}    // M3E SplitButtonのメニュー項目\n${contentPad}}`).join('\n')
+    : `${contentPad}Button("メニュー") {\n${contentPad}    // M3E SplitButtonのメニュー項目\n${contentPad}}`;
   const primary = node.navigationAction === 'back'
     ? `${innerPad}Button {\n${contentPad}dismiss()\n${innerPad}} label: {\n${labelBlock}\n${innerPad}}`
     : destination
       ? `${innerPad}NavigationLink {\n${contentPad}${destination}()\n${innerPad}} label: {\n${labelBlock}\n${innerPad}}`
       : `${innerPad}Button {\n${contentPad}// Action\n${innerPad}} label: {\n${labelBlock}\n${innerPad}}`;
-  return `${pad}HStack(spacing: 2) {\n${primary}\n${innerPad}Menu {\n${contentPad}Button("メニュー") {\n${contentPad}    // M3E SplitButtonのメニュー項目\n${contentPad}}\n${innerPad}} label: {\n${contentPad}Image(systemName: "chevron.down")\n${innerPad}}\n${pad}}\n${pad}.frame(minHeight: ${node.minHeight})`;
+  return `${pad}HStack(spacing: 2) {\n${primary}\n${innerPad}Menu {\n${menuContent}\n${innerPad}} label: {\n${contentPad}Image(systemName: "chevron.down")\n${innerPad}}\n${pad}}\n${pad}.frame(minHeight: ${node.minHeight})`;
 }
 
 function renderM3eFabMenu(node: ContainerNode, depth: number, context: RenderContext): string {
