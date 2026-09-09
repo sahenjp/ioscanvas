@@ -1168,6 +1168,7 @@ describe('M3E compatibility importer', () => {
     const exportReport = inspectM3eExportCompatibility(document);
     expect(exportReport.lostFields).toEqual([]);
     expect(exportReport.preservedFields).toEqual(expect.arrayContaining(['corners', 'fill', 'noCheck', 'size', 'toggle']));
+    expect(exportReport.roundTripValid).toBe(true);
   });
 
   it('maps slider value and range into SwiftUI semantics before exporting', () => {
