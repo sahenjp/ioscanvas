@@ -117,7 +117,7 @@ describe('M3E compatibility importer', () => {
       flattenedPaths: ['screens[home].root.children[2].kind', 'screens[home].root.kind'],
       approximatedKinds: ['securefield'],
       approximatedPaths: ['screens[home].root.children[1].kind'],
-      unresolvedDestinationCount: 2,
+      unresolvedDestinationCount: 1,
       unresolvedActionCount: 2,
       unresolvedPaths: ['screens[home].root.children[3].destinationScreenId', 'screens[home].swipe.right'],
       preservedFields: [],
@@ -198,6 +198,44 @@ describe('M3E compatibility importer', () => {
     ]));
   });
 
+  it('reports NavigationLink projection as an M3E approximation', () => {
+    const report = inspectM3eExportCompatibility({
+      version: 1,
+      name: '遷移互換',
+      platform: 'iOS',
+      minimumOS: '26.0',
+      appearance: { colorScheme: 'system', accentColor: 'blue' },
+      activeScreenId: 'home',
+      screens: [{
+        id: 'home',
+        name: 'ホーム',
+        navigationTitle: 'ホーム',
+        root: {
+          id: 'root',
+          kind: 'vstack',
+          children: [{
+            id: 'detail-link',
+            kind: 'navigation-link',
+            label: '詳細',
+            destinationScreenId: 'home',
+            minHeight: 44,
+            children: [{ id: 'detail-label', kind: 'text', text: '詳細', fontSize: 17, weight: 'regular' }],
+          }],
+        },
+      }],
+    });
+
+    expect(report.approximatedKinds).toContain('navigation-link');
+    expect(report.approximatedPaths).toContain('screens[home].root.children[0].kind');
+    expect(getM3eCompatibilityAnomalies(report)).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        code: 'APPROXIMATED_KIND',
+        status: 'approximated',
+        detail: expect.stringContaining('navigation-link（listItemへ投影するため'),
+      }),
+    ]));
+  });
+
   it('reports unresolved actions retained in M3E metadata during export', () => {
     const document: CanvasDocument = {
       version: 1,
@@ -233,7 +271,7 @@ describe('M3E compatibility importer', () => {
     };
 
     const report = inspectM3eExportCompatibility(document);
-    expect(report.unresolvedDestinationCount).toBe(3);
+    expect(report.unresolvedDestinationCount).toBe(1);
     expect(report.unresolvedActionCount).toBe(3);
     expect(report.unresolvedPaths).toEqual([
       'screens[home].m3eTopAppBar.actions.icon.to',
@@ -244,7 +282,7 @@ describe('M3E compatibility importer', () => {
       expect.objectContaining({
         code: 'UNRESOLVED_NAVIGATION',
         status: 'unresolved',
-        detail: expect.stringContaining('screens[home].m3eTopAppBar.actions.icon.to'),
+        detail: expect.stringContaining('遷移先1件、操作3件'),
       }),
     ]));
   });
@@ -959,7 +997,7 @@ describe('M3E compatibility importer', () => {
       orphanedGroupPaths: [],
       discardedItemCount: 1,
       discardedItemPaths: ['groups[0].items[3]'],
-      unresolvedDestinationCount: 2,
+      unresolvedDestinationCount: 1,
       unresolvedActionCount: 2,
       unresolvedPaths: ['frames[0].swipe.left', 'groups[0].items[1].action.to'],
       flattenedPaths: [],
@@ -1709,6 +1747,58 @@ describe('M3E compatibility importer', () => {
     expect(exported.lostFields).toContain('screens[home].root.children[0].m3eMetadata.supporting');
     expect(exported.preservedFields).not.toContain('supporting');
     expect(exported.lostFields).not.toContain('supporting');
+  });
+
+  it('does not claim compressed child metadata was exported as a standalone item', () => {
+    const report = inspectM3eExportCompatibility({
+      version: 1,
+      name: '圧縮要素診断',
+      platform: 'iOS',
+      minimumOS: '26.0',
+      appearance: { colorScheme: 'system', accentColor: 'blue' },
+      activeScreenId: 'home',
+      screens: [{
+        id: 'home',
+        name: 'ホーム',
+        navigationTitle: 'ホーム',
+        root: {
+          id: 'root',
+          kind: 'vstack',
+          children: [
+            {
+              id: 'tabs',
+              kind: 'tabview',
+              children: [{
+                id: 'tab',
+                kind: 'text',
+                text: 'ホーム',
+                fontSize: 17,
+                weight: 'regular',
+                m3eMetadata: { icon: 'home', supporting: 'タブの補足' },
+              }],
+            },
+            {
+              id: 'card',
+              kind: 'groupbox',
+              m3eKind: 'card',
+              title: 'カード',
+              children: [{
+                id: 'card-copy',
+                kind: 'text',
+                text: '説明',
+                fontSize: 17,
+                weight: 'regular',
+                m3eMetadata: { supporting: 'カード内の補足' },
+              }],
+            },
+          ],
+        },
+      }],
+    });
+
+    expect(report.preservedFields).toContain('screens[home].root.children[0].children[0].m3eMetadata.icon');
+    expect(report.lostFields).toContain('screens[home].root.children[0].children[0].m3eMetadata.supporting');
+    expect(report.lostFields).toContain('screens[home].root.children[1].children[0].m3eMetadata.supporting');
   });
 
   it('retains typed M3E presentation fields through an editable round trip', () => {

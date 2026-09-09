@@ -91,7 +91,7 @@ export function TopBar() {
           report.unresolvedActionCount > 0 ? `未解決の操作${report.unresolvedActionCount}件` : '',
           report.unsupportedKinds.length > 0 ? `未対応パーツ: ${report.unsupportedKinds.join(', ')}` : '',
           report.approximatedKinds.length > 0 ? `近似変換: ${describeM3eCompatibilityKinds(report.approximatedKinds)}` : '',
-          report.preservedFields.length > 0 ? `保持: ${report.preservedFields.join(', ')}` : '',
+          report.preservedFields.length > 0 ? `保持フィールド${report.preservedFields.length}件` : '',
           report.approximatedFields.length > 0 ? `近似フィールド: ${describeM3eCompatibilityFields(report.approximatedFields)}` : '',
           report.lostFields.length > 0 ? `失われたフィールド: ${report.lostFields.join(', ')}` : '',
           report.invalidFields.length > 0 ? `不正な値: ${report.invalidFields.join(', ')}` : '',
