@@ -1063,9 +1063,9 @@ function mapItem(item: JsonObject, context: ConversionContext): CanvasNode | nul
       return linkM3eNode(node, item, context, '画像');
     }
     case 'camera':
-      return appendNotes({ id, kind: 'camera', label: label || 'カメラ', minHeight: 44 }, item, ['カメラ入力は標準ButtonからAVFoundationの実装へ接続してください。']);
+      return linkM3eNode({ id, kind: 'camera', label: label || 'カメラ', minHeight: 44 }, item, context, 'カメラ', ['カメラ入力は標準ButtonからAVFoundationの実装へ接続してください。']);
     case 'map':
-      return appendNotes({ id, kind: 'map', label: label || '地図' }, item, ['M3Eの地図をMapKitのMapへ変換しました。位置情報や注釈は実装側で追加してください。']);
+      return linkM3eNode({ id, kind: 'map', label: label || '地図' }, item, context, '地図', ['M3Eの地図をMapKitのMapへ変換しました。位置情報や注釈は実装側で追加してください。']);
     case 'divider':
       return appendNotes({ id, kind: 'divider' }, item);
     case 'loadingIndicator':
@@ -1082,7 +1082,7 @@ function mapItem(item: JsonObject, context: ConversionContext): CanvasNode | nul
           ? [`M3Eのトラック太さ ${trackThickness}pt を保持しています。SwiftUI生成へ引き継ぎます。`]
           : []),
       ];
-      return appendNotes({
+      return linkM3eNode({
         id,
         kind: 'progress',
         label: label || '進捗',
@@ -1091,7 +1091,7 @@ function mapItem(item: JsonObject, context: ConversionContext): CanvasNode | nul
         ...(value === undefined ? { indeterminate: true } : {}),
         ...(booleanValue(item, 'wavy') ? { wavy: true } : {}),
         ...(trackThickness !== undefined && Number.isInteger(trackThickness) && trackThickness >= 2 && trackThickness <= 16 ? { trackThickness } : {}),
-      }, item, extras);
+      }, item, context, '進捗', extras);
     }
     case 'badge':
       return linkM3eNode({ id, kind: 'text', text: label, fontSize: 13, weight: 'semibold', textStyle: 'caption', m3eKind: 'badge' }, item, context, 'バッジ');
@@ -1809,6 +1809,27 @@ function exportItem(node: CanvasNode, frameIds: Map<string, string>, inheritedNo
       });
     }
     case 'navigation-link': {
+      const linkedCamera = node.children?.find((child): child is Extract<CanvasNode, { kind: 'camera' }> => child.kind === 'camera');
+      if (node.m3eKind === 'camera' && linkedCamera) {
+        const action = exportAction(node, frameIds);
+        return base('camera', linkedCamera.label, null, action ? { action } : {});
+      }
+      const linkedMap = node.children?.find((child): child is Extract<CanvasNode, { kind: 'map' }> => child.kind === 'map');
+      if (node.m3eKind === 'map' && linkedMap) {
+        const action = exportAction(node, frameIds);
+        return base('map', linkedMap.label, 'map', action ? { action } : {});
+      }
+      const linkedProgress = node.children?.find((child): child is Extract<CanvasNode, { kind: 'progress' }> => child.kind === 'progress');
+      if (linkedProgress && (node.m3eKind === 'loadingIndicator' || node.m3eKind === 'linearProgress' || node.m3eKind === 'circularProgress')) {
+        const action = exportAction(node, frameIds);
+        const kind = node.m3eKind;
+        return base(kind, linkedProgress.label, null, {
+          ...(linkedProgress.indeterminate ? {} : { value: Math.round(linkedProgress.value * 100) }),
+          ...(linkedProgress.wavy ? { wavy: true } : {}),
+          ...(linkedProgress.trackThickness === undefined ? {} : { trackThickness: linkedProgress.trackThickness }),
+          ...(action ? { action } : {}),
+        });
+      }
       const linkedText = node.children?.find((child): child is Extract<CanvasNode, { kind: 'text' }> => child.kind === 'text');
       if ((node.m3eKind === 'text' || node.m3eKind === 'badge') && linkedText) {
         const action = exportAction(node, frameIds);

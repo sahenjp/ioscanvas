@@ -368,6 +368,31 @@ describe('M3E compatibility importer', () => {
     ]));
   });
 
+  it('keeps actions on linked camera, map, and progress elements', () => {
+    const document = convertM3eDocument({
+      frames: [{ id: 'home', name: 'ホーム', x: 0, y: 0 }, { id: 'detail', name: '詳細', x: 492, y: 0 }],
+      groups: [{
+        id: 'content',
+        x: 16,
+        y: 80,
+        axis: 'y',
+        items: [
+          { id: 'camera', kind: 'camera', label: '撮影', icon: null, variant: 'filled', action: { to: 'detail', transition: 'slide' } },
+          { id: 'map', kind: 'map', label: '地図', icon: 'map', variant: 'filled', action: { to: 'detail', transition: 'fade' } },
+          { id: 'progress', kind: 'linearProgress', label: '同期', icon: null, variant: 'filled', value: 40, action: { to: 'detail', transition: 'slideUp' } },
+        ],
+      }],
+    });
+
+    expect(document).not.toBeNull();
+    if (!document) throw new Error('Linked control fixture was not converted');
+    expect(exportM3eDocument(document).groups.flatMap((group) => group.items)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: 'camera', label: '撮影', action: { to: 'screen-detail', transition: 'slide' } }),
+      expect.objectContaining({ kind: 'map', label: '地図', action: { to: 'screen-detail', transition: 'fade' } }),
+      expect.objectContaining({ kind: 'linearProgress', label: '同期', value: 40, action: { to: 'screen-detail', transition: 'slideUp' } }),
+    ]));
+  });
+
   it('keeps approximation notes when exporting native SwiftUI controls to M3E', () => {
     const document = structuredClone(defaultDocument);
     const screen = document.screens[0];
