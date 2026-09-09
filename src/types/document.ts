@@ -531,6 +531,7 @@ export interface CanvasScreen {
   name: string;
   navigationTitle: string;
   notes?: string;
+  m3eNoteHistory?: string[];
   navigationTitleDisplayMode?: NavigationTitleDisplayMode;
   contentPlacement?: ContentPlacement;
   background?: ScreenBackground;

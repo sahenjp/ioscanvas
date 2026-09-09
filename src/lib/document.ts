@@ -304,6 +304,7 @@ function readNodeProperties(value: RecordValue): {
   if (value.tabTitle !== undefined && !isString(value.tabTitle)) return null;
   if (value.tabSystemName !== undefined && !isString(value.tabSystemName)) return null;
   if (value.notes !== undefined && !isString(value.notes)) return null;
+  if (value.m3eNoteHistory !== undefined && (!Array.isArray(value.m3eNoteHistory) || !value.m3eNoteHistory.every(isString))) return null;
   if (value.glassInteractive !== undefined && typeof value.glassInteractive !== 'boolean') return null;
   if (value.glassTint !== undefined && !isOneOf(value.glassTint, ['blue', 'purple', 'pink', 'orange', 'green'])) return null;
   if (value.glassShape !== undefined && !isOneOf(value.glassShape, ['automatic', 'capsule', 'rounded', 'circle'])) return null;
@@ -710,6 +711,7 @@ function readScreen(value: unknown, ids: Set<string>): CanvasScreen | null {
         name: value.name,
         navigationTitle: value.navigationTitle,
         ...(value.notes === undefined ? {} : { notes: value.notes }),
+        ...(value.m3eNoteHistory === undefined ? {} : { m3eNoteHistory: value.m3eNoteHistory as string[] }),
         ...(value.navigationTitleDisplayMode === undefined ? {} : { navigationTitleDisplayMode: value.navigationTitleDisplayMode as NavigationTitleDisplayMode }),
         ...(value.contentPlacement === undefined ? {} : { contentPlacement: value.contentPlacement as ContentPlacement }),
         ...(value.background === undefined ? {} : { background: value.background as ScreenBackground }),

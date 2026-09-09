@@ -49,6 +49,7 @@ interface M3eFrame {
   previewDevice: ScreenDevice;
   previewOrientation: ScreenOrientation;
   note?: string;
+  noteHistory?: string[];
   swipe?: Partial<Record<SwipeDirection, string>>;
 }
 
@@ -130,6 +131,7 @@ interface M3eExportFrame {
   h: number;
   bg?: ScreenBackground;
   note?: string;
+  noteHistory?: string[];
   place?: ContentPlacement;
   swipe?: Partial<Record<SwipeDirection, string>>;
 }
@@ -533,6 +535,12 @@ function readFrame(value: unknown): M3eFrame | null {
       ? value.bg
       : null;
   if (background === null) return null;
+  const noteHistory = value.noteHistory === undefined
+    ? undefined
+    : Array.isArray(value.noteHistory) && value.noteHistory.every((entry) => typeof entry === 'string')
+      ? value.noteHistory
+      : null;
+  if (noteHistory === null) return null;
 
   const swipeValue = recordValue(value, 'swipe');
   const swipe: Partial<Record<SwipeDirection, string>> = {};
@@ -555,6 +563,7 @@ function readFrame(value: unknown): M3eFrame | null {
     ...(place === undefined ? {} : { place }),
     ...(background === undefined ? {} : { background: background as ScreenBackground }),
     ...(stringValue(value, 'note')?.trim() ? { note: stringValue(value, 'note') } : {}),
+    ...(noteHistory === undefined ? {} : { noteHistory }),
     ...(Object.keys(swipe).length > 0 ? { swipe } : {}),
   };
 }
@@ -843,7 +852,7 @@ function inspectM3eItemFields(item: JsonObject): { preserved: string[]; approxim
 const m3ePaletteKeys = ['blue', 'purple', 'green', 'coral', 'amber', 'teal', 'mono', 'custom'] as const;
 const m3eDocumentFields = new Set(['title', 'paletteKey', 'theme', 'platform', 'frame', 'activeFrame', 'frames', 'groups', 'customPalette', 'dynamicColor', 'brief', 'promptEdit']);
 const m3eThemeFields = new Set(['dark', 'bothModes', 'contrast', 'shape', 'font', 'emphasized', 'motion']);
-const m3eFrameFields = new Set(['id', 'name', 'x', 'y', 'w', 'h', 'bg', 'note', 'place', 'swipe']);
+const m3eFrameFields = new Set(['id', 'name', 'x', 'y', 'w', 'h', 'bg', 'note', 'noteHistory', 'place', 'swipe']);
 const m3eGroupFields = new Set(['id', 'x', 'y', 'axis', 'items', 'free', 'locked', 'pos']);
 const m3ePositionFields = new Set(['x', 'y']);
 const m3eItemFields = new Set([
@@ -1052,6 +1061,7 @@ function collectM3eInvalidFields(value: unknown): string[] {
     numericField(frame, 'x', `${framePath}.x`);
     numericField(frame, 'y', `${framePath}.y`);
     if (hasField(frame, 'note') && typeof frame.note !== 'string') invalidFields.add(`${framePath}.note`);
+    if (hasField(frame, 'noteHistory') && (!Array.isArray(frame.noteHistory) || !frame.noteHistory.every((entry) => typeof entry === 'string'))) invalidFields.add(`${framePath}.noteHistory`);
     if (Object.prototype.hasOwnProperty.call(frame, 'place') && !isOneOf(frame.place, ['top', 'center', 'bottom', 'spread'])) invalidFields.add(`${framePath}.place`);
     if (Object.prototype.hasOwnProperty.call(frame, 'bg') && !isOneOf(frame.bg, ['surface', 'surfaceContainerLow', 'surfaceContainer', 'surfaceContainerHigh', 'surfaceContainerHighest', 'primaryContainer', 'secondaryContainer', 'tertiaryContainer', 'primary', 'inverseSurface'])) invalidFields.add(`${framePath}.bg`);
     positiveDimension(frame, 'w', `${framePath}.w`);
@@ -1908,6 +1918,7 @@ function convertScreen(frame: M3eFrame, groups: M3eGroup[], frames: M3eFrame[], 
     navigationTitle,
     ...(frame.background === undefined ? {} : { background: frame.background }),
     ...(frame.note ? { notes: frame.note } : {}),
+    ...(frame.noteHistory === undefined ? {} : { m3eNoteHistory: frame.noteHistory }),
     ...(frame.place ? { contentPlacement: frame.place } : {}),
     previewDevice: frame.previewDevice,
     previewOrientation: frame.previewOrientation,
@@ -2954,6 +2965,7 @@ export function exportM3eDocument(document: CanvasDocument): M3eExportDocument {
       h: size.height,
       ...(screen.background ? { bg: screen.background } : {}),
       ...(screen.notes?.trim() ? { note: screen.notes.trim() } : {}),
+      ...(screen.m3eNoteHistory === undefined ? {} : { noteHistory: screen.m3eNoteHistory }),
       ...(screen.contentPlacement ? { place: screen.contentPlacement } : {}),
       ...(swipe ? { swipe } : {}),
     } satisfies M3eExportFrame;

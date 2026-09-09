@@ -1334,6 +1334,22 @@ describe('M3E compatibility importer', () => {
     expect(inspectM3eExportCompatibility(document).roundTripValid).toBe(true);
   });
 
+  it('retains canonical M3E frame note history as screen metadata', () => {
+    const source = {
+      frame: 'phone',
+      frames: [{ id: 'home', name: 'ホーム', x: 0, y: 0, note: '現在の説明', noteHistory: ['以前の説明'] }],
+      groups: [{ id: 'body', x: 0, y: 0, axis: 'y', items: [{ id: 'text', kind: 'text', label: '本文' }] }],
+    };
+
+    const report = inspectM3eCompatibility(source);
+    expect(report?.invalidFields).toEqual([]);
+    expect(report?.unknownFields).toEqual([]);
+    const document = convertM3eDocument(source);
+    expect(document?.screens[0]?.m3eNoteHistory).toEqual(['以前の説明']);
+    if (!document) throw new Error('M3E note history fixture was not converted');
+    expect(exportM3eDocument(document).frames[0]?.noteHistory).toEqual(['以前の説明']);
+  });
+
   it('reports and drops groups that are outside every valid frame', () => {
     const value = {
       frames: [{ id: 'home', name: 'ホーム', x: 0, y: 0, w: 412, h: 892 }],
