@@ -312,6 +312,56 @@ describe('M3E compatibility importer', () => {
     ]));
   });
 
+  it('keeps back actions on list items and preserves linked cards', () => {
+    const document = convertM3eDocument({
+      frames: [{ id: 'home', name: 'ホーム', x: 0, y: 0 }, { id: 'next', name: '次', x: 492, y: 0 }],
+      groups: [{
+        id: 'content',
+        x: 16,
+        y: 80,
+        axis: 'y',
+        items: [
+          { id: 'back-row', kind: 'listItem', label: '戻る', icon: null, variant: 'filled', action: { to: 'back', transition: 'fade' } },
+          { id: 'next-card', kind: 'card', label: '詳細', supporting: '続き', icon: 'doc.text', variant: 'tonal', action: { to: 'next', transition: 'slide' } },
+        ],
+      }],
+    });
+
+    expect(document).not.toBeNull();
+    if (!document) throw new Error('Linked compatibility fixture was not converted');
+    const exported = exportM3eDocument(document).groups.flatMap((group) => group.items);
+    expect(exported).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: 'listItem', label: '戻る', action: { to: 'back', transition: 'fade' } }),
+      expect.objectContaining({ kind: 'card', label: '詳細', supporting: '続き', action: { to: 'screen-next', transition: 'slide' } }),
+    ]));
+  });
+
+  it('keeps approximation notes when exporting native SwiftUI controls to M3E', () => {
+    const document = structuredClone(defaultDocument);
+    const screen = document.screens[0];
+    if (!screen) throw new Error('Default document has no screen');
+    screen.root.children = [
+      { id: 'secure', kind: 'securefield', label: 'パスワード', binding: 'password', minHeight: 44 },
+      { id: 'editor', kind: 'texteditor', label: 'メモ', binding: 'notes', minHeight: 88 },
+      { id: 'color', kind: 'colorpicker', label: '色', binding: 'tint', color: '#007AFF', minHeight: 44 },
+      { id: 'stepper', kind: 'stepper', label: '数量', binding: 'quantity', value: 1, minimum: 0, maximum: 10, step: 1, minHeight: 44 },
+      { id: 'menu', kind: 'menu', label: '操作', options: ['編集'], minHeight: 44 },
+      { id: 'gauge', kind: 'gauge', label: '進捗', value: 0.5, minimum: 0, maximum: 1, minHeight: 44 },
+      { id: 'link', kind: 'link', label: '公式', url: 'https://example.com', minHeight: 44 },
+      { id: 'date', kind: 'datepicker', label: '日付', binding: 'date', minHeight: 44 },
+    ];
+
+    const exported = exportM3eDocument(document).groups.flatMap((group) => group.items);
+    expect(exported.find((item) => item.id === 'secure')?.note).toContain('SecureField');
+    expect(exported.find((item) => item.id === 'editor')?.note).toContain('TextEditor');
+    expect(exported.find((item) => item.id === 'color')?.note).toContain('ColorPicker');
+    expect(exported.find((item) => item.id === 'stepper')).toEqual(expect.objectContaining({ value: 1, minimum: 0, maximum: 10, step: 1, note: expect.stringContaining('Stepper') }));
+    expect(exported.find((item) => item.id === 'menu')).toEqual(expect.objectContaining({ tabs: [{ label: '編集', icon: null }], note: expect.stringContaining('メニュー項目') }));
+    expect(exported.find((item) => item.id === 'gauge')).toEqual(expect.objectContaining({ value: 50, minimum: 0, maximum: 1, note: expect.stringContaining('Gauge') }));
+    expect(exported.find((item) => item.id === 'link')?.note).toContain('外部リンク');
+    expect(exported.find((item) => item.id === 'date')?.note).toContain('DatePicker');
+  });
+
   it('exports icon-only semantic buttons as M3E icon buttons', () => {
     const document = convertM3eDocument({
       frames: [{ id: 'home', name: 'ホーム', x: 0, y: 0 }],

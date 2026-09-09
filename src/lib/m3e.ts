@@ -1615,17 +1615,16 @@ function withM3eMetadata(item: M3eExportItem, metadata: M3eItemMetadata | undefi
 }
 
 function exportAction(node: CanvasNode, frameIds: Map<string, string>): M3eExportAction | undefined {
-  const navigable = node.kind === 'button' || node.kind === 'navigation-link' ? node : undefined;
-  if (!navigable) return undefined;
-  const target = navigable.navigationAction === 'back'
+  if (node.kind !== 'button' && node.kind !== 'navigation-link' && node.navigationAction !== 'back') return undefined;
+  const target = node.navigationAction === 'back'
     ? 'back'
-    : navigable.destinationScreenId && frameIds.has(navigable.destinationScreenId)
-      ? frameIds.get(navigable.destinationScreenId)
+    : (node.kind === 'button' || node.kind === 'navigation-link') && node.destinationScreenId && frameIds.has(node.destinationScreenId)
+      ? frameIds.get(node.destinationScreenId)
       : undefined;
   if (!target) return undefined;
   return {
     to: target,
-    transition: navigable.navigationTransition ?? (target === 'back' ? 'slideLeft' : 'slide'),
+    transition: node.navigationTransition ?? (target === 'back' ? 'slideLeft' : 'slide'),
   };
 }
 
@@ -1685,6 +1684,8 @@ function exportItem(node: CanvasNode, frameIds: Map<string, string>, inheritedNo
   const nodeFill = exportNodeFill(node);
   const base = (kind: string, label: string, icon: string | null = null, extra: Partial<M3eExportItem> = {}): M3eExportItem => {
     const metadata = exportM3eMetadata(node.m3eMetadata);
+    const extraNote = typeof extra.note === 'string' ? extra.note : '';
+    const note = exportNote(node, [inheritedNote, extraNote].filter(Boolean).join('\n'));
     return {
       id: node.id,
       kind,
@@ -1696,7 +1697,7 @@ function exportItem(node: CanvasNode, frameIds: Map<string, string>, inheritedNo
       ...extra,
       ...(metadata.icon === undefined ? {} : { icon: preferOriginalIcon(metadata.icon, extra.icon === undefined ? icon : extra.icon) }),
       ...(metadata.icon2 === undefined ? {} : { icon2: preferOriginalIcon(metadata.icon2, extra.icon2) }),
-      ...(exportNote(node, inheritedNote) ? { note: exportNote(node, inheritedNote) } : {}),
+      ...(note ? { note } : {}),
     };
   };
 
@@ -1729,6 +1730,20 @@ function exportItem(node: CanvasNode, frameIds: Map<string, string>, inheritedNo
       });
     }
     case 'navigation-link': {
+      const cardNode = node.children?.find((child): child is ContainerNode => child.kind === 'groupbox' && child.m3eKind === 'card');
+      if (node.m3eKind === 'card' && cardNode) {
+        const presentation = exportCardPresentation(cardNode);
+        const action = exportAction(node, frameIds);
+        return base('card', node.label || cardNode.title || 'カード', presentation.icon, {
+          ...(cardNode.cardNoImage ? { noImage: true } : {}),
+          ...(cardNode.cardImagePosition ? { imagePos: cardNode.cardImagePosition } : {}),
+          ...(cardNode.cardImageSize === undefined ? {} : { imageSize: cardNode.cardImageSize }),
+          ...(cardNode.cardContentAlignment ? { contentAlign: cardNode.cardContentAlignment } : {}),
+          ...(presentation.supporting ? { supporting: presentation.supporting } : {}),
+          ...(presentation.src ? { src: presentation.src } : {}),
+          ...(action ? { action } : {}),
+        });
+      }
       const presentation = exportListItemPresentation(node);
       const action = exportAction(node, frameIds);
       return base('listItem', node.label, presentation.icon, {
@@ -1744,9 +1759,9 @@ function exportItem(node: CanvasNode, frameIds: Map<string, string>, inheritedNo
     case 'searchfield':
       return base('searchBar', node.prompt || node.label, 'magnifyingglass');
     case 'securefield':
-      return base('textField', node.label, null, { note: exportNote(node, 'SwiftUIではSecureFieldとして再構成します。') });
+      return base('textField', node.label, null, { note: 'SwiftUIではSecureFieldとして再構成します。' });
     case 'texteditor':
-      return base('textField', node.label, null, { note: exportNote(node, 'SwiftUIではTextEditorとして再構成します。') });
+      return base('textField', node.label, null, { note: 'SwiftUIではTextEditorとして再構成します。' });
     case 'picker': {
       const selected = node.initialOption ? Math.max(0, node.options.indexOf(node.initialOption)) : undefined;
       return base('select', node.label, null, {
@@ -1755,19 +1770,28 @@ function exportItem(node: CanvasNode, frameIds: Map<string, string>, inheritedNo
       });
     }
     case 'colorpicker':
-      return base('textField', node.label, null, { note: exportNote(node, `SwiftUI ColorPickerの色バインディング: ${node.binding}`) });
+      return base('textField', node.label, null, { note: `SwiftUI ColorPickerの色バインディング: ${node.binding}` });
     case 'slider':
       return base('slider', node.label, null, {
         value: node.maximum > node.minimum ? ((node.value - node.minimum) / (node.maximum - node.minimum)) * 100 : 0,
         minimum: node.minimum,
         maximum: node.maximum,
         step: node.step,
-        note: exportNote(node, `値の範囲: ${node.minimum}〜${node.maximum} / 刻み: ${node.step}`),
+        note: `値の範囲: ${node.minimum}〜${node.maximum} / 刻み: ${node.step}`,
       });
     case 'stepper':
-      return base('button', node.label, null, { note: exportNote(node, `SwiftUI Stepperとして再構成します。初期値 ${node.value} / 範囲 ${node.minimum}〜${node.maximum} / 刻み ${node.step}`) });
+      return base('button', node.label, null, {
+        value: node.value,
+        minimum: node.minimum,
+        maximum: node.maximum,
+        step: node.step,
+        note: `SwiftUI Stepperとして再構成します。初期値 ${node.value} / 範囲 ${node.minimum}〜${node.maximum} / 刻み ${node.step}`,
+      });
     case 'menu':
-      return base('button', node.label, null, { note: exportNote(node, `メニュー項目: ${node.options.join('、')}`) });
+      return base('button', node.label, null, {
+        tabs: node.options.map((option) => ({ label: option, icon: null })),
+        note: `メニュー項目: ${node.options.join('、')}`,
+      });
     case 'progress':
       return base(node.m3eKind === 'loadingIndicator' || node.m3eKind === 'linearProgress' || node.m3eKind === 'circularProgress'
         ? node.m3eKind
@@ -1779,16 +1803,18 @@ function exportItem(node: CanvasNode, frameIds: Map<string, string>, inheritedNo
     case 'gauge':
       return base('linearProgress', node.label, null, {
         value: node.maximum > node.minimum ? ((node.value - node.minimum) / (node.maximum - node.minimum)) * 100 : 0,
-        note: exportNote(node, `SwiftUI Gaugeとして再構成します。範囲 ${node.minimum}〜${node.maximum}`),
+        minimum: node.minimum,
+        maximum: node.maximum,
+        note: `SwiftUI Gaugeとして再構成します。範囲 ${node.minimum}〜${node.maximum}`,
       });
     case 'content-unavailable':
       return base('box', node.title, node.systemName || null, { supporting: node.description });
     case 'label':
       return base('text', node.title, node.systemName || null);
     case 'link':
-      return base('button', node.label, null, { note: exportNote(node, `外部リンク: ${node.url}`) });
+      return base('button', node.label, null, { note: `外部リンク: ${node.url}` });
     case 'datepicker':
-      return base('textField', node.label, 'calendar_month', { note: exportNote(node, 'SwiftUIではDatePickerとして再構成します。') });
+      return base('textField', node.label, 'calendar_month', { note: 'SwiftUIではDatePickerとして再構成します。' });
     case 'image': {
       const external = node.source !== 'symbol' && node.source !== undefined && node.systemName.trim() !== '';
       return base('image', node.accessibilityLabel || '画像', external ? null : node.systemName || null, external ? { src: node.systemName } : {});
@@ -1800,7 +1826,7 @@ function exportItem(node: CanvasNode, frameIds: Map<string, string>, inheritedNo
     case 'divider':
       return base('divider', '区切り線');
     case 'spacer':
-      return base('box', 'スペーサー', null, { note: exportNote(node, 'SwiftUI Spacerとして再構成します。') });
+      return base('box', 'スペーサー', null, { note: 'SwiftUI Spacerとして再構成します。' });
     case 'alert': {
       const actions = node.actions?.filter((action) => action.label.trim()) ?? [];
       const exportedActions = Object.fromEntries(actions.flatMap((action, index) => {
@@ -1814,11 +1840,11 @@ function exportItem(node: CanvasNode, frameIds: Map<string, string>, inheritedNo
         supporting: node.message,
         ...(tabs ? { tabs } : {}),
         ...(Object.keys(exportedActions).length > 0 ? { actions: exportedActions } : {}),
-        note: exportNote(node, `主ボタン: ${node.primaryButton}${node.secondaryButton ? ` / 副ボタン: ${node.secondaryButton}` : ''}`),
+        note: `主ボタン: ${node.primaryButton}${node.secondaryButton ? ` / 副ボタン: ${node.secondaryButton}` : ''}`,
       });
     }
     case 'confirmation-dialog':
-      return base('dialog', node.title || node.label, null, { supporting: node.message, note: exportNote(node, `選択肢: ${node.options.join('、')}${node.cancelButton ? ` / キャンセル: ${node.cancelButton}` : ''}`) });
+      return base('dialog', node.title || node.label, null, { supporting: node.message, note: `選択肢: ${node.options.join('、')}${node.cancelButton ? ` / キャンセル: ${node.cancelButton}` : ''}` });
     default:
       return null;
   }
@@ -1893,7 +1919,7 @@ function exportCardPresentation(node: ContainerNode): Pick<M3eExportItem, 'icon'
   };
 }
 
-function exportListItemNode(node: ContainerNode, inheritedNote: string): M3eExportItem {
+function exportListItemNode(node: ContainerNode, frameIds: Map<string, string>, inheritedNote: string): M3eExportItem {
   const descendants: CanvasNode[] = [];
   const visit = (current: CanvasNode): void => {
     descendants.push(current);
@@ -1907,6 +1933,7 @@ function exportListItemNode(node: ContainerNode, inheritedNote: string): M3eExpo
   const supporting = texts.find((child) => child.text.trim() && child.text.trim() !== label)?.text.trim();
   const leading = images[0];
   const trailing = images[1];
+  const action = exportAction(node, frameIds);
   return withM3eMetadata({
     id: node.id,
     kind: 'listItem',
@@ -1916,6 +1943,7 @@ function exportListItemNode(node: ContainerNode, inheritedNote: string): M3eExpo
     ...(trailing?.source === 'remote' ? {} : trailing?.systemName ? { icon2: trailing.systemName } : {}),
     ...(supporting ? { supporting } : {}),
     ...(toggle ? { switch: true, checked: toggle.isOn ?? false } : {}),
+    ...(action ? { action } : {}),
     ...(exportNote(node, inheritedNote) ? { note: exportNote(node, inheritedNote) } : {}),
   }, node.m3eMetadata);
 }
@@ -1980,7 +2008,7 @@ function isExportContainer(node: CanvasNode): node is ContainerNode {
 
 function exportContainerItems(node: ContainerNode, frameIds: Map<string, string>, inheritedNote = ''): M3eExportItem[] {
   if (node.m3eKind === 'fabMenu') return [exportFabMenuNode(node, frameIds, inheritedNote)];
-  if (node.m3eKind === 'listItem') return [exportListItemNode(node, inheritedNote)];
+  if (node.m3eKind === 'listItem') return [exportListItemNode(node, frameIds, inheritedNote)];
   if (node.kind === 'tabview') return [exportTabsNode(node, frameIds, inheritedNote)];
   if (node.kind === 'navigation-split-view') {
     const detail = node.children[1];
