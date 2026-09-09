@@ -678,6 +678,14 @@ button.ios-navigation-link:hover { background: #f5f5f7; }
 .m3e-compatibility strong { color: var(--text-soft); font-size: 11px; }
 .m3e-compatibility.has-warning { background: #1c1812; color: #d2b37e; }
 .m3e-compatibility.has-warning strong { color: #f0d49b; }
+.m3e-anomaly-details { margin-top: 3px; border-top: 1px solid rgba(210, 179, 126, .25); padding-top: 4px; }
+.m3e-anomaly-details summary { color: inherit; cursor: pointer; }
+.m3e-anomaly-list { display: grid; gap: 3px; margin: 5px 0 0; padding-left: 16px; }
+.m3e-anomaly-list li { display: flex; gap: 6px; }
+.m3e-anomaly-list li strong { color: var(--text-soft); font-size: 10px; }
+.m3e-anomaly-list li span { color: inherit; }
+.m3e-anomaly-unresolved strong { color: #e7c681; }
+.m3e-anomaly-lost strong { color: #e7867e; }
 .export-footer { min-height: 52px; display: flex; align-items: center; gap: 12px; padding: 0 12px 0 18px; border-top: 1px solid var(--line); }
 .export-footer span { color: var(--muted); font-size: 10px; }
 .export-footer .primary-toolbar-button { margin-left: auto; }

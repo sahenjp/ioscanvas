@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { findNode } from '../lib/nodes';
-import { convertM3eDocument, describeM3eCompatibilityFields, describeM3eCompatibilityKinds, exportM3eDocument, generateM3eJson, inspectM3eCompatibility, inspectM3eExportCompatibility, isM3eDocument } from '../lib/m3e';
+import { convertM3eDocument, describeM3eCompatibilityFields, describeM3eCompatibilityKinds, exportM3eDocument, generateM3eJson, getM3eCompatibilityAnomalies, inspectM3eCompatibility, inspectM3eExportCompatibility, isM3eDocument } from '../lib/m3e';
 import { defaultDocument } from '../lib/defaultDocument';
 import { parseCanvasDocument } from '../lib/document';
 import { generateSwiftUI } from '../lib/swiftui';
@@ -108,9 +108,11 @@ describe('M3E compatibility importer', () => {
     };
 
     expect(exportM3eDocument(document).frames[0]?.swipe).toBeUndefined();
-    expect(inspectM3eExportCompatibility(document)).toEqual({
+    const report = inspectM3eExportCompatibility(document);
+    expect(report).toEqual({
       flattenedItemCount: 4,
-      unsupportedNodeKinds: ['glass-container', 'vstack'],
+      unsupportedNodeKinds: [],
+      flattenedNodeKinds: ['glass-container', 'vstack'],
       approximatedKinds: ['securefield'],
       unresolvedDestinationCount: 2,
       unresolvedActionCount: 2,
@@ -120,6 +122,11 @@ describe('M3E compatibility importer', () => {
       normalizedScreenCount: 1,
       roundTripValid: true,
     });
+    expect(getM3eCompatibilityAnomalies(report)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'FLATTENED_LAYOUT', status: 'approximated' }),
+      expect.objectContaining({ code: 'APPROXIMATED_KIND', status: 'approximated' }),
+      expect.objectContaining({ code: 'UNRESOLVED_NAVIGATION', status: 'unresolved' }),
+    ]));
   });
 
   it('preserves card presentation and indeterminate circular progress on export', () => {
@@ -541,6 +548,12 @@ describe('M3E compatibility importer', () => {
       lostFields: [],
       flattenedLayoutCount: 0,
     });
+    if (!report) throw new Error('Compatibility report was not generated');
+    expect(getM3eCompatibilityAnomalies(report)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'UNSUPPORTED_KIND', status: 'lost' }),
+      expect.objectContaining({ code: 'APPROXIMATED_KIND', status: 'approximated' }),
+      expect.objectContaining({ code: 'UNRESOLVED_NAVIGATION', status: 'unresolved' }),
+    ]));
   });
 
   it('reports and drops groups that are outside every valid frame', () => {

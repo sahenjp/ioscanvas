@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { generateImplementationPrompt, type PromptScope } from '../lib/prompt';
-import { describeM3eCompatibilityFields, describeM3eCompatibilityKinds, generateM3eJson, inspectM3eExportCompatibility } from '../lib/m3e';
+import { describeM3eCompatibilityFields, describeM3eCompatibilityKinds, generateM3eJson, getM3eCompatibilityAnomalies, inspectM3eExportCompatibility } from '../lib/m3e';
 import { copyText } from '../lib/share';
 import { generateSwiftUI } from '../lib/swiftui';
 import { useEditorStore } from '../store/editor';
@@ -19,12 +19,9 @@ export function ExportPanel() {
   const prompt = useMemo(() => generateImplementationPrompt(document, promptScope), [document, promptScope]);
   const m3e = useMemo(() => generateM3eJson(document), [document]);
   const m3eReport = useMemo(() => inspectM3eExportCompatibility(document), [document]);
+  const m3eAnomalies = useMemo(() => getM3eCompatibilityAnomalies(m3eReport), [m3eReport]);
   const value = tab === 'swiftui' ? swiftui : tab === 'prompt' ? prompt : m3e;
-  const m3eHasWarnings = m3eReport.unsupportedNodeKinds.length > 0
-    || m3eReport.approximatedKinds.length > 0
-    || m3eReport.unresolvedDestinationCount > 0
-    || m3eReport.lostFields.length > 0
-    || !m3eReport.roundTripValid;
+  const m3eHasWarnings = m3eAnomalies.length > 0;
 
   useEffect(() => {
     if (!open) return;
@@ -88,12 +85,26 @@ export function ExportPanel() {
             <span>{m3eReport.flattenedItemCount}要素を平坦化 / {m3eReport.normalizedScreenCount}画面を端末プリセットへ正規化</span>
             <span>再読込検証: {m3eReport.roundTripValid ? '成功' : '要確認'}</span>
             {m3eReport.unsupportedNodeKinds.length > 0 && <span>直接対応なし: {m3eReport.unsupportedNodeKinds.join(', ')}</span>}
+            {m3eReport.flattenedNodeKinds.length > 0 && <span>構造平坦化: {m3eReport.flattenedNodeKinds.join(', ')}</span>}
             {m3eReport.approximatedKinds.length > 0 && <span>近似変換: {describeM3eCompatibilityKinds(m3eReport.approximatedKinds)}</span>}
             {m3eReport.unresolvedDestinationCount > 0 && <span>未解決の遷移: {m3eReport.unresolvedDestinationCount}件</span>}
             {m3eReport.unresolvedActionCount > 0 && <span>未解決の操作: {m3eReport.unresolvedActionCount}件</span>}
             {m3eReport.preservedFields.length > 0 && <span>保持フィールド: {m3eReport.preservedFields.join(', ')}</span>}
             {m3eReport.approximatedFields.length > 0 && <span>近似フィールド: {describeM3eCompatibilityFields(m3eReport.approximatedFields)}</span>}
             {m3eReport.lostFields.length > 0 && <span>出力できないフィールド: {m3eReport.lostFields.join(', ')}</span>}
+            {m3eAnomalies.length > 0 && (
+              <details className="m3e-anomaly-details">
+                <summary>互換異常 {m3eAnomalies.length}件を確認</summary>
+                <ul className="m3e-anomaly-list">
+                  {m3eAnomalies.map((anomaly) => (
+                    <li key={`${anomaly.code}-${anomaly.label}`} className={`m3e-anomaly-${anomaly.status}`}>
+                      <strong>{anomaly.label}</strong>
+                      <span>{anomaly.detail}</span>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
           </div>
         )}
         <pre className="export-code"><code>{value}</code></pre>

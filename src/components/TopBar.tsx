@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { parseCanvasDocument } from '../lib/document';
-import { convertM3eDocument, describeM3eCompatibilityFields, describeM3eCompatibilityKinds, inspectM3eCompatibility } from '../lib/m3e';
+import { convertM3eDocument, describeM3eCompatibilityFields, describeM3eCompatibilityKinds, getM3eCompatibilityAnomalies, inspectM3eCompatibility } from '../lib/m3e';
 import { lintDocument } from '../lib/hig';
 import { findNode } from '../lib/nodes';
 import { copyText, createShareUrl } from '../lib/share';
@@ -68,7 +68,9 @@ export function TopBar() {
       loadDocument(loadedDocument);
       const report = imported ? inspectM3eCompatibility(raw) : null;
       if (report) {
+        const anomalies = getM3eCompatibilityAnomalies(report);
         const details = [
+          anomalies.length > 0 ? `互換異常${anomalies.length}件` : '',
           report.invalidFrameCount > 0 ? `無効な画面${report.invalidFrameCount}件` : '',
           report.invalidGroupCount > 0 ? `無効なグループ${report.invalidGroupCount}件` : '',
           report.orphanedGroupCount > 0 ? `画面外グループ${report.orphanedGroupCount}件` : '',

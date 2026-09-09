@@ -179,9 +179,31 @@ export interface M3eCompatibilityReport {
   lostFields: string[];
 }
 
+export type M3eCompatibilityAnomalyStatus = 'approximated' | 'unresolved' | 'lost';
+export type M3eCompatibilityAnomalyCode =
+  | 'INVALID_FRAME'
+  | 'INVALID_GROUP'
+  | 'ORPHANED_GROUP'
+  | 'DISCARDED_ITEM'
+  | 'FLATTENED_LAYOUT'
+  | 'UNSUPPORTED_KIND'
+  | 'APPROXIMATED_KIND'
+  | 'APPROXIMATED_FIELD'
+  | 'UNRESOLVED_NAVIGATION'
+  | 'LOST_FIELD'
+  | 'ROUND_TRIP';
+
+export interface M3eCompatibilityAnomaly {
+  code: M3eCompatibilityAnomalyCode;
+  status: M3eCompatibilityAnomalyStatus;
+  label: string;
+  detail: string;
+}
+
 export interface M3eExportCompatibilityReport {
   flattenedItemCount: number;
   unsupportedNodeKinds: string[];
+  flattenedNodeKinds: string[];
   approximatedKinds: string[];
   unresolvedDestinationCount: number;
   unresolvedActionCount: number;
@@ -243,6 +265,60 @@ export function describeM3eCompatibilityFields(fields: string[]): string {
     const reason = m3eFieldApproximationReasons[field];
     return reason ? `${field}（${reason}）` : field;
   }).join(', ');
+}
+
+function compatibilityAnomaly(
+  status: M3eCompatibilityAnomalyStatus,
+  code: M3eCompatibilityAnomalyCode,
+  label: string,
+  detail: string,
+): M3eCompatibilityAnomaly {
+  return { status, code, label, detail };
+}
+
+function importCompatibilityAnomalies(report: M3eCompatibilityReport): M3eCompatibilityAnomaly[] {
+  const anomalies: M3eCompatibilityAnomaly[] = [];
+  if (report.invalidFrameCount > 0) anomalies.push(compatibilityAnomaly('lost', 'INVALID_FRAME', '無効な画面', `${report.invalidFrameCount}件を読み込めませんでした。`));
+  if (report.invalidGroupCount > 0) anomalies.push(compatibilityAnomaly('lost', 'INVALID_GROUP', '無効なグループ', `${report.invalidGroupCount}件を読み込めませんでした。`));
+  if (report.orphanedGroupCount > 0) anomalies.push(compatibilityAnomaly('lost', 'ORPHANED_GROUP', '画面外グループ', `${report.orphanedGroupCount}件を画面へ割り当てられませんでした。`));
+  if (report.discardedItemCount > 0) anomalies.push(compatibilityAnomaly('lost', 'DISCARDED_ITEM', '破棄した項目', `${report.discardedItemCount}件が有効な項目として解釈できませんでした。`));
+  if (report.flattenedLayoutCount > 0) anomalies.push(compatibilityAnomaly('approximated', 'FLATTENED_LAYOUT', '自由配置の平坦化', `${report.flattenedLayoutCount}件の座標・ロック情報を意味構造へ変換しました。`));
+  if (report.unresolvedDestinationCount > 0 || report.unresolvedActionCount > 0) {
+    anomalies.push(compatibilityAnomaly(
+      'unresolved',
+      'UNRESOLVED_NAVIGATION',
+      '未解決の遷移',
+      `遷移先${report.unresolvedDestinationCount}件、操作${report.unresolvedActionCount}件を確認できませんでした。`,
+    ));
+  }
+  if (report.unsupportedKinds.length > 0) anomalies.push(compatibilityAnomaly('lost', 'UNSUPPORTED_KIND', '未対応パーツ', report.unsupportedKinds.join(', ')));
+  if (report.approximatedKinds.length > 0) anomalies.push(compatibilityAnomaly('approximated', 'APPROXIMATED_KIND', '近似変換', describeM3eCompatibilityKinds(report.approximatedKinds)));
+  if (report.approximatedFields.length > 0) anomalies.push(compatibilityAnomaly('approximated', 'APPROXIMATED_FIELD', '近似フィールド', describeM3eCompatibilityFields(report.approximatedFields)));
+  if (report.lostFields.length > 0) anomalies.push(compatibilityAnomaly('lost', 'LOST_FIELD', '失われたフィールド', report.lostFields.join(', ')));
+  return anomalies;
+}
+
+function exportCompatibilityAnomalies(report: M3eExportCompatibilityReport): M3eCompatibilityAnomaly[] {
+  const anomalies: M3eCompatibilityAnomaly[] = [];
+  if (report.unsupportedNodeKinds.length > 0) anomalies.push(compatibilityAnomaly('lost', 'UNSUPPORTED_KIND', '直接対応のない要素', report.unsupportedNodeKinds.join(', ')));
+  if (report.flattenedNodeKinds.length > 0) anomalies.push(compatibilityAnomaly('approximated', 'FLATTENED_LAYOUT', '構造平坦化', report.flattenedNodeKinds.join(', ')));
+  if (report.approximatedKinds.length > 0) anomalies.push(compatibilityAnomaly('approximated', 'APPROXIMATED_KIND', '近似変換', describeM3eCompatibilityKinds(report.approximatedKinds)));
+  if (report.unresolvedDestinationCount > 0 || report.unresolvedActionCount > 0) {
+    anomalies.push(compatibilityAnomaly(
+      'unresolved',
+      'UNRESOLVED_NAVIGATION',
+      '未解決の遷移',
+      `遷移先${report.unresolvedDestinationCount}件、操作${report.unresolvedActionCount}件を出力できませんでした。`,
+    ));
+  }
+  if (report.approximatedFields.length > 0) anomalies.push(compatibilityAnomaly('approximated', 'APPROXIMATED_FIELD', '近似フィールド', describeM3eCompatibilityFields(report.approximatedFields)));
+  if (report.lostFields.length > 0) anomalies.push(compatibilityAnomaly('lost', 'LOST_FIELD', '出力できないフィールド', report.lostFields.join(', ')));
+  if (!report.roundTripValid) anomalies.push(compatibilityAnomaly('lost', 'ROUND_TRIP', '再読込検証', '書き出したM3E JSONを再読込できませんでした。'));
+  return anomalies;
+}
+
+export function getM3eCompatibilityAnomalies(report: M3eCompatibilityReport | M3eExportCompatibilityReport): M3eCompatibilityAnomaly[] {
+  return 'invalidFrameCount' in report ? importCompatibilityAnomalies(report) : exportCompatibilityAnomalies(report);
 }
 
 const flattenedOnlyNodeKinds: ReadonlySet<NodeKind> = new Set([
@@ -2191,14 +2267,14 @@ export function exportM3eDocument(document: CanvasDocument): M3eExportDocument {
 
 function collectExportCompatibilityKinds(
   node: CanvasNode,
-  unsupportedNodeKinds: Set<string>,
+  flattenedNodeKinds: Set<string>,
   approximatedKinds: Set<string>,
 ): void {
-  if (flattenedOnlyNodeKinds.has(node.kind)) unsupportedNodeKinds.add(node.kind);
+  if (flattenedOnlyNodeKinds.has(node.kind)) flattenedNodeKinds.add(node.kind);
   if (approximatedNodeKinds.has(node.kind)) approximatedKinds.add(node.kind);
   if (node.m3eKind && approximatedM3eKinds.has(node.m3eKind)) approximatedKinds.add(node.m3eKind);
   if (Array.isArray(node.children)) {
-    for (const child of node.children) collectExportCompatibilityKinds(child, unsupportedNodeKinds, approximatedKinds);
+    for (const child of node.children) collectExportCompatibilityKinds(child, flattenedNodeKinds, approximatedKinds);
   }
 }
 
@@ -2207,6 +2283,7 @@ export function inspectM3eExportCompatibility(document: CanvasDocument): M3eExpo
   const roundTripped = convertM3eDocument(exported);
   const frameIds = new Set(document.screens.map((screen) => screen.id));
   const unsupportedNodeKinds = new Set<string>();
+  const flattenedNodeKinds = new Set<string>();
   const approximatedKinds = new Set<string>();
   const sourceFields = new Set<string>();
   const exportedFields = new Set<string>();
@@ -2223,7 +2300,7 @@ export function inspectM3eExportCompatibility(document: CanvasDocument): M3eExpo
   exported.groups.forEach((group) => group.items.forEach(collectExportedFields));
 
   for (const screen of document.screens) {
-    collectExportCompatibilityKinds(screen.root, unsupportedNodeKinds, approximatedKinds);
+    collectExportCompatibilityKinds(screen.root, flattenedNodeKinds, approximatedKinds);
     collectMetadataFields(screen.root);
     Object.keys(screen.m3eTopAppBar ?? {}).forEach((field) => sourceFields.add(field));
     Object.keys(screen.m3eBottomNav ?? {}).forEach((field) => sourceFields.add(field));
@@ -2271,6 +2348,7 @@ export function inspectM3eExportCompatibility(document: CanvasDocument): M3eExpo
       0,
     ),
     unsupportedNodeKinds: [...unsupportedNodeKinds].sort(),
+    flattenedNodeKinds: [...flattenedNodeKinds].sort(),
     approximatedKinds: [...approximatedKinds].sort(),
     unresolvedDestinationCount,
     unresolvedActionCount,
