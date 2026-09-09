@@ -1,6 +1,7 @@
 import { parseCanvasDocument } from './document';
 import { isContainerNode } from './nodes';
 import type {
+  AlertAction,
   ButtonStyle,
   CanvasDocument,
   CanvasNode,
@@ -189,6 +190,59 @@ export interface M3eExportCompatibilityReport {
   lostFields: string[];
   normalizedScreenCount: number;
   roundTripValid: boolean;
+}
+
+const m3eApproximationReasons: Record<string, string> = {
+  securefield: 'textFieldへ投影するため、伏字入力はSwiftUI側の実装で補います',
+  texteditor: 'textFieldへ投影するため、複数行入力はSwiftUI側の実装で補います',
+  colorpicker: 'textFieldへ投影するため、色入力はSwiftUI側の実装で補います',
+  stepper: 'buttonへ投影するため、値の増減ロジックはSwiftUI側の実装で補います',
+  menu: 'buttonへ投影するため、メニュー項目は実装用メモへ残します',
+  gauge: 'linearProgressへ投影するため、Gaugeの表示形式は保持しません',
+  'content-unavailable': 'boxへ投影するため、空状態の専用表示は保持しません',
+  label: 'textへ投影するため、Labelのアイコン構造は保持しません',
+  link: 'buttonへ投影するため、外部URLは実装用メモへ残します',
+  datepicker: 'textFieldへ投影するため、DatePickerの表示形式は保持しません',
+  spacer: 'boxへ投影するため、空間の意味は実装用メモへ残します',
+  section: 'boxへ投影するため、SwiftUIのSection構造は保持しません',
+  'disclosure-group': 'boxへ投影するため、展開状態は保持しません',
+  sheet: 'boxへ投影するため、モーダル表示は実装用メモへ残します',
+  groupbox: 'cardまたはboxへ投影するため、GroupBoxの構造は保持しません',
+  tabview: 'tabsへ投影するため、SwiftUIのTabView構造は保持しません',
+  'navigation-split-view': 'navRailへ投影するため、列構造はM3Eの射影へ正規化します',
+  alert: 'dialogへ投影するため、Alert固有のSwiftUI構造は保持しません',
+  'confirmation-dialog': 'dialogへ投影するため、選択肢はM3Eのtabsへ正規化します',
+};
+
+const m3eFieldApproximationReasons: Record<string, string> = {
+  size: 'SwiftUIのframeへ近似',
+  size2: 'SwiftUIの最小高さへ近似',
+  minimum: 'SwiftUIの値範囲へ近似',
+  maximum: 'SwiftUIの値範囲へ近似',
+  step: 'SwiftUIの刻みへ近似',
+  radiusTop: 'SwiftUIの角丸へ近似',
+  radiusBottom: 'SwiftUIの角丸へ近似',
+  corners: 'SwiftUIの角丸へ近似',
+  textColor: 'SwiftUIのforegroundStyleへ近似',
+  iconFill: 'SwiftUIの背景へ近似',
+  src: 'SwiftUIのAssetまたはURLへ差し替え',
+  noCheck: 'SwiftUI標準部品に直接対応なし',
+  contained: 'SwiftUIのMaterial背景へ近似',
+  railExpansionSide: 'NavigationSplitViewの標準レイアウトへ近似',
+};
+
+export function describeM3eCompatibilityKinds(kinds: string[]): string {
+  return kinds.map((kind) => {
+    const reason = m3eApproximationReasons[kind];
+    return reason ? `${kind}（${reason}）` : kind;
+  }).join(', ');
+}
+
+export function describeM3eCompatibilityFields(fields: string[]): string {
+  return fields.map((field) => {
+    const reason = m3eFieldApproximationReasons[field];
+    return reason ? `${field}（${reason}）` : field;
+  }).join(', ');
 }
 
 const flattenedOnlyNodeKinds: ReadonlySet<NodeKind> = new Set([
@@ -490,6 +544,25 @@ function resolvedM3eMenuActions(item: JsonObject, context: ConversionContext): R
       : [];
   }));
   return Object.keys(actions).length > 0 ? actions : undefined;
+}
+
+function resolvedM3eAlertAction(value: unknown, context: ConversionContext): Omit<AlertAction, 'label' | 'role'> | undefined {
+  const action = m3eAction(value);
+  if (!action) return undefined;
+  if (action.to === 'back') return { navigationAction: 'back', navigationTransition: action.transition };
+  const destinationScreenId = context.frameIds.get(action.to);
+  return destinationScreenId ? { destinationScreenId, navigationTransition: action.transition } : undefined;
+}
+
+function m3eDialogActions(item: JsonObject, context: ConversionContext): AlertAction[] {
+  return tabEntries(item).flatMap((tab, index) => {
+    const label = stringValue(tab, 'label')?.trim();
+    if (!label) return [];
+    const actions = recordValue(item, 'actions');
+    const action = resolvedM3eAlertAction(actions && actions[`tab:${index}`], context)
+      ?? (index === 0 ? resolvedM3eAlertAction(item.action, context) : undefined);
+    return [{ label, role: 'normal' as const, ...(action ?? {}) }];
+  });
 }
 
 function readM3eMetadata(item: JsonObject): M3eItemMetadata | undefined {
@@ -1003,8 +1076,32 @@ function mapItem(item: JsonObject, context: ConversionContext): CanvasNode | nul
     }
     case 'listItem':
       return listItemNode(item, context);
-    case 'dialog':
-      return appendNotes({ id, kind: 'alert', label: '確認を表示', title: label || '確認', message: stringValue(item, 'supporting') ?? '', primaryButton: '続ける', primaryRole: 'normal', minHeight: 44 }, item);
+    case 'dialog': {
+      const actions = m3eDialogActions(item, context);
+      const directAction = actions.length === 0 ? resolvedM3eAlertAction(item.action, context) : undefined;
+      const semanticActions = actions.length > 0
+        ? actions
+        : directAction
+          ? [{ label: '続ける', role: 'normal' as const, ...directAction }]
+          : undefined;
+      const primary = semanticActions?.[0];
+      const secondary = semanticActions?.[1];
+      return appendNotes({
+        id,
+        kind: 'alert',
+        label: '確認を表示',
+        title: label || '確認',
+        message: stringValue(item, 'supporting') ?? '',
+        primaryButton: primary?.label ?? '続ける',
+        primaryRole: primary?.role ?? 'normal',
+        ...(secondary ? { secondaryButton: secondary.label, secondaryRole: secondary.role } : {}),
+        ...(semanticActions ? { actions: semanticActions } : {}),
+        minHeight: 44,
+      }, item, [
+        ...(semanticActions && semanticActions.length > 2 ? [`M3Eダイアログの${semanticActions.length}個の操作をAlertの意味構造へ保持しました。`] : []),
+        ...(semanticActions?.some((action) => action.destinationScreenId || action.navigationAction) ? ['M3Eダイアログの遷移先をAlert actionへ保持しました。'] : []),
+      ]);
+    }
     case 'snackbar': {
       const actionLabel = stringValue(item, 'supporting')?.trim();
       const children: CanvasNode[] = [
@@ -1532,6 +1629,15 @@ function exportAction(node: CanvasNode, frameIds: Map<string, string>): M3eExpor
   };
 }
 
+function exportAlertAction(action: AlertAction, frameIds: Map<string, string>): M3eExportAction | undefined {
+  const target = action.navigationAction === 'back'
+    ? 'back'
+    : action.destinationScreenId && frameIds.has(action.destinationScreenId)
+      ? frameIds.get(action.destinationScreenId)
+      : undefined;
+  return target ? { to: target, transition: action.navigationTransition ?? (target === 'back' ? 'slideLeft' : 'slide') } : undefined;
+}
+
 function exportM3eMenuActions(node: Extract<CanvasNode, { kind: 'button' }>, frameIds: Map<string, string>): Record<string, M3eExportAction> | undefined {
   const resolved = Object.fromEntries(Object.entries(node.m3eMenuActions ?? {}).flatMap(([slot, action]) => {
     const target = action.navigationAction === 'back'
@@ -1695,8 +1801,22 @@ function exportItem(node: CanvasNode, frameIds: Map<string, string>, inheritedNo
       return base('divider', '区切り線');
     case 'spacer':
       return base('box', 'スペーサー', null, { note: exportNote(node, 'SwiftUI Spacerとして再構成します。') });
-    case 'alert':
-      return base('dialog', node.title || node.label, null, { supporting: node.message, note: exportNote(node, `主ボタン: ${node.primaryButton}${node.secondaryButton ? ` / 副ボタン: ${node.secondaryButton}` : ''}`) });
+    case 'alert': {
+      const actions = node.actions?.filter((action) => action.label.trim()) ?? [];
+      const exportedActions = Object.fromEntries(actions.flatMap((action, index) => {
+        const exported = exportAlertAction(action, frameIds);
+        return exported ? [[`tab:${index}`, exported]] : [];
+      }));
+      const tabs = actions.length > 0
+        ? actions.map((action, index) => ({ label: action.label, icon: node.m3eMetadata?.tabs?.[index]?.icon ?? null }))
+        : undefined;
+      return base('dialog', node.title || node.label, null, {
+        supporting: node.message,
+        ...(tabs ? { tabs } : {}),
+        ...(Object.keys(exportedActions).length > 0 ? { actions: exportedActions } : {}),
+        note: exportNote(node, `主ボタン: ${node.primaryButton}${node.secondaryButton ? ` / 副ボタン: ${node.secondaryButton}` : ''}`),
+      });
+    }
     case 'confirmation-dialog':
       return base('dialog', node.title || node.label, null, { supporting: node.message, note: exportNote(node, `選択肢: ${node.options.join('、')}${node.cancelButton ? ` / キャンセル: ${node.cancelButton}` : ''}`) });
     default:

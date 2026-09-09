@@ -1,4 +1,4 @@
-import type { CanvasDocument, CanvasNode, CanvasScreen, ContainerNode, M3eItemMetadata, M3eTextColor, ScreenBackground, SwipeDirection, ToolbarItem } from '../types/document';
+import type { AlertAction, CanvasDocument, CanvasNode, CanvasScreen, ContainerNode, M3eItemMetadata, M3eTextColor, ScreenBackground, SwipeDirection, ToolbarItem } from '../types/document';
 
 const indent = (depth: number) => '    '.repeat(depth);
 const indentBlock = (value: string, depth: number) => value
@@ -144,8 +144,81 @@ private struct M3ECircularProgressView: View {
     }
 }`;
 
+const cameraSupport = `private struct M3ECameraCapture: View {
+    let label: String
+    @State private var isPresented = false
+    @State private var image: UIImage?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if let image {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFit()
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .accessibilityLabel("撮影した画像")
+            }
+            Button {
+                isPresented = true
+            } label: {
+                Label(label, systemImage: "camera.fill")
+            }
+            .frame(minHeight: 44)
+        }
+        .sheet(isPresented: $isPresented) {
+            M3EImagePicker { image in
+                self.image = image
+            }
+            .presentationDragIndicator(.visible)
+        }
+        .accessibilityElement(children: .contain)
+    }
+}
+
+private struct M3EImagePicker: UIViewControllerRepresentable {
+    let onImagePicked: (UIImage) -> Void
+    @Environment(\\.dismiss) private var dismiss
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker = UIImagePickerController()
+        picker.sourceType = UIImagePickerController.isSourceTypeAvailable(.camera) ? .camera : .photoLibrary
+        picker.delegate = context.coordinator
+        return picker
+    }
+
+    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
+
+    final class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+        private let parent: M3EImagePicker
+
+        init(_ parent: M3EImagePicker) {
+            self.parent = parent
+        }
+
+        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
+            if let image = info[.originalImage] as? UIImage {
+                parent.onImagePicked(image)
+            }
+            parent.dismiss()
+        }
+
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+            parent.dismiss()
+        }
+    }
+}
+// Add NSCameraUsageDescription to the app's Info.plist before shipping camera capture.`;
+
 function alertBindingKey(node: Extract<CanvasNode, { kind: 'alert' }>): string {
   return `Alert:${node.id}`;
+}
+
+function alertActionBindingKey(node: Extract<CanvasNode, { kind: 'alert' }>, index: number): string {
+  return `AlertAction:${node.id}:${index}`;
 }
 
 function confirmationDialogBindingKey(node: Extract<CanvasNode, { kind: 'confirmation-dialog' }>): string {
@@ -667,6 +740,46 @@ function renderAlertAction(title: string, role: string | undefined, depth: numbe
   return `${indent(depth)}Button(${quoted(title)}${roleArgument}) {}`;
 }
 
+function renderSemanticAlertAction(action: AlertAction, index: number, depth: number, node: Extract<CanvasNode, { kind: 'alert' }>, context: RenderContext): string {
+  const pad = indent(depth);
+  const roleArgument = action.role !== 'normal' ? `, role: .${action.role}` : '';
+  const destination = action.destinationScreenId ? context.viewNames.get(action.destinationScreenId) : undefined;
+  const destinationBinding = context.bindings.get(alertActionBindingKey(node, index));
+  const body = action.navigationAction === 'back'
+    ? `${indent(depth + 1)}dismiss()`
+    : destination && destinationBinding
+      ? `${indent(depth + 1)}${destinationBinding.name} = true`
+      : destination
+        ? `${indent(depth + 1)}// M3E遷移先: ${destination}()。遷移先を確認してください。`
+      : `${indent(depth + 1)}// Action`;
+  return `${pad}Button(${quoted(action.label)}${roleArgument}) {
+${body}
+${pad}}`;
+}
+
+function renderAlertNavigationLinks(node: Extract<CanvasNode, { kind: 'alert' }>, depth: number, context: RenderContext): string {
+  const links = (node.actions ?? []).flatMap((action, index) => {
+    const destination = action.destinationScreenId ? context.viewNames.get(action.destinationScreenId) : undefined;
+    const binding = context.bindings.get(alertActionBindingKey(node, index));
+    if (!destination || !binding) return [];
+    const pad = indent(depth + 2);
+    return [`${pad}NavigationLink(destination: ${destination}(), isActive: $${binding.name}) {
+${indent(depth + 3)}EmptyView()
+${pad}}
+${pad}.accessibilityHidden(true)`];
+  });
+  if (links.length === 0) return '';
+  const pad = indent(depth);
+  return `
+${pad}.background {
+${indent(depth + 1)}VStack(spacing: 0) {
+${links.join('\n')}
+${indent(depth + 1)}}
+${indent(depth + 1)}.frame(width: 0, height: 0)
+${indent(depth + 1)}.accessibilityHidden(true)
+${pad}}`;
+}
+
 function renderNodeContent(node: CanvasNode, depth: number, context: RenderContext): string {
   const pad = indent(depth);
 
@@ -719,11 +832,13 @@ function renderNodeContent(node: CanvasNode, depth: number, context: RenderConte
     }
     case 'alert': {
       const binding = context.bindings.get(alertBindingKey(node))?.name ?? swiftIdentifier(`show_${node.id}`, 'showAlert');
-      const actions = [
-        node.secondaryButton ? renderAlertAction(node.secondaryButton, node.secondaryRole, depth + 1) : '',
-        renderAlertAction(node.primaryButton, node.primaryRole, depth + 1),
-      ].filter(Boolean).join('\n');
-      return `${pad}Button(${quoted(node.label)}) {\n${pad}    ${binding} = true\n${pad}}\n${pad}.frame(minHeight: ${node.minHeight})\n${pad}.alert(${quoted(node.title)}, isPresented: $${binding}) {\n${actions}\n${pad}} message: {\n${pad}    Text(${quoted(node.message)})\n${pad}}`;
+      const actions = node.actions && node.actions.length > 0
+        ? node.actions.map((action, index) => renderSemanticAlertAction(action, index, depth + 1, node, context)).join('\n')
+        : [
+            node.secondaryButton ? renderAlertAction(node.secondaryButton, node.secondaryRole, depth + 1) : '',
+            renderAlertAction(node.primaryButton, node.primaryRole, depth + 1),
+          ].filter(Boolean).join('\n');
+      return `${pad}Button(${quoted(node.label)}) {\n${pad}    ${binding} = true\n${pad}}\n${pad}.frame(minHeight: ${node.minHeight})\n${pad}.alert(${quoted(node.title)}, isPresented: $${binding}) {\n${actions}\n${pad}} message: {\n${pad}    Text(${quoted(node.message)})\n${pad}}${renderAlertNavigationLinks(node, depth, context)}`;
     }
     case 'confirmation-dialog': {
       const binding = context.bindings.get(confirmationDialogBindingKey(node))?.name ?? swiftIdentifier(`show_${node.id}`, 'showConfirmationDialog');
@@ -813,7 +928,7 @@ function renderNodeContent(node: CanvasNode, depth: number, context: RenderConte
       return `${pad}${image}\n${pad}    ${accessibility}`;
     }
     case 'camera':
-      return `${pad}Button {\n${pad}    // AVFoundation: AVCaptureSessionをカメラプレビューへ接続する\n${pad}} label: {\n${pad}    Label(${quoted(node.label || 'カメラ')}, systemImage: "camera.fill")\n${pad}}\n${pad}.frame(minHeight: ${node.minHeight})\n${pad}.accessibilityLabel(${quoted(node.label || 'カメラ')})`;
+      return `${pad}M3ECameraCapture(label: ${quoted(node.label || 'カメラ')})\n${pad}.frame(minHeight: ${node.minHeight})\n${pad}.accessibilityLabel(${quoted(node.label || 'カメラ')})`;
     case 'map':
       return `${pad}Map()\n${pad}    .mapControls {\n${pad}        MapCompass()\n${pad}        MapScaleView()\n${pad}    }\n${pad}    .frame(minHeight: 220)\n${pad}    .accessibilityLabel(${quoted(node.label || '地図')})`;
     case 'label': {
@@ -945,6 +1060,17 @@ function collectBindings(
         usedNames.add(name);
         result.set(key, { name, type: 'Bool', initial: 'false' });
       }
+      for (const [index, action] of (node.actions ?? []).entries()) {
+        if (!action.destinationScreenId) continue;
+        const actionKey = alertActionBindingKey(node, index);
+        if (result.has(actionKey)) continue;
+        const base = swiftIdentifier(`show_alert_action_${node.id}_${index}`, 'showAlertAction');
+        let name = base;
+        let suffix = 2;
+        while (usedNames.has(name)) name = `${base}${suffix++}`;
+        usedNames.add(name);
+        result.set(actionKey, { name, type: 'Bool', initial: 'false' });
+      }
     }
     if (node.kind === 'confirmation-dialog') {
       const key = confirmationDialogBindingKey(node);
@@ -1063,6 +1189,7 @@ function screenBackgroundModifier(background: ScreenBackground | undefined, dept
 
 function hasBackAction(nodes: CanvasNode[]): boolean {
   return nodes.some((node) => node.navigationAction === 'back'
+    || (node.kind === 'alert' && node.actions?.some((action) => action.navigationAction === 'back'))
     || Object.values(node.m3eMenuActions ?? {}).some((action) => action.navigationAction === 'back')
     || (node.children ? hasBackAction(node.children) : false));
 }
@@ -1159,10 +1286,12 @@ export function generateSwiftUI(document: CanvasDocument): string {
     'import Foundation',
     'import SwiftUI',
     ...(hasNodeKind(document.screens.flatMap((candidate) => candidate.root.children), 'map') ? ['import MapKit'] : []),
-    ...(document.screens.some((candidate) => candidate.background && candidate.background !== 'surface') ? ['import UIKit'] : []),
+    ...(document.screens.some((candidate) => candidate.background && candidate.background !== 'surface')
+      || hasNodeKind(document.screens.flatMap((candidate) => candidate.root.children), 'camera') ? ['import UIKit'] : []),
   ].join('\n');
-  const helpers = hasCustomProgress(document.screens.flatMap((candidate) => candidate.root.children))
-    ? `\n\n${customProgressSupport}`
-    : '';
-  return `${imports}\n\n${views}${helpers}\n`;
+  const support = [
+    hasCustomProgress(document.screens.flatMap((candidate) => candidate.root.children)) ? customProgressSupport : '',
+    hasNodeKind(document.screens.flatMap((candidate) => candidate.root.children), 'camera') ? cameraSupport : '',
+  ].filter(Boolean).join('\n\n');
+  return `${imports}\n\n${views}${support ? `\n\n${support}` : ''}\n`;
 }

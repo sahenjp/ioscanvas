@@ -238,6 +238,14 @@ export interface ButtonNode extends BaseNode {
   minHeight: number;
 }
 
+export interface AlertAction {
+  label: string;
+  role: ButtonRole;
+  destinationScreenId?: string;
+  navigationAction?: 'back';
+  navigationTransition?: NavigationTransition;
+}
+
 export interface AlertNode extends BaseNode {
   kind: 'alert';
   label: string;
@@ -247,6 +255,7 @@ export interface AlertNode extends BaseNode {
   primaryRole: ButtonRole;
   secondaryButton?: string;
   secondaryRole?: ButtonRole;
+  actions?: AlertAction[];
   minHeight: number;
 }
 

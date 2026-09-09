@@ -10,7 +10,7 @@ import {
   NODE_DRAG_MIME,
 } from '../lib/nodes';
 import { useEditorStore } from '../store/editor';
-import type { AlertNode, CanvasDocument, CanvasNode, CanvasScreen, ConfirmationDialogNode, ContainerNode, FontDesign, M3eItemMetadata, M3eTextColor, NavigationTransition, ScreenBackground, ScreenDevice, ScreenOrientation, SwipeDirection, TextStyle, ToolbarItem } from '../types/document';
+import type { AlertAction, AlertNode, CanvasDocument, CanvasNode, CanvasScreen, ConfirmationDialogNode, ContainerNode, FontDesign, M3eItemMetadata, M3eTextColor, NavigationTransition, ScreenBackground, ScreenDevice, ScreenOrientation, SwipeDirection, TextStyle, ToolbarItem } from '../types/document';
 
 function readDragData(event: React.DragEvent): ReturnType<typeof decodeDragData> {
   const value = event.dataTransfer.getData(NODE_DRAG_MIME) || event.dataTransfer.getData('text/plain');
@@ -730,8 +730,7 @@ function renderNodeContent(
           <div className="section-title">{node.label || '確認を表示'} · {node.title || 'Alert'}</div>
           {node.message && <div className="alert-editor-message">{node.message}</div>}
           <div className="alert-editor-actions">
-            {node.secondaryButton && <span>{node.secondaryButton}</span>}
-            <span>{node.primaryButton || '続ける'}</span>
+            {alertActions(node).map((action, index) => <span key={`${action.label}-${index}`}>{action.label}</span>)}
           </div>
         </div>
       );
@@ -1238,6 +1237,14 @@ function PreviewToolbarButton({ item, onNavigate }: { item: ToolbarItem; onNavig
   );
 }
 
+function alertActions(node: AlertNode): AlertAction[] {
+  if (node.actions && node.actions.length > 0) return node.actions;
+  return [
+    ...(node.secondaryButton ? [{ label: node.secondaryButton, role: node.secondaryRole ?? 'normal' as const }] : []),
+    { label: node.primaryButton || '続ける', role: node.primaryRole },
+  ];
+}
+
 function AlertPreview({ node, onClose }: { node: AlertNode; onClose: () => void }) {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -1256,14 +1263,11 @@ function AlertPreview({ node, onClose }: { node: AlertNode; onClose: () => void 
           {node.message && <p>{node.message}</p>}
         </div>
         <div className="ios-alert-actions">
-          {node.secondaryButton && (
-            <button className={`ios-alert-action ${node.secondaryRole === 'destructive' ? 'destructive' : ''}`} type="button" onClick={onClose}>
-              {node.secondaryButton}
+          {alertActions(node).map((action, index) => (
+            <button className={`ios-alert-action ${action.role === 'destructive' ? 'destructive' : ''}`} type="button" key={`${action.label}-${index}`} onClick={onClose}>
+              {action.label}
             </button>
-          )}
-          <button className={`ios-alert-action ${node.primaryRole === 'destructive' ? 'destructive' : ''}`} type="button" onClick={onClose}>
-            {node.primaryButton || '続ける'}
-          </button>
+          ))}
         </div>
       </section>
     </div>

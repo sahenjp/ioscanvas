@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { findNode } from '../lib/nodes';
-import { convertM3eDocument, exportM3eDocument, generateM3eJson, inspectM3eCompatibility, inspectM3eExportCompatibility, isM3eDocument } from '../lib/m3e';
+import { convertM3eDocument, describeM3eCompatibilityFields, describeM3eCompatibilityKinds, exportM3eDocument, generateM3eJson, inspectM3eCompatibility, inspectM3eExportCompatibility, isM3eDocument } from '../lib/m3e';
 import { defaultDocument } from '../lib/defaultDocument';
 import { parseCanvasDocument } from '../lib/document';
 import { generateSwiftUI } from '../lib/swiftui';
@@ -56,6 +56,11 @@ const m3eDocument = {
 };
 
 describe('M3E compatibility importer', () => {
+  it('explains approximate mappings in compatibility diagnostics', () => {
+    expect(describeM3eCompatibilityKinds(['securefield', 'gauge'])).toContain('securefield（textFieldへ投影するため');
+    expect(describeM3eCompatibilityFields(['size', 'src'])).toContain('src（SwiftUIのAssetまたはURLへ差し替え）');
+  });
+
   it('exports the semantic iOS document to a readable M3E project and imports it again', () => {
     const exported = exportM3eDocument(defaultDocument);
     const parsedJson: unknown = JSON.parse(generateM3eJson(defaultDocument));
@@ -659,7 +664,49 @@ describe('M3E compatibility importer', () => {
 
     expect(findNode(document?.screens[0]?.root.children ?? [], 'm3e-camera')).toMatchObject({ kind: 'camera', label: '料理を撮影' });
     if (!document) throw new Error('Camera fixture was not converted');
-    expect(generateSwiftUI(document)).toContain('AVFoundation: AVCaptureSessionをカメラプレビューへ接続する');
+    expect(generateSwiftUI(document)).toContain('M3ECameraCapture(label: "料理を撮影")');
+  });
+
+  it('keeps M3E dialog choices and destinations in the Alert tree', () => {
+    const document = convertM3eDocument({
+      frames: [{ id: 'home', name: 'ホーム', x: 0, y: 0 }, { id: 'detail', name: '詳細', x: 492, y: 0 }],
+      groups: [{
+        id: 'dialog-group',
+        x: 16,
+        y: 80,
+        axis: 'y',
+        items: [{
+          id: 'dialog',
+          kind: 'dialog',
+          label: '削除しますか？',
+          supporting: 'この操作は取り消せません。',
+          tabs: [{ label: '削除', icon: 'trash' }, { label: 'キャンセル', icon: 'xmark' }, { label: '詳細', icon: null }],
+          actions: { 'tab:0': { to: 'detail', transition: 'slide' }, 'tab:1': { to: 'back', transition: 'slideLeft' } },
+        }],
+      }],
+    });
+
+    const dialog = findNode(document?.screens[0]?.root.children ?? [], 'm3e-dialog');
+    expect(dialog).toMatchObject({
+      kind: 'alert',
+      primaryButton: '削除',
+      secondaryButton: 'キャンセル',
+      actions: [
+        { label: '削除', destinationScreenId: 'screen-detail' },
+        { label: 'キャンセル', navigationAction: 'back' },
+        { label: '詳細' },
+      ],
+    });
+    if (!document) throw new Error('Dialog fixture was not converted');
+    const output = generateSwiftUI(document);
+    expect(output).toContain('Button("削除")');
+    expect(output).toContain('NavigationLink(destination: Screen2View()');
+    expect(output).toContain('show_alert_action_m3e_dialog_0 = true');
+    expect(output).toContain('Button("キャンセル")');
+    expect(output).toContain('dismiss()');
+    expect(exportM3eDocument(document).groups.flatMap((group) => group.items)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: 'dialog', tabs: expect.arrayContaining([{ label: '削除', icon: 'trash' }, { label: 'キャンセル', icon: 'xmark' }]) }),
+    ]));
   });
 
   it('keeps MapKit, Snackbar actions, and navigation selection state semantic', () => {

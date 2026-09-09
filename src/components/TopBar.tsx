@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { parseCanvasDocument } from '../lib/document';
-import { convertM3eDocument, inspectM3eCompatibility } from '../lib/m3e';
+import { convertM3eDocument, describeM3eCompatibilityFields, describeM3eCompatibilityKinds, inspectM3eCompatibility } from '../lib/m3e';
 import { lintDocument } from '../lib/hig';
 import { findNode } from '../lib/nodes';
 import { copyText, createShareUrl } from '../lib/share';
@@ -77,9 +77,9 @@ export function TopBar() {
           report.unresolvedDestinationCount > 0 ? `未解決の遷移${report.unresolvedDestinationCount}件` : '',
           report.unresolvedActionCount > 0 ? `未解決の操作${report.unresolvedActionCount}件` : '',
           report.unsupportedKinds.length > 0 ? `未対応パーツ: ${report.unsupportedKinds.join(', ')}` : '',
-          report.approximatedKinds.length > 0 ? `近似変換: ${report.approximatedKinds.join(', ')}` : '',
+          report.approximatedKinds.length > 0 ? `近似変換: ${describeM3eCompatibilityKinds(report.approximatedKinds)}` : '',
           report.preservedFields.length > 0 ? `保持: ${report.preservedFields.join(', ')}` : '',
-          report.approximatedFields.length > 0 ? `近似フィールド: ${report.approximatedFields.join(', ')}` : '',
+          report.approximatedFields.length > 0 ? `近似フィールド: ${describeM3eCompatibilityFields(report.approximatedFields)}` : '',
           report.lostFields.length > 0 ? `失われたフィールド: ${report.lostFields.join(', ')}` : '',
         ].filter(Boolean);
         setFileNotice(details.length > 0 ? `M3E互換確認: ${details.join(' / ')}` : null);

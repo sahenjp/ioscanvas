@@ -1,5 +1,5 @@
 import { isContainerNode } from './nodes';
-import type { AccentColor, AppearanceAccentColor, BackgroundStyle, ButtonStyle, ButtonToggle, CanvasDocument, CanvasNode, CanvasScreen, CardContentAlignment, CardImagePosition, ColorScheme, ContentPlacement, FontDesign, FrameWidth, GlassShape, GlassStyle, ImageSource, M3eAction, M3eItemMetadata, M3eMenuAction, M3ePresentationKind, M3eTab, M3eTextColor, M3eToggleAppearance, M3eVariant, NavigationTitleDisplayMode, NavigationTransition, NodeKind, ProgressStyle, ScreenBackground, ScreenDevice, ScreenOrientation, ShadowStyle, StackAlignment, SwipeDirection, TextAlignment, TextStyle, ToolbarItem, ToolbarPlacement } from '../types/document';
+import type { AccentColor, AlertAction, AppearanceAccentColor, BackgroundStyle, ButtonStyle, ButtonToggle, CanvasDocument, CanvasNode, CanvasScreen, CardContentAlignment, CardImagePosition, ColorScheme, ContentPlacement, FontDesign, FrameWidth, GlassShape, GlassStyle, ImageSource, M3eAction, M3eItemMetadata, M3eMenuAction, M3ePresentationKind, M3eTab, M3eTextColor, M3eToggleAppearance, M3eVariant, NavigationTitleDisplayMode, NavigationTransition, NodeKind, ProgressStyle, ScreenBackground, ScreenDevice, ScreenOrientation, ShadowStyle, StackAlignment, SwipeDirection, TextAlignment, TextStyle, ToolbarItem, ToolbarPlacement } from '../types/document';
 
 type RecordValue = Record<string, unknown>;
 
@@ -48,6 +48,29 @@ function readButtonToggle(value: unknown): ButtonToggle | null | undefined {
 function readNavigationTransition(value: unknown): NavigationTransition | null | undefined {
   if (value === undefined) return undefined;
   return isOneOf(value, ['slide', 'slideLeft', 'slideUp', 'slideDown', 'fade', 'expand', 'none']) ? value : null;
+}
+
+function readAlertActions(value: unknown): AlertAction[] | null | undefined {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value)) return null;
+  const actions: AlertAction[] = [];
+  for (const rawAction of value) {
+    if (!isRecord(rawAction) || !isString(rawAction.label) || !isOneOf(rawAction.role, ['normal', 'destructive', 'cancel'])) return null;
+    const navigationTransition = readNavigationTransition(rawAction.navigationTransition);
+    if (navigationTransition === null) return null;
+    const destinationScreenId = rawAction.destinationScreenId;
+    if (destinationScreenId !== undefined && !isString(destinationScreenId)) return null;
+    if (rawAction.navigationAction !== undefined && rawAction.navigationAction !== 'back') return null;
+    if (destinationScreenId !== undefined && rawAction.navigationAction !== undefined) return null;
+    actions.push({
+      label: rawAction.label,
+      role: rawAction.role,
+      ...(destinationScreenId === undefined ? {} : { destinationScreenId }),
+      ...(rawAction.navigationAction === undefined ? {} : { navigationAction: 'back' as const }),
+      ...(navigationTransition === undefined ? {} : { navigationTransition }),
+    });
+  }
+  return actions;
 }
 
 function readM3eMenuActions(value: unknown): Record<string, M3eMenuAction> | null | undefined {
@@ -360,7 +383,8 @@ function readNode(value: unknown, ids: Set<string>): CanvasNode | null {
         ? { id: value.id, kind: 'button', label: value.label, role: value.role, minHeight: value.minHeight, ...(value.accessibilityLabel === undefined ? {} : { accessibilityLabel: value.accessibilityLabel }), ...(value.systemName === undefined ? {} : { systemName: value.systemName }), ...(value.destinationScreenId === undefined ? {} : { destinationScreenId: value.destinationScreenId }), ...(value.buttonStyle === undefined ? {} : { buttonStyle: value.buttonStyle as ButtonStyle }), ...(toggle === undefined ? {} : { toggle }), ...nodeProperties }
         : null;
     }
-    case 'alert':
+    case 'alert': {
+      const actions = readAlertActions(value.actions);
       return isString(value.label)
         && isString(value.title)
         && isString(value.message)
@@ -369,6 +393,7 @@ function readNode(value: unknown, ids: Set<string>): CanvasNode | null {
         && (value.secondaryButton === undefined || isString(value.secondaryButton))
         && (value.secondaryRole === undefined || isOneOf(value.secondaryRole, ['normal', 'destructive', 'cancel']))
         && (value.secondaryButton !== undefined || value.secondaryRole === undefined)
+        && actions !== null
         && isNonNegativeNumber(value.minHeight)
         ? {
             id: value.id,
@@ -381,9 +406,11 @@ function readNode(value: unknown, ids: Set<string>): CanvasNode | null {
             minHeight: value.minHeight,
             ...(value.secondaryButton === undefined ? {} : { secondaryButton: value.secondaryButton }),
             ...(value.secondaryRole === undefined ? {} : { secondaryRole: value.secondaryRole }),
+            ...(actions === undefined ? {} : { actions }),
             ...nodeProperties,
           }
         : null;
+    }
     case 'confirmation-dialog':
       return isString(value.label)
         && isString(value.title)

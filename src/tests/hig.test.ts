@@ -101,6 +101,31 @@ describe('HIG linter', () => {
     ]));
   });
 
+  it('checks imported Alert actions for labels and destinations', () => {
+    const document = structuredClone(defaultDocument);
+    const screen = document.screens[0];
+    if (!screen) throw new Error('Fixture screen missing');
+    screen.root.children.push({
+      id: 'alert-actions-test',
+      kind: 'alert',
+      label: '確認',
+      title: '確認',
+      message: '確認してください。',
+      primaryButton: '続ける',
+      primaryRole: 'normal',
+      actions: [
+        { label: ' ', role: 'normal' },
+        { label: '設定', role: 'normal', destinationScreenId: 'missing-screen' },
+      ],
+      minHeight: 44,
+    });
+
+    expect(lintDocument(document)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ nodeId: 'alert-actions-test', code: 'ACCESSIBILITY' }),
+      expect.objectContaining({ nodeId: 'alert-actions-test', code: 'NAVIGATION_DESTINATION' }),
+    ]));
+  });
+
   it('checks ConfirmationDialog tap targets and choices', () => {
     const document = structuredClone(defaultDocument);
     document.screens[0]?.root.children.push({

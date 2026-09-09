@@ -127,6 +127,15 @@ function lintNode(
     });
   }
 
+  if (node.kind === 'alert' && node.actions?.some((action) => action.label.trim().length === 0)) {
+    issues.push({
+      nodeId: node.id,
+      severity: 'warning',
+      code: 'ACCESSIBILITY',
+      message: 'Alertの各操作には、VoiceOverで理解できるラベルを付けてください。',
+    });
+  }
+
   if (node.kind === 'confirmation-dialog' && (node.title.trim().length === 0 || node.options.every((option) => option.trim().length === 0))) {
     issues.push({
       nodeId: node.id,
@@ -175,6 +184,26 @@ function lintNode(
       code: 'NAVIGATION_STRUCTURE',
       message: `${node.kind === 'button' ? 'Button' : 'NavigationLink'}が現在の画面自身を遷移先にしています。意図しないNavigationStackの積み重ねにならないか確認してください。`,
     });
+  }
+
+  if (node.kind === 'alert') {
+    for (const action of node.actions ?? []) {
+      if (action.destinationScreenId !== undefined && !screenIds.has(action.destinationScreenId)) {
+        issues.push({
+          nodeId: node.id,
+          severity: 'warning',
+          code: 'NAVIGATION_DESTINATION',
+          message: `Alert「${action.label || '操作'}」の遷移先画面が未設定です。`,
+        });
+      } else if (action.destinationScreenId === screenId) {
+        issues.push({
+          nodeId: node.id,
+          severity: 'warning',
+          code: 'NAVIGATION_STRUCTURE',
+          message: `Alert「${action.label || '操作'}」が現在の画面自身を遷移先にしています。`,
+        });
+      }
+    }
   }
 
   for (const [slot, action] of Object.entries(node.m3eMenuActions ?? {})) {
