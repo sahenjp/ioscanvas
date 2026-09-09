@@ -2519,12 +2519,35 @@ function canonicalJson(value: unknown): string {
 }
 
 function exportMeaningfulSignatures(document: M3eExportDocument): string[] {
-  return document.groups
+  const frameReferences = new Map(document.frames.map((frame, index) => [frame.id, `frame-${index}`]));
+  const frameReference = (id: string): string => frameReferences.get(id) ?? id;
+  const normalizeAction = (action: M3eExportAction): M3eExportAction => ({ ...action, to: frameReference(action.to) });
+  const normalizeItem = (item: M3eExportItem): M3eExportItem => ({
+    ...item,
+    ...(item.action ? { action: normalizeAction(item.action) } : {}),
+    ...(item.actions ? { actions: Object.fromEntries(Object.entries(item.actions).map(([slot, action]) => [slot, normalizeAction(action)])) } : {}),
+  });
+  const documentSignature = canonicalJson({
+    title: document.title,
+    paletteKey: document.paletteKey,
+    theme: document.theme,
+    platform: document.platform,
+    frame: frameReference(document.frame),
+  });
+  const frameSignatures = document.frames.map((frame) => {
+    const swipe = frame.swipe;
+    const frameWithoutId = Object.fromEntries(Object.entries(frame).filter(([key]) => key !== 'id' && key !== 'swipe'));
+    return `frame:${canonicalJson({
+      ...frameWithoutId,
+      ...(swipe ? { swipe: Object.fromEntries(Object.entries(swipe).map(([direction, destination]) => [direction, frameReference(destination)])) } : {}),
+    })}`;
+  });
+  const itemSignatures = document.groups
     .flatMap((group) => group.items)
-    .map((item) => canonicalJson(Object.fromEntries(
-      Object.entries(item).filter(([key]) => key !== 'id' && key !== 'note' && key !== 'noteHistory'),
-    )))
-    .sort();
+    .map((item) => `item:${canonicalJson(Object.fromEntries(
+      Object.entries(normalizeItem(item)).filter(([key]) => key !== 'id' && key !== 'note' && key !== 'noteHistory'),
+    ))}`);
+  return [`document:${documentSignature}`, ...frameSignatures, ...itemSignatures].sort();
 }
 
 function exportTopBar(screen: CanvasScreen, frameIds: Map<string, string>): M3eExportItem | null {
@@ -2570,10 +2593,10 @@ function exportBottomBar(screen: CanvasScreen, frameIds: Map<string, string>): M
   }, screen.m3eBottomNav);
 }
 
-function exportGroupsForScreen(screen: CanvasScreen, frameIds: Map<string, string>, size: { width: number; height: number }): M3eExportGroup[] {
+function exportGroupsForScreen(screen: CanvasScreen, frameIds: Map<string, string>, size: { width: number; height: number }, originX: number): M3eExportGroup[] {
   const groups: M3eExportGroup[] = [];
   const topBar = exportTopBar(screen, frameIds);
-  if (topBar) groups.push({ id: `${screen.id}-group-top-bar`, x: 0, y: 0, axis: 'x', items: [topBar] });
+  if (topBar) groups.push({ id: `${screen.id}-group-top-bar`, x: originX, y: 0, axis: 'x', items: [topBar] });
 
   let y = 80;
   for (const [index, node] of screen.root.children.entries()) {
@@ -2582,12 +2605,12 @@ function exportGroupsForScreen(screen: CanvasScreen, frameIds: Map<string, strin
       : [exportItem(node, frameIds)].filter((item): item is M3eExportItem => item !== null);
     if (items.length === 0) continue;
     const axis = node.kind === 'hstack' || node.kind === 'lazyhstack' || node.kind === 'lazyhgrid' ? 'x' : 'y';
-    groups.push({ id: `${screen.id}-group-${index}`, x: 16, y, axis, items });
+    groups.push({ id: `${screen.id}-group-${index}`, x: originX + 16, y, axis, items });
     y += Math.max(80, items.length * 72);
   }
 
   const bottomBar = exportBottomBar(screen, frameIds);
-  if (bottomBar) groups.push({ id: `${screen.id}-group-bottom-bar`, x: 0, y: Math.max(0, size.height - 88), axis: 'x', items: [bottomBar] });
+  if (bottomBar) groups.push({ id: `${screen.id}-group-bottom-bar`, x: originX, y: Math.max(0, size.height - 88), axis: 'x', items: [bottomBar] });
   return groups;
 }
 
@@ -2608,13 +2631,14 @@ function exportFont(appearance: CanvasDocument['appearance']): string {
 
 export function exportM3eDocument(document: CanvasDocument): M3eExportDocument {
   const frameIds = new Map(document.screens.map((screen) => [screen.id, screen.id]));
-  const frames = document.screens.map((screen, index) => {
+  let frameX = 0;
+  const frames = document.screens.map((screen) => {
     const size = frameDimensions(screen);
     const swipe = exportSwipe(screen, frameIds);
-    return {
+    const frame = {
       id: screen.id,
       name: screen.name,
-      x: index * (size.width + 120),
+      x: frameX,
       y: 0,
       w: size.width,
       h: size.height,
@@ -2623,8 +2647,10 @@ export function exportM3eDocument(document: CanvasDocument): M3eExportDocument {
       ...(screen.contentPlacement ? { place: screen.contentPlacement } : {}),
       ...(swipe ? { swipe } : {}),
     } satisfies M3eExportFrame;
+    frameX += size.width + 120;
+    return frame;
   });
-  const groups = document.screens.flatMap((screen) => exportGroupsForScreen(screen, frameIds, frameDimensions(screen)));
+  const groups = document.screens.flatMap((screen, index) => exportGroupsForScreen(screen, frameIds, frameDimensions(screen), frames[index]?.x ?? 0));
   return {
     title: document.name,
     paletteKey: exportPaletteKey(document.appearance),

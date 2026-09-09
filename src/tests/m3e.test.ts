@@ -1256,6 +1256,47 @@ describe('M3E compatibility importer', () => {
     expect(exportReport.roundTripValid).toBe(true);
   });
 
+  it('validates screen and document metadata during an M3E round trip', () => {
+    const document: CanvasDocument = {
+      version: 1,
+      name: '画面メタデータ',
+      platform: 'iOS',
+      minimumOS: '26.0',
+      appearance: { colorScheme: 'dark', accentColor: 'custom', accentHex: '#14b8a6', fontDesign: 'serif' },
+      activeScreenId: 'detail',
+      screens: [
+        {
+          id: 'home',
+          name: 'ホーム',
+          navigationTitle: 'ホーム',
+          notes: '一覧',
+          contentPlacement: 'spread',
+          background: 'surfaceContainerHigh',
+          previewDevice: 'iphone-se',
+          previewOrientation: 'landscape',
+          root: { id: 'home-root', kind: 'vstack', children: [] },
+        },
+        {
+          id: 'detail',
+          name: '詳細',
+          navigationTitle: '詳細',
+          previewDevice: 'iphone-16',
+          previewOrientation: 'portrait',
+          swipe: { left: 'home' },
+          root: { id: 'detail-root', kind: 'vstack', children: [] },
+        },
+      ],
+    };
+
+    const report = inspectM3eExportCompatibility(document);
+    expect(report.normalizedScreenCount).toBe(2);
+    const exported = exportM3eDocument(document);
+    expect(exported.groups.find((group) => group.id === 'detail-group-top-bar')?.x).toBe(787);
+    const roundTripped = convertM3eDocument(exported);
+    expect(roundTripped).not.toBeNull();
+    expect(report.roundTripValid).toBe(true);
+  });
+
   it('maps slider value and range into SwiftUI semantics before exporting', () => {
     const document = convertM3eDocument({
       frames: [{ id: 'home', name: 'ホーム', x: 0, y: 0 }],
