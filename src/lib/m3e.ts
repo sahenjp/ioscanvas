@@ -181,6 +181,7 @@ export interface M3eCompatibilityReport {
   approximatedFields: string[];
   lostFields: string[];
   invalidFields: string[];
+  duplicateIdFields: string[];
   unknownFields: string[];
 }
 
@@ -197,6 +198,7 @@ export type M3eCompatibilityAnomalyCode =
   | 'UNRESOLVED_NAVIGATION'
   | 'LOST_FIELD'
   | 'INVALID_FIELD'
+  | 'DUPLICATE_ID'
   | 'UNKNOWN_FIELD'
   | 'ROUND_TRIP';
 
@@ -218,6 +220,7 @@ export interface M3eExportCompatibilityReport {
   approximatedFields: string[];
   lostFields: string[];
   invalidFields: string[];
+  duplicateIdFields: string[];
   unknownFields: string[];
   normalizedScreenCount: number;
   roundTripValid: boolean;
@@ -305,6 +308,7 @@ function importCompatibilityAnomalies(report: M3eCompatibilityReport): M3eCompat
   if (report.approximatedFields.length > 0) anomalies.push(compatibilityAnomaly('approximated', 'APPROXIMATED_FIELD', '近似フィールド', describeM3eCompatibilityFields(report.approximatedFields)));
   if (report.lostFields.length > 0) anomalies.push(compatibilityAnomaly('lost', 'LOST_FIELD', '失われたフィールド', report.lostFields.join(', ')));
   if (report.invalidFields.length > 0) anomalies.push(compatibilityAnomaly('lost', 'INVALID_FIELD', '不正な値', report.invalidFields.join(', ')));
+  if (report.duplicateIdFields.length > 0) anomalies.push(compatibilityAnomaly('lost', 'DUPLICATE_ID', '重複したID', report.duplicateIdFields.join(', ')));
   if (report.unknownFields.length > 0) anomalies.push(compatibilityAnomaly('lost', 'UNKNOWN_FIELD', '未知のフィールド', report.unknownFields.join(', ')));
   return anomalies;
 }
@@ -325,6 +329,7 @@ function exportCompatibilityAnomalies(report: M3eExportCompatibilityReport): M3e
   if (report.approximatedFields.length > 0) anomalies.push(compatibilityAnomaly('approximated', 'APPROXIMATED_FIELD', '近似フィールド', describeM3eCompatibilityFields(report.approximatedFields)));
   if (report.lostFields.length > 0) anomalies.push(compatibilityAnomaly('lost', 'LOST_FIELD', '出力できないフィールド', report.lostFields.join(', ')));
   if (report.invalidFields.length > 0) anomalies.push(compatibilityAnomaly('lost', 'INVALID_FIELD', '不正な値', report.invalidFields.join(', ')));
+  if (report.duplicateIdFields.length > 0) anomalies.push(compatibilityAnomaly('lost', 'DUPLICATE_ID', '重複したID', report.duplicateIdFields.join(', ')));
   if (report.unknownFields.length > 0) anomalies.push(compatibilityAnomaly('lost', 'UNKNOWN_FIELD', '未知のフィールド', report.unknownFields.join(', ')));
   if (!report.roundTripValid) anomalies.push(compatibilityAnomaly('lost', 'ROUND_TRIP', '再読込検証', '書き出したM3E JSONを再読込できませんでした。'));
   return anomalies;
@@ -1005,6 +1010,39 @@ function collectM3eInvalidFields(value: unknown): string[] {
   });
 
   return [...invalidFields].sort();
+}
+
+function collectM3eDuplicateIdFields(value: unknown): string[] {
+  if (!isRecord(value)) return [];
+  const duplicateFields = new Set<string>();
+  const collect = (entries: Array<{ id: unknown; path: string }>): void => {
+    const firstPathById = new Map<string, string>();
+    for (const entry of entries) {
+      if (typeof entry.id !== 'string' || !entry.id.trim()) continue;
+      const firstPath = firstPathById.get(entry.id);
+      if (firstPath) {
+        duplicateFields.add(firstPath);
+        duplicateFields.add(entry.path);
+      } else {
+        firstPathById.set(entry.id, entry.path);
+      }
+    }
+  };
+
+  const frames = Array.isArray(value.frames) ? value.frames : [];
+  collect(frames.map((frame, index) => ({ id: isRecord(frame) ? frame.id : undefined, path: `frames[${index}].id` })));
+
+  const groups = Array.isArray(value.groups) ? value.groups : [];
+  collect(groups.map((group, index) => ({ id: isRecord(group) ? group.id : undefined, path: `groups[${index}].id` })));
+  collect(groups.flatMap((group, groupIndex) => {
+    if (!isRecord(group) || !Array.isArray(group.items)) return [];
+    return group.items.map((item, itemIndex) => ({
+      id: isRecord(item) ? item.id : undefined,
+      path: `groups[${groupIndex}].items[${itemIndex}].id`,
+    }));
+  }));
+
+  return [...duplicateFields].sort();
 }
 
 function appendNotes(node: CanvasNode, item: JsonObject, extra: string[] = []): CanvasNode {
@@ -1790,6 +1828,7 @@ export function inspectM3eCompatibility(value: unknown): M3eCompatibilityReport 
     approximatedFields: [...approximatedFields].sort(),
     lostFields: [...lostFields].sort(),
     invalidFields: collectM3eInvalidFields(value),
+    duplicateIdFields: collectM3eDuplicateIdFields(value),
     unknownFields: collectM3eUnknownFields(value),
   };
 }
@@ -2758,6 +2797,7 @@ export function inspectM3eExportCompatibility(document: CanvasDocument): M3eExpo
     approximatedFields,
     lostFields,
     invalidFields: collectM3eInvalidFields(exported),
+    duplicateIdFields: collectM3eDuplicateIdFields(exported),
     unknownFields: [],
     normalizedScreenCount: exported.frames.length,
     roundTripValid: roundTripped !== null

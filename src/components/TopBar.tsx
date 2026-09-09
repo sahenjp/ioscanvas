@@ -84,6 +84,7 @@ export function TopBar() {
           report.approximatedFields.length > 0 ? `近似フィールド: ${describeM3eCompatibilityFields(report.approximatedFields)}` : '',
           report.lostFields.length > 0 ? `失われたフィールド: ${report.lostFields.join(', ')}` : '',
           report.invalidFields.length > 0 ? `不正な値: ${report.invalidFields.join(', ')}` : '',
+          report.duplicateIdFields.length > 0 ? `重複したID: ${report.duplicateIdFields.join(', ')}` : '',
           report.unknownFields.length > 0 ? `未知のフィールド: ${report.unknownFields.join(', ')}` : '',
         ].filter(Boolean);
         setFileNotice(details.length > 0 ? `M3E互換確認: ${details.join(' / ')}` : null);

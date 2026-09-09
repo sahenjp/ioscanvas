@@ -120,6 +120,7 @@ describe('M3E compatibility importer', () => {
       approximatedFields: [],
       lostFields: [],
       invalidFields: [],
+      duplicateIdFields: [],
       unknownFields: [],
       normalizedScreenCount: 1,
       roundTripValid: true,
@@ -723,6 +724,7 @@ describe('M3E compatibility importer', () => {
       approximatedFields: [],
       lostFields: [],
       invalidFields: ['frames[1].name', 'groups[0].items[3]', 'groups[1].axis', 'groups[1].items'],
+      duplicateIdFields: [],
       unknownFields: [],
       flattenedLayoutCount: 0,
     });
@@ -823,6 +825,31 @@ describe('M3E compatibility importer', () => {
     ]));
     expect(getM3eCompatibilityAnomalies(report!)).toEqual(expect.arrayContaining([
       expect.objectContaining({ code: 'INVALID_FIELD', status: 'lost' }),
+    ]));
+  });
+
+  it('reports duplicate frame, group, and item IDs before navigation becomes ambiguous', () => {
+    const report = inspectM3eCompatibility({
+      frames: [
+        { id: 'home', name: 'ホーム', x: 0, y: 0 },
+        { id: 'home', name: '別のホーム', x: 500, y: 0 },
+      ],
+      groups: [
+        { id: 'body', x: 0, y: 0, axis: 'y', items: [{ id: 'title', kind: 'text', label: '一' }] },
+        { id: 'body', x: 500, y: 0, axis: 'y', items: [{ id: 'title', kind: 'text', label: '二' }] },
+      ],
+    });
+
+    expect(report?.duplicateIdFields).toEqual(expect.arrayContaining([
+      'frames[0].id',
+      'frames[1].id',
+      'groups[0].id',
+      'groups[1].id',
+      'groups[0].items[0].id',
+      'groups[1].items[0].id',
+    ]));
+    expect(getM3eCompatibilityAnomalies(report!)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'DUPLICATE_ID', status: 'lost' }),
     ]));
   });
 
