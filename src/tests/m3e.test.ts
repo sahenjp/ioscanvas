@@ -1131,8 +1131,9 @@ describe('M3E compatibility importer', () => {
     const report = inspectM3eCompatibility({
       title: 42,
       platform: false,
+      paletteKey: 'unknown-palette',
       frame: 'missing',
-      theme: { dark: 'true', bothModes: 1, font: null },
+      theme: { dark: 'true', bothModes: 1, font: 'unknown-font' },
       frames: [{ id: 'home', name: 'ホーム', x: 0, y: 0 }],
       groups: [],
     });
@@ -1140,6 +1141,7 @@ describe('M3E compatibility importer', () => {
     expect(report?.invalidFields).toEqual(expect.arrayContaining([
       'document.title',
       'document.platform',
+      'document.paletteKey',
       'document.frame',
       'theme.dark',
       'theme.bothModes',

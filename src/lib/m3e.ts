@@ -906,7 +906,7 @@ function collectM3eInvalidFields(value: unknown): string[] {
   const frames = Array.isArray(value.frames) ? value.frames : [];
   const frameIds = new Set(frames.flatMap((frame) => isRecord(frame) && typeof frame.id === 'string' ? [frame.id] : []));
   if (Object.prototype.hasOwnProperty.call(value, 'title') && typeof value.title !== 'string') invalidFields.add('document.title');
-  if (Object.prototype.hasOwnProperty.call(value, 'paletteKey') && typeof value.paletteKey !== 'string') invalidFields.add('document.paletteKey');
+  if (Object.prototype.hasOwnProperty.call(value, 'paletteKey') && !isOneOf(value.paletteKey, ['blue', 'purple', 'green', 'coral', 'amber', 'teal', 'mono'])) invalidFields.add('document.paletteKey');
   if (Object.prototype.hasOwnProperty.call(value, 'platform') && typeof value.platform !== 'string') invalidFields.add('document.platform');
   if (Object.prototype.hasOwnProperty.call(value, 'frame')) {
     if (typeof value.frame !== 'string' || !value.frame.trim() || !frameIds.has(value.frame)) invalidFields.add('document.frame');
@@ -917,7 +917,7 @@ function collectM3eInvalidFields(value: unknown): string[] {
     } else {
       if (Object.prototype.hasOwnProperty.call(value.theme, 'dark') && typeof value.theme.dark !== 'boolean') invalidFields.add('theme.dark');
       if (Object.prototype.hasOwnProperty.call(value.theme, 'bothModes') && typeof value.theme.bothModes !== 'boolean') invalidFields.add('theme.bothModes');
-      if (Object.prototype.hasOwnProperty.call(value.theme, 'font') && typeof value.theme.font !== 'string') invalidFields.add('theme.font');
+      if (Object.prototype.hasOwnProperty.call(value.theme, 'font') && !isOneOf(value.theme.font, ['system', 'robotoSerif'])) invalidFields.add('theme.font');
     }
   }
   frames.forEach((frame, frameIndex) => {
