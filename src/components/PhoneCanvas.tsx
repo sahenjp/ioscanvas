@@ -9,6 +9,7 @@ import {
   isContainerNode,
   NODE_DRAG_MIME,
 } from '../lib/nodes';
+import { screenNavigationEntries } from '../lib/navigation';
 import { useEditorStore } from '../store/editor';
 import type { AlertAction, AlertNode, CanvasDocument, CanvasNode, CanvasScreen, ConfirmationDialogNode, ContainerNode, FontDesign, M3eItemMetadata, M3eTextColor, NavigationTransition, ScreenBackground, ScreenDevice, ScreenOrientation, SwipeDirection, TextStyle, ToolbarItem } from '../types/document';
 
@@ -1083,18 +1084,18 @@ function ScreenPreview({
               return (
                 <button
                   className="screen-flow-link"
-                  key={`${connection.nodeId ?? connection.gesture}-${connection.destinationScreenId}`}
+                  key={`${initialScreen.id}-${connection.key}`}
                   type="button"
                   onClick={(event) => {
                     event.stopPropagation();
                     selectScreen(initialScreen.id);
                     selectNode(connection.nodeId);
                   }}
-                  title={`${initialScreen.name}から${destination?.name ?? '未設定'}へ`}
+                  title={`${initialScreen.name}から${connection.navigationAction === 'back' ? '前の画面' : destination?.name ?? '未設定'}へ`}
                 >
                   <span aria-hidden="true">→</span>
-                  <span>{destination?.name ?? '未設定'}</span>
-                  <span className="screen-flow-kind">{connection.gesture ?? 'NavigationLink'}</span>
+                  <span>{connection.navigationAction === 'back' ? '前の画面' : destination?.name ?? '未設定'}</span>
+                  <span className="screen-flow-kind">{connection.gesture ?? (connection.navigationAction === 'back' ? '戻る' : 'NavigationLink')}</span>
                 </button>
               );
             })}
@@ -1158,7 +1159,12 @@ function ScreenPreview({
             />
           )}
           {previewMode && alert && (
-            <AlertPreview node={alert} onClose={() => setOpenSheetId(null)} />
+            <AlertPreview
+              node={alert}
+              onClose={() => setOpenSheetId(null)}
+              onNavigateScreen={navigatePreview}
+              onNavigateBack={backPreview}
+            />
           )}
           {previewMode && confirmationDialog && (
             <ConfirmationDialogPreview node={confirmationDialog} onClose={() => setOpenSheetId(null)} />
@@ -1246,7 +1252,17 @@ function alertActions(node: AlertNode): AlertAction[] {
   ];
 }
 
-function AlertPreview({ node, onClose }: { node: AlertNode; onClose: () => void }) {
+function AlertPreview({
+  node,
+  onClose,
+  onNavigateScreen,
+  onNavigateBack,
+}: {
+  node: AlertNode;
+  onClose: () => void;
+  onNavigateScreen?: (screenId: string, transition?: NavigationTransition) => void;
+  onNavigateBack?: (transition?: NavigationTransition) => void;
+}) {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose();
@@ -1265,7 +1281,16 @@ function AlertPreview({ node, onClose }: { node: AlertNode; onClose: () => void 
         </div>
         <div className="ios-alert-actions">
           {alertActions(node).map((action, index) => (
-            <button className={`ios-alert-action ${action.role === 'destructive' ? 'destructive' : ''}`} type="button" key={`${action.label}-${index}`} onClick={onClose}>
+            <button
+              className={`ios-alert-action ${action.role === 'destructive' ? 'destructive' : ''}`}
+              type="button"
+              key={`${action.label}-${index}`}
+              onClick={() => {
+                onClose();
+                if (action.navigationAction === 'back') onNavigateBack?.(action.navigationTransition);
+                else if (action.destinationScreenId) onNavigateScreen?.(action.destinationScreenId, action.navigationTransition);
+              }}
+            >
               {action.label}
             </button>
           ))}
@@ -1840,54 +1865,28 @@ function containerAlignmentStyle(node: CanvasNode): CSSProperties {
   return { alignItems: node.alignment === 'top' ? 'flex-start' : node.alignment === 'bottom' ? 'flex-end' : 'center' };
 }
 
-function navigationDestinations(nodes: CanvasNode[]): string[] {
-  return [...new Set(nodes.flatMap((node) => [
-    ...((node.kind === 'navigation-link' || node.kind === 'button') && node.destinationScreenId ? [node.destinationScreenId] : []),
-    ...(node.children ? navigationDestinations(node.children) : []),
-  ]))];
-}
-
 function screenDestinations(screen: CanvasScreen): string[] {
-  return [...new Set([
-    ...navigationDestinations(screen.root.children),
-    ...(screen.toolbarItems ?? []).flatMap((item) => item.destinationScreenId ? [item.destinationScreenId] : []),
-    ...(screen.tabBarItems ?? []).flatMap((item) => item.destinationScreenId ? [item.destinationScreenId] : []),
-  ])];
+  return [...new Set(screenNavigationEntries(screen).flatMap((entry) => entry.destinationScreenId ? [entry.destinationScreenId] : []))];
 }
 
 interface ScreenConnection {
-  destinationScreenId: string;
+  key: string;
+  destinationScreenId?: string;
   nodeId: string | null;
+  navigationAction?: 'back';
   gesture?: string;
 }
 
 function screenConnections(screen: CanvasScreen): ScreenConnection[] {
-  const navigation = navigationLinks(screen.root.children).flatMap((node) =>
-    node.destinationScreenId
-      ? [{ destinationScreenId: node.destinationScreenId, nodeId: node.id }]
-      : [],
-  );
-  const toolbar = (screen.toolbarItems ?? []).flatMap((item) =>
-    item.destinationScreenId
-      ? [{ destinationScreenId: item.destinationScreenId, nodeId: null, gesture: `ツールバー · ${item.title}` }]
-      : [],
-  );
-  const tabBar = (screen.tabBarItems ?? []).flatMap((item) =>
-    item.destinationScreenId
-      ? [{ destinationScreenId: item.destinationScreenId, nodeId: null, gesture: `タブバー · ${item.title}` }]
-      : [],
-  );
+  const navigation = screenNavigationEntries(screen).map((entry) => ({
+    ...entry,
+    gesture: entry.context,
+  }));
   const swipe = Object.entries(screen.swipe ?? {}).map(([direction, destinationScreenId]) => ({
+    key: `swipe-${direction}`,
     destinationScreenId,
     nodeId: null,
     gesture: direction === 'left' ? '左スワイプ' : direction === 'right' ? '右スワイプ' : direction === 'up' ? '上スワイプ' : '下スワイプ',
   }));
-  return [...navigation, ...toolbar, ...tabBar, ...swipe];
-}
-
-function navigationLinks(nodes: CanvasNode[]): Extract<CanvasNode, { kind: 'navigation-link' | 'button' }>[] {
-  return nodes.flatMap((node) => [
-    ...(node.kind === 'navigation-link' || node.kind === 'button' ? (node.destinationScreenId ? [node] : []) : []),
-    ...(node.children ? navigationLinks(node.children) : []),
-  ]);
+  return [...navigation, ...swipe];
 }

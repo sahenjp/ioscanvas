@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { decodeDragData, encodeDragData, findNode, findNodeLocation, isContainerNode, NODE_DRAG_MIME } from '../lib/nodes';
+import { screenNavigationEntries } from '../lib/navigation';
 import { useEditorStore } from '../store/editor';
 import type { CanvasNode, CanvasScreen, M3eInsertKind, M3ePresentationKind, M3eScreenPartKind, NodeKind, PatternId, SwipeDirection } from '../types/document';
 
@@ -741,15 +742,13 @@ function NavigationList() {
   const selectScreen = useEditorStore((state) => state.selectScreen);
   const names = new Map(document.screens.map((screen) => [screen.id, screen.name]));
   const links = document.screens.flatMap((screen) => [
-    ...navigationLinks(screen.root.children).flatMap((node) =>
-      node.destinationScreenId
-        ? [{ screen, nodeId: node.id, destinationScreenId: node.destinationScreenId, gesture: '' }]
-        : [],
-    ),
+    ...screenNavigationEntries(screen).map((entry) => ({ screen, ...entry, gesture: entry.context ?? '' })),
     ...Object.entries(screen.swipe ?? {}).map(([direction, destinationScreenId]) => ({
       screen,
       nodeId: null,
+      key: `swipe-${direction}`,
       destinationScreenId,
+      navigationAction: undefined,
       gesture: swipeDirectionLabel(direction as SwipeDirection),
     })),
   ]);
@@ -761,13 +760,13 @@ function NavigationList() {
         <span className="section-heading-meta">{links.length}接続</span>
       </div>
       {links.length === 0 ? (
-        <div className="navigation-empty">NavigationLink、遷移ボタン、スワイプ遷移を追加すると、画面の接続が表示されます。</div>
+        <div className="navigation-empty">NavigationLink、操作バー、Alert、メニュー、スワイプ遷移を追加すると、画面の接続が表示されます。</div>
       ) : (
         <div className="navigation-list">
-          {links.map(({ screen, nodeId, destinationScreenId, gesture }) => (
+          {links.map(({ screen, nodeId, key, destinationScreenId, navigationAction, gesture }) => (
             <button
               className="navigation-list-item"
-              key={`${screen.id}-${nodeId ?? gesture}`}
+              key={`${screen.id}-${key}`}
               type="button"
               onClick={() => {
                 selectScreen(screen.id);
@@ -776,7 +775,7 @@ function NavigationList() {
             >
               <span className="navigation-source">{screen.name}</span>
               <span className="navigation-arrow" aria-hidden="true">→</span>
-              <span className="navigation-destination">{names.get(destinationScreenId) ?? '未設定'}</span>
+              <span className="navigation-destination">{navigationAction === 'back' ? '前の画面' : names.get(destinationScreenId ?? '') ?? '未設定'}</span>
               {gesture && <span className="navigation-gesture">{gesture}</span>}
             </button>
           ))}
@@ -873,13 +872,6 @@ function TreeNode({
       )}
     </div>
   );
-}
-
-function navigationLinks(nodes: CanvasNode[]): Extract<CanvasNode, { kind: 'navigation-link' | 'button' }>[] {
-  return nodes.flatMap((node) => [
-    ...(node.kind === 'navigation-link' || node.kind === 'button' ? (node.destinationScreenId ? [node] : []) : []),
-    ...(node.children ? navigationLinks(node.children) : []),
-  ]);
 }
 
 function swipeDirectionLabel(direction: SwipeDirection): string {
