@@ -169,15 +169,22 @@ function orientationForFrame(width: number, height: number): ScreenOrientation {
 
 export interface M3eCompatibilityReport {
   invalidFrameCount: number;
+  invalidFramePaths: string[];
   invalidGroupCount: number;
+  invalidGroupPaths: string[];
   orphanedGroupCount: number;
+  orphanedGroupPaths: string[];
   discardedItemCount: number;
+  discardedItemPaths: string[];
   unresolvedDestinationCount: number;
   unresolvedActionCount: number;
   unresolvedPaths: string[];
   flattenedLayoutCount: number;
+  flattenedPaths: string[];
   unsupportedKinds: string[];
+  unsupportedPaths: string[];
   approximatedKinds: string[];
+  approximatedPaths: string[];
   preservedFields: string[];
   approximatedFields: string[];
   lostFields: string[];
@@ -213,8 +220,11 @@ export interface M3eCompatibilityAnomaly {
 export interface M3eExportCompatibilityReport {
   flattenedItemCount: number;
   unsupportedNodeKinds: string[];
+  unsupportedPaths: string[];
   flattenedNodeKinds: string[];
+  flattenedPaths: string[];
   approximatedKinds: string[];
+  approximatedPaths: string[];
   unresolvedDestinationCount: number;
   unresolvedActionCount: number;
   unresolvedPaths: string[];
@@ -298,13 +308,17 @@ function unresolvedNavigationDetail(
   return report.unresolvedPaths.length > 0 ? `${summary} 対象: ${report.unresolvedPaths.join(', ')}` : summary;
 }
 
+function compatibilityDetail(summary: string, paths: string[]): string {
+  return paths.length > 0 ? `${summary} 対象: ${paths.join(', ')}` : summary;
+}
+
 function importCompatibilityAnomalies(report: M3eCompatibilityReport): M3eCompatibilityAnomaly[] {
   const anomalies: M3eCompatibilityAnomaly[] = [];
-  if (report.invalidFrameCount > 0) anomalies.push(compatibilityAnomaly('lost', 'INVALID_FRAME', '無効な画面', `${report.invalidFrameCount}件を読み込めませんでした。`));
-  if (report.invalidGroupCount > 0) anomalies.push(compatibilityAnomaly('lost', 'INVALID_GROUP', '無効なグループ', `${report.invalidGroupCount}件を読み込めませんでした。`));
-  if (report.orphanedGroupCount > 0) anomalies.push(compatibilityAnomaly('lost', 'ORPHANED_GROUP', '画面外グループ', `${report.orphanedGroupCount}件を画面へ割り当てられませんでした。`));
-  if (report.discardedItemCount > 0) anomalies.push(compatibilityAnomaly('lost', 'DISCARDED_ITEM', '破棄した項目', `${report.discardedItemCount}件が有効な項目として解釈できませんでした。`));
-  if (report.flattenedLayoutCount > 0) anomalies.push(compatibilityAnomaly('approximated', 'FLATTENED_LAYOUT', '自由配置の平坦化', `${report.flattenedLayoutCount}件の座標・ロック情報を意味構造へ変換しました。`));
+  if (report.invalidFrameCount > 0) anomalies.push(compatibilityAnomaly('lost', 'INVALID_FRAME', '無効な画面', compatibilityDetail(`${report.invalidFrameCount}件を読み込めませんでした。`, report.invalidFramePaths)));
+  if (report.invalidGroupCount > 0) anomalies.push(compatibilityAnomaly('lost', 'INVALID_GROUP', '無効なグループ', compatibilityDetail(`${report.invalidGroupCount}件を読み込めませんでした。`, report.invalidGroupPaths)));
+  if (report.orphanedGroupCount > 0) anomalies.push(compatibilityAnomaly('lost', 'ORPHANED_GROUP', '画面外グループ', compatibilityDetail(`${report.orphanedGroupCount}件を画面へ割り当てられませんでした。`, report.orphanedGroupPaths)));
+  if (report.discardedItemCount > 0) anomalies.push(compatibilityAnomaly('lost', 'DISCARDED_ITEM', '破棄した項目', compatibilityDetail(`${report.discardedItemCount}件が有効な項目として解釈できませんでした。`, report.discardedItemPaths)));
+  if (report.flattenedLayoutCount > 0) anomalies.push(compatibilityAnomaly('approximated', 'FLATTENED_LAYOUT', '自由配置の平坦化', compatibilityDetail(`${report.flattenedLayoutCount}件の座標・ロック情報を意味構造へ変換しました。`, report.flattenedPaths)));
   if (report.unresolvedDestinationCount > 0 || report.unresolvedActionCount > 0) {
     anomalies.push(compatibilityAnomaly(
       'unresolved',
@@ -313,8 +327,8 @@ function importCompatibilityAnomalies(report: M3eCompatibilityReport): M3eCompat
       unresolvedNavigationDetail(report, 'を確認できませんでした。'),
     ));
   }
-  if (report.unsupportedKinds.length > 0) anomalies.push(compatibilityAnomaly('lost', 'UNSUPPORTED_KIND', '未対応パーツ', report.unsupportedKinds.join(', ')));
-  if (report.approximatedKinds.length > 0) anomalies.push(compatibilityAnomaly('approximated', 'APPROXIMATED_KIND', '近似変換', describeM3eCompatibilityKinds(report.approximatedKinds)));
+  if (report.unsupportedKinds.length > 0) anomalies.push(compatibilityAnomaly('lost', 'UNSUPPORTED_KIND', '未対応パーツ', compatibilityDetail(report.unsupportedKinds.join(', '), report.unsupportedPaths)));
+  if (report.approximatedKinds.length > 0) anomalies.push(compatibilityAnomaly('approximated', 'APPROXIMATED_KIND', '近似変換', compatibilityDetail(describeM3eCompatibilityKinds(report.approximatedKinds), report.approximatedPaths)));
   if (report.approximatedFields.length > 0) anomalies.push(compatibilityAnomaly('approximated', 'APPROXIMATED_FIELD', '近似フィールド', describeM3eCompatibilityFields(report.approximatedFields)));
   if (report.lostFields.length > 0) anomalies.push(compatibilityAnomaly('lost', 'LOST_FIELD', '失われたフィールド', report.lostFields.join(', ')));
   if (report.invalidFields.length > 0) anomalies.push(compatibilityAnomaly('lost', 'INVALID_FIELD', '不正な値', report.invalidFields.join(', ')));
@@ -325,9 +339,9 @@ function importCompatibilityAnomalies(report: M3eCompatibilityReport): M3eCompat
 
 function exportCompatibilityAnomalies(report: M3eExportCompatibilityReport): M3eCompatibilityAnomaly[] {
   const anomalies: M3eCompatibilityAnomaly[] = [];
-  if (report.unsupportedNodeKinds.length > 0) anomalies.push(compatibilityAnomaly('lost', 'UNSUPPORTED_KIND', '直接対応のない要素', report.unsupportedNodeKinds.join(', ')));
-  if (report.flattenedNodeKinds.length > 0) anomalies.push(compatibilityAnomaly('approximated', 'FLATTENED_LAYOUT', '構造平坦化', report.flattenedNodeKinds.join(', ')));
-  if (report.approximatedKinds.length > 0) anomalies.push(compatibilityAnomaly('approximated', 'APPROXIMATED_KIND', '近似変換', describeM3eCompatibilityKinds(report.approximatedKinds)));
+  if (report.unsupportedNodeKinds.length > 0) anomalies.push(compatibilityAnomaly('lost', 'UNSUPPORTED_KIND', '直接対応のない要素', compatibilityDetail(report.unsupportedNodeKinds.join(', '), report.unsupportedPaths)));
+  if (report.flattenedNodeKinds.length > 0) anomalies.push(compatibilityAnomaly('approximated', 'FLATTENED_LAYOUT', '構造平坦化', compatibilityDetail(report.flattenedNodeKinds.join(', '), report.flattenedPaths)));
+  if (report.approximatedKinds.length > 0) anomalies.push(compatibilityAnomaly('approximated', 'APPROXIMATED_KIND', '近似変換', compatibilityDetail(describeM3eCompatibilityKinds(report.approximatedKinds), report.approximatedPaths)));
   if (report.unresolvedDestinationCount > 0 || report.unresolvedActionCount > 0) {
     anomalies.push(compatibilityAnomaly(
       'unresolved',
@@ -1789,51 +1803,82 @@ export function inspectM3eCompatibility(value: unknown): M3eCompatibilityReport 
   if (!isM3eDocument(value)) return null;
 
   const rawFrames = value.frames as unknown[];
-  const frames = rawFrames.map(readFrame).filter((frame): frame is M3eFrame => frame !== null);
+  const invalidFramePaths = new Set<string>();
+  const frames = rawFrames.flatMap((rawFrame, frameIndex) => {
+    const frame = readFrame(rawFrame);
+    if (!frame) invalidFramePaths.add(`frames[${frameIndex}]`);
+    return frame ? [frame] : [];
+  });
   const frameIds = new Set(frames.map((frame) => frame.id));
   const unsupportedKinds = new Set<string>();
+  const unsupportedPaths = new Set<string>();
   const approximatedKinds = new Set<string>();
+  const approximatedPaths = new Set<string>();
   const preservedFields = new Set<string>();
   const approximatedFields = new Set<string>();
   const lostFields = new Set<string>();
   let invalidGroupCount = 0;
+  const invalidGroupPaths = new Set<string>();
   let orphanedGroupCount = 0;
+  const orphanedGroupPaths = new Set<string>();
   let discardedItemCount = 0;
+  const discardedItemPaths = new Set<string>();
   let unresolvedDestinationCount = 0;
   let unresolvedActionCount = 0;
   const unresolvedPaths = new Set<string>();
   let flattenedLayoutCount = 0;
+  const flattenedPaths = new Set<string>();
 
   for (const [groupIndex, rawGroup] of (value.groups as unknown[]).entries()) {
+    const groupPath = `groups[${groupIndex}]`;
     if (!isRecord(rawGroup) || !Array.isArray(rawGroup.items)) {
       invalidGroupCount += 1;
+      invalidGroupPaths.add(groupPath);
       continue;
     }
     const group = readGroup(rawGroup);
     if (!group) {
       invalidGroupCount += 1;
+      invalidGroupPaths.add(groupPath);
       continue;
     }
-    if (!frameForGroup(group, frames)) orphanedGroupCount += 1;
+    if (!frameForGroup(group, frames)) {
+      orphanedGroupCount += 1;
+      orphanedGroupPaths.add(groupPath);
+    }
     for (const field of ['free', 'locked', 'pos']) {
-      if (Object.prototype.hasOwnProperty.call(rawGroup, field)) flattenedLayoutCount += 1;
+      if (Object.prototype.hasOwnProperty.call(rawGroup, field)) {
+        flattenedLayoutCount += 1;
+        flattenedPaths.add(`groups[${groupIndex}].${field}`);
+      }
     }
     for (const [itemIndex, rawItem] of rawGroup.items.entries()) {
       if (!isRecord(rawItem)) {
         discardedItemCount += 1;
+        discardedItemPaths.add(`${groupPath}.items[${itemIndex}]`);
         continue;
       }
+      const itemPath = `groups[${groupIndex}].items[${itemIndex}]`;
       for (const field of ['locked', 'pos']) {
-        if (Object.prototype.hasOwnProperty.call(rawItem, field)) flattenedLayoutCount += 1;
+        if (Object.prototype.hasOwnProperty.call(rawItem, field)) {
+          flattenedLayoutCount += 1;
+          flattenedPaths.add(`${itemPath}.${field}`);
+        }
       }
       const kind = stringValue(rawItem, 'kind');
-      if (!kind || !supportedM3eKinds.has(kind)) unsupportedKinds.add(kind || 'unknown');
-      if (kind && approximatedM3eKinds.has(kind)) approximatedKinds.add(kind);
+      const kindPath = `${itemPath}.kind`;
+      if (!kind || !supportedM3eKinds.has(kind)) {
+        unsupportedKinds.add(kind || 'unknown');
+        unsupportedPaths.add(kindPath);
+      }
+      if (kind && approximatedM3eKinds.has(kind)) {
+        approximatedKinds.add(kind);
+        approximatedPaths.add(kindPath);
+      }
       const fieldSummary = inspectM3eItemFields(rawItem);
       fieldSummary.preserved.forEach((field) => preservedFields.add(field));
       fieldSummary.approximated.forEach((field) => approximatedFields.add(field));
       fieldSummary.lost.forEach((field) => lostFields.add(field));
-      const itemPath = `groups[${groupIndex}].items[${itemIndex}]`;
       const actionTargets = [
         { path: `${itemPath}.action`, action: recordValue(rawItem, 'action') },
         ...Object.entries(recordValue(rawItem, 'actions') ?? {}).map(([slot, value]) => ({
@@ -1866,16 +1911,23 @@ export function inspectM3eCompatibility(value: unknown): M3eCompatibilityReport 
   }
 
   return {
-    invalidFrameCount: rawFrames.length - frames.length,
+    invalidFrameCount: invalidFramePaths.size,
+    invalidFramePaths: [...invalidFramePaths].sort(),
     invalidGroupCount,
+    invalidGroupPaths: [...invalidGroupPaths].sort(),
     orphanedGroupCount,
+    orphanedGroupPaths: [...orphanedGroupPaths].sort(),
     discardedItemCount,
+    discardedItemPaths: [...discardedItemPaths].sort(),
     unresolvedDestinationCount,
     unresolvedActionCount,
     unresolvedPaths: [...unresolvedPaths].sort(),
     flattenedLayoutCount,
+    flattenedPaths: [...flattenedPaths].sort(),
     unsupportedKinds: [...unsupportedKinds].sort(),
+    unsupportedPaths: [...unsupportedPaths].sort(),
     approximatedKinds: [...approximatedKinds].sort(),
+    approximatedPaths: [...approximatedPaths].sort(),
     preservedFields: [...preservedFields].sort(),
     approximatedFields: [...approximatedFields].sort(),
     lostFields: [...lostFields].sort(),
@@ -2775,21 +2827,40 @@ export function exportM3eDocument(document: CanvasDocument): M3eExportDocument {
 
 function collectExportCompatibilityKinds(
   node: CanvasNode,
+  path: string,
   flattenedNodeKinds: Set<string>,
+  flattenedPaths: Set<string>,
   approximatedKinds: Set<string>,
+  approximatedPaths: Set<string>,
   unsupportedNodeKinds: Set<string>,
+  unsupportedPaths: Set<string>,
   frameIds: Map<string, string>,
 ): void {
-  if (flattenedOnlyNodeKinds.has(node.kind)) flattenedNodeKinds.add(node.kind);
-  if (approximatedNodeKinds.has(node.kind)) approximatedKinds.add(node.kind);
-  if (node.m3eKind) {
-    if (approximatedM3eKinds.has(node.m3eKind)) approximatedKinds.add(node.m3eKind);
-    if (!supportedM3eKinds.has(node.m3eKind)) unsupportedNodeKinds.add(node.m3eKind);
+  if (flattenedOnlyNodeKinds.has(node.kind)) {
+    flattenedNodeKinds.add(node.kind);
+    flattenedPaths.add(`${path}.kind`);
   }
-  if (!isContainerNode(node) && exportItem(node, frameIds) === null) unsupportedNodeKinds.add(node.kind);
+  if (approximatedNodeKinds.has(node.kind)) {
+    approximatedKinds.add(node.kind);
+    approximatedPaths.add(`${path}.kind`);
+  }
+  if (node.m3eKind) {
+    if (approximatedM3eKinds.has(node.m3eKind)) {
+      approximatedKinds.add(node.m3eKind);
+      approximatedPaths.add(`${path}.m3eKind`);
+    }
+    if (!supportedM3eKinds.has(node.m3eKind)) {
+      unsupportedNodeKinds.add(node.m3eKind);
+      unsupportedPaths.add(`${path}.m3eKind`);
+    }
+  }
+  if (!isContainerNode(node) && exportItem(node, frameIds) === null) {
+    unsupportedNodeKinds.add(node.kind);
+    unsupportedPaths.add(`${path}.kind`);
+  }
   if (Array.isArray(node.children)) {
-    for (const child of node.children) {
-      collectExportCompatibilityKinds(child, flattenedNodeKinds, approximatedKinds, unsupportedNodeKinds, frameIds);
+    for (const [index, child] of node.children.entries()) {
+      collectExportCompatibilityKinds(child, `${path}.children[${index}]`, flattenedNodeKinds, flattenedPaths, approximatedKinds, approximatedPaths, unsupportedNodeKinds, unsupportedPaths, frameIds);
     }
   }
 }
@@ -2800,8 +2871,11 @@ export function inspectM3eExportCompatibility(document: CanvasDocument): M3eExpo
   const roundTripExport = roundTripped ? exportM3eDocument(roundTripped) : null;
   const frameIds = new Map(document.screens.map((screen) => [screen.id, screen.id]));
   const unsupportedNodeKinds = new Set<string>();
+  const unsupportedPaths = new Set<string>();
   const flattenedNodeKinds = new Set<string>();
+  const flattenedPaths = new Set<string>();
   const approximatedKinds = new Set<string>();
+  const approximatedPaths = new Set<string>();
   const sourceFields = new Set<string>();
   const exportedFields = new Set<string>();
   let unresolvedDestinationCount = 0;
@@ -2843,7 +2917,7 @@ export function inspectM3eExportCompatibility(document: CanvasDocument): M3eExpo
   exported.groups.forEach((group) => group.items.forEach(collectExportedFields));
 
   for (const screen of document.screens) {
-    collectExportCompatibilityKinds(screen.root, flattenedNodeKinds, approximatedKinds, unsupportedNodeKinds, frameIds);
+    collectExportCompatibilityKinds(screen.root, `screens[${screen.id}].root`, flattenedNodeKinds, flattenedPaths, approximatedKinds, approximatedPaths, unsupportedNodeKinds, unsupportedPaths, frameIds);
     collectMetadataFields(screen.root);
     collectUnresolvedMetadataActions(screen.m3eTopAppBar, `screens[${screen.id}].m3eTopAppBar`, exportTopBar(screen, frameIds) ?? undefined);
     collectUnresolvedMetadataActions(screen.m3eBottomNav, `screens[${screen.id}].m3eBottomNav`, exportBottomBar(screen, frameIds) ?? undefined);
@@ -2912,8 +2986,11 @@ export function inspectM3eExportCompatibility(document: CanvasDocument): M3eExpo
       0,
     ),
     unsupportedNodeKinds: [...unsupportedNodeKinds].sort(),
+    unsupportedPaths: [...unsupportedPaths].sort(),
     flattenedNodeKinds: [...flattenedNodeKinds].sort(),
+    flattenedPaths: [...flattenedPaths].sort(),
     approximatedKinds: [...approximatedKinds].sort(),
+    approximatedPaths: [...approximatedPaths].sort(),
     unresolvedDestinationCount,
     unresolvedActionCount,
     unresolvedPaths: [...unresolvedPaths].sort(),

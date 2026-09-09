@@ -112,8 +112,11 @@ describe('M3E compatibility importer', () => {
     expect(report).toEqual({
       flattenedItemCount: 4,
       unsupportedNodeKinds: [],
+      unsupportedPaths: [],
       flattenedNodeKinds: ['glass-container', 'vstack'],
+      flattenedPaths: ['screens[home].root.children[2].kind', 'screens[home].root.kind'],
       approximatedKinds: ['securefield'],
+      approximatedPaths: ['screens[home].root.children[1].kind'],
       unresolvedDestinationCount: 2,
       unresolvedActionCount: 2,
       unresolvedPaths: ['screens[home].root.children[3].destinationScreenId', 'screens[home].swipe.right'],
@@ -158,7 +161,7 @@ describe('M3E compatibility importer', () => {
     const report = inspectM3eExportCompatibility(document);
     expect(report.unsupportedNodeKinds).toEqual(['unknown-widget']);
     expect(getM3eCompatibilityAnomalies(report)).toEqual(expect.arrayContaining([
-      expect.objectContaining({ code: 'UNSUPPORTED_KIND', status: 'lost', detail: 'unknown-widget' }),
+      expect.objectContaining({ code: 'UNSUPPORTED_KIND', status: 'lost', detail: expect.stringContaining('unknown-widget') }),
     ]));
   });
 
@@ -191,7 +194,7 @@ describe('M3E compatibility importer', () => {
     expect(report.unsupportedNodeKinds).toEqual(['future-control']);
     expect(report.roundTripValid).toBe(false);
     expect(getM3eCompatibilityAnomalies(report)).toEqual(expect.arrayContaining([
-      expect.objectContaining({ code: 'UNSUPPORTED_KIND', status: 'lost', detail: 'future-control' }),
+      expect.objectContaining({ code: 'UNSUPPORTED_KIND', status: 'lost', detail: expect.stringContaining('future-control') }),
     ]));
   });
 
@@ -920,14 +923,21 @@ describe('M3E compatibility importer', () => {
 
     expect(report).toEqual({
       invalidFrameCount: 1,
+      invalidFramePaths: ['frames[1]'],
       invalidGroupCount: 1,
+      invalidGroupPaths: ['groups[1]'],
       orphanedGroupCount: 0,
+      orphanedGroupPaths: [],
       discardedItemCount: 1,
+      discardedItemPaths: ['groups[0].items[3]'],
       unresolvedDestinationCount: 2,
       unresolvedActionCount: 2,
       unresolvedPaths: ['frames[0].swipe.left', 'groups[0].items[1].action.to'],
+      flattenedPaths: [],
       unsupportedKinds: ['unknownPart'],
+      unsupportedPaths: ['groups[0].items[0].kind'],
       approximatedKinds: ['fab'],
+      approximatedPaths: ['groups[0].items[2].kind'],
       preservedFields: ['action', 'icon'],
       approximatedFields: [],
       lostFields: [],
@@ -1117,7 +1127,10 @@ describe('M3E compatibility importer', () => {
       groups: [{ id: 'outside', x: 900, y: 0, axis: 'y', items: [{ id: 'text', kind: 'text', label: '画面外' }] }],
     };
 
-    expect(inspectM3eCompatibility(value)).toMatchObject({ orphanedGroupCount: 1 });
+    expect(inspectM3eCompatibility(value)).toMatchObject({
+      orphanedGroupCount: 1,
+      orphanedGroupPaths: ['groups[0]'],
+    });
     expect(convertM3eDocument(value)?.screens[0]?.root.children).toEqual([]);
   });
 
@@ -1136,7 +1149,16 @@ describe('M3E compatibility importer', () => {
       }],
     };
 
-    expect(inspectM3eCompatibility(source)).toMatchObject({ flattenedLayoutCount: 5 });
+    expect(inspectM3eCompatibility(source)).toMatchObject({
+      flattenedLayoutCount: 5,
+      flattenedPaths: [
+        'groups[0].free',
+        'groups[0].items[0].locked',
+        'groups[0].items[0].pos',
+        'groups[0].locked',
+        'groups[0].pos',
+      ],
+    });
     const document = convertM3eDocument(source);
     expect(document?.screens[0]?.root.children[0]).toMatchObject({
       kind: 'text',
