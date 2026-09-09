@@ -814,8 +814,21 @@ function renderNodeContent(
       if (node.m3eKind === 'fabMenu') {
         return (
           <div className="canvas-fab-menu-preview" aria-label={node.label || 'FABメニュー'}>
-            {node.children.map((child) => <NodeView key={child.id} node={child} allNodes={allNodes} screenId={screenId} onOpenSheet={onOpenSheet} onNavigateScreen={onNavigateScreen} onNavigateBack={onNavigateBack} />)}
-            <div className="m3e-fab-menu-trigger" aria-hidden="true">{symbolGlyph(node.m3eIcon || 'plus')}</div>
+            {controls && splitMenuOpen && (
+              <div className="ios-fab-menu-items" role="menu" aria-label={`${node.label || 'FABメニュー'}の項目`}>
+                {node.children.map((child) => <NodeView key={child.id} node={child} allNodes={allNodes} screenId={screenId} onOpenSheet={onOpenSheet} onNavigateScreen={onNavigateScreen} onNavigateBack={onNavigateBack} />)}
+              </div>
+            )}
+            <button
+              className="m3e-fab-menu-trigger"
+              type="button"
+              aria-label={node.label || 'FABメニュー'}
+              aria-haspopup="menu"
+              aria-expanded={controls ? splitMenuOpen : undefined}
+              onClick={controls ? (event) => { event.stopPropagation(); onSplitMenuOpenChange?.(!splitMenuOpen); } : undefined}
+            >
+              <span aria-hidden="true">{symbolGlyph(node.m3eIcon || 'plus')}</span>
+            </button>
           </div>
         );
       }
