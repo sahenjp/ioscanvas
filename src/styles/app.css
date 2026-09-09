@@ -717,11 +717,17 @@ button.ios-navigation-link:hover { background: #f5f5f7; }
 .m3e-anomaly-list li strong { color: var(--text-soft); font-size: 10px; }
 .m3e-anomaly-list li > span { color: inherit; }
 .m3e-anomaly-list li small { color: var(--muted-2); font-size: 9px; }
-.m3e-anomaly-targets { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
-.m3e-anomaly-targets button { max-width: 100%; padding: 2px 5px; border: 1px solid var(--line-strong); border-radius: 4px; background: transparent; color: var(--text-soft); font: 10px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace; text-align: left; cursor: pointer; }
-.m3e-anomaly-targets button:hover { border-color: var(--blue); background: var(--blue-soft); color: var(--text); }
-.m3e-anomaly-targets code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.m3e-anomaly-path { display: block; max-width: 100%; overflow: hidden; color: var(--muted-2); font: 9px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace; text-overflow: ellipsis; white-space: nowrap; }
+.m3e-anomaly-targets { display: grid; gap: 4px; margin-top: 3px; }
+.m3e-anomaly-path-row { min-width: 0; display: flex; align-items: stretch; gap: 4px; }
+.m3e-anomaly-target-button, .m3e-anomaly-unresolved-path { min-width: 0; flex: 1; padding: 5px 6px; border: 1px solid var(--line-strong); border-radius: 4px; background: transparent; color: var(--text-soft); font: 10px/1.35 ui-monospace, SFMono-Regular, Menlo, monospace; text-align: left; }
+.m3e-anomaly-target-button { cursor: pointer; }
+.m3e-anomaly-target-button:hover { border-color: var(--blue); background: var(--blue-soft); color: var(--text); }
+.m3e-anomaly-target-button code, .m3e-anomaly-unresolved-path code { display: block; overflow: hidden; margin-top: 2px; color: inherit; text-overflow: ellipsis; white-space: nowrap; }
+.m3e-anomaly-unresolved-path { color: var(--muted-2); }
+.m3e-anomaly-unresolved-path > span { display: block; color: var(--warning); font: 650 9px/1.2 var(--ui-font); }
+.m3e-anomaly-copy-button { flex: 0 0 auto; min-height: 28px; padding: 0 7px; border: 1px solid var(--line-strong); border-radius: 4px; background: transparent; color: var(--muted); font-size: 10px; cursor: pointer; }
+.m3e-anomaly-copy-button:hover { border-color: var(--blue); background: var(--blue-soft); color: var(--text); }
+.m3e-anomaly-copy-error { display: block; margin-top: 5px; color: var(--warning); font-size: 10px; }
 .m3e-anomaly-unresolved strong { color: #e7c681; }
 .m3e-anomaly-lost strong { color: #e7867e; }
 .m3e-anomaly-unresolved .m3e-anomaly-status { color: #e7c681; }

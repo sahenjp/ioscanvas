@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
+import { M3eCompatibilityList } from './M3eCompatibilityList';
 import { generateImplementationPrompt, type PromptScope } from '../lib/prompt';
-import { describeM3eCompatibilityFields, describeM3eCompatibilityKinds, describeM3eCompatibilityStatus, generateM3eJson, getM3eCompatibilityAnomalies, inspectM3eExportCompatibility, resolveM3eExportPath } from '../lib/m3e';
+import { describeM3eCompatibilityFields, describeM3eCompatibilityKinds, generateM3eJson, getM3eCompatibilityAnomalies, inspectM3eExportCompatibility, resolveM3eExportPath, type M3eCompatibilityTarget } from '../lib/m3e';
 import { copyText } from '../lib/share';
 import { generateSwiftUI } from '../lib/swiftui';
 import { useEditorStore, type ExportTab } from '../store/editor';
@@ -60,9 +61,7 @@ export function ExportPanel() {
     window.setTimeout(() => URL.revokeObjectURL(url), 0);
   };
 
-  const selectDiagnosticTarget = (path: string) => {
-    const target = resolveM3eExportPath(document, path);
-    if (!target) return;
+  const selectDiagnosticTarget = (target: M3eCompatibilityTarget) => {
     selectScreen(target.screenId);
     selectNode(target.nodeId ?? null);
     setOpen(false);
@@ -122,30 +121,12 @@ export function ExportPanel() {
             {m3eAnomalies.length > 0 && (
               <details className="m3e-anomaly-details">
                 <summary>{m3eHasWarnings ? `互換異常 ${m3eActionableAnomalies.length}件を確認` : `近似 ${approximatedAnomalyCount}件を確認`}</summary>
-                <ul className="m3e-anomaly-list">
-                  {m3eAnomalies.map((anomaly) => (
-                    <li key={`${anomaly.code}-${anomaly.label}`} className={`m3e-anomaly-${anomaly.status}`}>
-                      <div className="m3e-anomaly-heading">
-                        <span className="m3e-anomaly-status">{describeM3eCompatibilityStatus(anomaly.status)}</span>
-                        <strong>{anomaly.label}</strong>
-                      </div>
-                      <span>{anomaly.detail}</span>
-                      <small>{anomaly.guidance}</small>
-                      {anomaly.paths.length > 0 && (
-                        <div className="m3e-anomaly-targets">
-                          {anomaly.paths.map((path) => {
-                            const target = resolveM3eExportPath(document, path);
-                            return target ? (
-                              <button type="button" key={path} onClick={() => selectDiagnosticTarget(path)}>
-                                {target.scope === 'document' ? 'メタデータを確認' : target.nodeId ? '要素を選択' : '画面を表示'} <code>{path}</code>
-                              </button>
-                            ) : <code key={path} className="m3e-anomaly-path">{path}</code>;
-                          })}
-                        </div>
-                      )}
-                    </li>
-                  ))}
-                </ul>
+                <M3eCompatibilityList
+                  anomalies={m3eAnomalies}
+                  resolvePath={(path) => resolveM3eExportPath(document, path)}
+                  onSelectTarget={(target) => selectDiagnosticTarget(target)}
+                  pathCaption="出力JSONの位置"
+                />
               </details>
             )}
           </div>

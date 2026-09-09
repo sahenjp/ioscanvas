@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
+import { M3eCompatibilityList } from './M3eCompatibilityList';
 import { parseCanvasDocument } from '../lib/document';
-import { convertM3eDocument, describeM3eCompatibilityFields, describeM3eCompatibilityKinds, describeM3eCompatibilityStatus, getM3eCompatibilityAnomalies, inspectM3eCompatibility, inspectM3eExportCompatibility, resolveM3eImportPath, type M3eCompatibilityAnomaly } from '../lib/m3e';
+import { convertM3eDocument, describeM3eCompatibilityFields, describeM3eCompatibilityKinds, getM3eCompatibilityAnomalies, inspectM3eCompatibility, inspectM3eExportCompatibility, resolveM3eImportPath, type M3eCompatibilityAnomaly } from '../lib/m3e';
 import { lintDocument } from '../lib/hig';
 import { findNode } from '../lib/nodes';
 import { copyText, createShareUrl } from '../lib/share';
@@ -187,39 +188,15 @@ export function TopBar() {
             {fileAnomalies.length > 0 && (
               <div className="project-anomaly-popover" role="region" aria-label="読み込み時の互換異常">
                 <strong>読み込み時の互換異常</strong>
-                <ul className="m3e-anomaly-list">
-                  {fileAnomalies.map((anomaly) => (
-                    <li key={`${anomaly.code}-${anomaly.label}`} className={`m3e-anomaly-${anomaly.status}`}>
-                      <div className="m3e-anomaly-heading">
-                        <span className="m3e-anomaly-status">{describeM3eCompatibilityStatus(anomaly.status)}</span>
-                        <strong>{anomaly.label}</strong>
-                      </div>
-                      <span>{anomaly.detail}</span>
-                      <small>{anomaly.guidance}</small>
-                      {anomaly.paths.length > 0 && (
-                        <div className="m3e-anomaly-targets">
-                          {anomaly.paths.map((path) => {
-                            const target = fileImportSource
-                              ? resolveM3eImportPath(document, fileImportSource, path)
-                              : null;
-                            return target ? (
-                              <button
-                                type="button"
-                                key={path}
-                                onClick={() => {
-                                  selectScreen(target.screenId);
-                                  selectNode(target.nodeId ?? null);
-                                }}
-                              >
-                                {target.scope === 'document' ? 'メタデータを確認' : target.nodeId ? '要素を選択' : '画面を表示'} <code>{path}</code>
-                              </button>
-                            ) : <code key={path} className="m3e-anomaly-path">{path}</code>;
-                          })}
-                        </div>
-                      )}
-                    </li>
-                  ))}
-                </ul>
+                <M3eCompatibilityList
+                  anomalies={fileAnomalies}
+                  resolvePath={(path) => fileImportSource ? resolveM3eImportPath(document, fileImportSource, path) : null}
+                  onSelectTarget={(target) => {
+                    selectScreen(target.screenId);
+                    selectNode(target.nodeId ?? null);
+                  }}
+                  pathCaption="元JSONの位置"
+                />
               </div>
             )}
           </details>
