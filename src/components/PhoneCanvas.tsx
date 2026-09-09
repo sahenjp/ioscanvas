@@ -317,7 +317,7 @@ function renderNodeContent(
         const toggleOn = node.toggle && controls ? controls.value === true : node.toggle?.isOn ?? false;
         const label = node.toggle && toggleOn ? node.toggle.onLabel : node.label;
         const systemName = node.toggle && toggleOn ? node.toggle.onSystemName ?? node.systemName : node.systemName;
-        const trailingSystemName = node.m3eIcon2 === undefined ? node.m3eMetadata?.icon2 : node.m3eIcon2;
+        const trailingSystemName = node.m3eIcon2;
         const buttonStyle = node.toggle && toggleOn ? node.toggle.onButtonStyle ?? node.buttonStyle : node.buttonStyle;
         if (node.m3eKind === 'splitButton') {
           return (

@@ -67,12 +67,13 @@ describe('implementation prompt generator', () => {
       kind: 'button',
       label: '次へ',
       systemName: 'arrow.right',
+      m3eIcon2: 'chevron.right',
       role: 'normal',
       buttonStyle: 'bordered',
       minHeight: 44,
     });
 
-    expect(generateImplementationPrompt(document)).toContain('- button: 次へ / role=normal / style=bordered / symbol=arrow.right');
+    expect(generateImplementationPrompt(document)).toContain('- button: 次へ / role=normal / style=bordered / symbol=arrow.right / trailingSymbol=chevron.right');
   });
 
   it('keeps M3E display attributes in the implementation brief', () => {

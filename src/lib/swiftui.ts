@@ -223,7 +223,7 @@ function m3eButtonLabel(
   symbolExpression = node.systemName?.trim() ? quoted(node.systemName) : undefined,
 ): string {
   const iconFill = node.m3eMetadata?.iconFill;
-  const trailingSymbol = node.m3eIcon2 === undefined ? node.m3eMetadata?.icon2 : node.m3eIcon2;
+  const trailingSymbol = node.m3eIcon2;
   const trailingExpression = trailingSymbol?.trim() ? quoted(trailingSymbol) : undefined;
   const icon = (expression: string): string => {
     const image = `Image(systemName: ${expression})`;
