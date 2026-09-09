@@ -75,6 +75,12 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .project-error, .project-notice { max-width: 360px; overflow: hidden; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 .project-error { color: #e07770; }
 .project-notice { color: var(--muted); }
+.project-notice-details { position: relative; min-width: 0; }
+.project-notice-details > summary { max-width: 360px; overflow: hidden; cursor: pointer; list-style: none; text-overflow: ellipsis; white-space: nowrap; }
+.project-notice-details > summary::-webkit-details-marker { display: none; }
+.project-notice-details[open] > summary { color: var(--topbar-text-strong); }
+.project-anomaly-popover { position: absolute; top: calc(100% + 8px); right: 0; z-index: 20; width: min(440px, calc(100vw - 32px)); max-height: min(360px, calc(100vh - 80px)); overflow: auto; padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: 7px; background: var(--panel); box-shadow: 0 16px 36px rgba(0, 0, 0, .32); color: var(--muted); font-size: 10px; line-height: 1.45; }
+.project-anomaly-popover > strong { color: var(--text-soft); font-size: 11px; }
 
 .editor-grid { min-height: 0; display: grid; grid-template-columns: 266px 214px minmax(520px, 1fr) 320px; }
 .editor-grid.preview-grid { grid-template-columns: minmax(0, 1fr); }

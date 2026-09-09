@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { parseCanvasDocument } from '../lib/document';
-import { convertM3eDocument, describeM3eCompatibilityFields, describeM3eCompatibilityKinds, getM3eCompatibilityAnomalies, inspectM3eCompatibility } from '../lib/m3e';
+import { convertM3eDocument, describeM3eCompatibilityFields, describeM3eCompatibilityKinds, getM3eCompatibilityAnomalies, inspectM3eCompatibility, type M3eCompatibilityAnomaly } from '../lib/m3e';
 import { lintDocument } from '../lib/hig';
 import { findNode } from '../lib/nodes';
 import { copyText, createShareUrl } from '../lib/share';
@@ -26,6 +26,7 @@ export function TopBar() {
   const fileInput = useRef<HTMLInputElement>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const [fileNotice, setFileNotice] = useState<string | null>(null);
+  const [fileAnomalies, setFileAnomalies] = useState<M3eCompatibilityAnomaly[]>([]);
   const [shareState, setShareState] = useState<'idle' | 'copied' | 'error'>('idle');
   const issues = lintDocument(document);
   const warnings = issues.filter((issue) => issue.severity === 'warning').length;
@@ -69,6 +70,7 @@ export function TopBar() {
       const report = imported ? inspectM3eCompatibility(raw) : null;
       if (report) {
         const anomalies = getM3eCompatibilityAnomalies(report);
+        setFileAnomalies(anomalies);
         const details = [
           anomalies.length > 0 ? `互換異常${anomalies.length}件` : '',
           report.invalidFrameCount > 0 ? `無効な画面${report.invalidFrameCount}件` : '',
@@ -90,11 +92,13 @@ export function TopBar() {
         setFileNotice(details.length > 0 ? `M3E互換確認: ${details.join(' / ')}` : null);
       } else {
         setFileNotice(null);
+        setFileAnomalies([]);
       }
       setFileError(null);
     } catch {
       setFileError('プロジェクトファイルを開けませんでした。');
       setFileNotice(null);
+      setFileAnomalies([]);
     }
   };
 
@@ -148,7 +152,24 @@ export function TopBar() {
           {notes > 0 && <span className="status-notes">補足 {notes}</span>}
         </button>
         {fileError && <span className="project-error" role="status">{fileError}</span>}
-        {fileNotice && <span className="project-notice" role="status">{fileNotice}</span>}
+        {fileNotice && (
+          <details className="project-notice-details">
+            <summary className="project-notice">{fileNotice}</summary>
+            {fileAnomalies.length > 0 && (
+              <div className="project-anomaly-popover" aria-label="読み込み時の互換異常">
+                <strong>読み込み時の互換異常</strong>
+                <ul className="m3e-anomaly-list">
+                  {fileAnomalies.map((anomaly) => (
+                    <li key={`${anomaly.code}-${anomaly.label}`} className={`m3e-anomaly-${anomaly.status}`}>
+                      <strong>{anomaly.label}</strong>
+                      <span>{anomaly.detail}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </details>
+        )}
       </div>
 
       <div className="topbar-actions">
