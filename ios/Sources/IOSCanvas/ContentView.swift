@@ -145,6 +145,7 @@ private struct PhonePreview: View {
     }
 }
 
+@MainActor
 @ViewBuilder
 private func GlassActionRow(previewMode: Binding<Bool>, selection: Binding<WorkspaceSection?>) -> some View {
     if #available(iOS 26.0, *) {
@@ -227,7 +228,7 @@ private struct SettingsView: View {
             Section("プロジェクト") {
                 TextField("プロジェクト名", text: $accountName)
                     .frame(minHeight: 44)
-                LabeledContent("バージョン", value: "1.50.28")
+                LabeledContent("バージョン", value: "1.51.0")
             }
 
             Section("表示") {
