@@ -1133,6 +1133,62 @@ describe('M3E compatibility importer', () => {
     ]));
   });
 
+  it('accepts the canonical M3E group position map', () => {
+    const source = {
+      frames: [{ id: 'home', name: 'ホーム', x: 0, y: 0 }],
+      groups: [{
+        id: 'free-group',
+        x: 0,
+        y: 0,
+        axis: 'y',
+        free: true,
+        pos: {
+          title: { x: 12, y: 24 },
+          action: { x: 12, y: 80 },
+        },
+        items: [
+          { id: 'title', kind: 'text', label: '見出し' },
+          { id: 'action', kind: 'button', label: '実行' },
+        ],
+      }],
+    };
+
+    const report = inspectM3eCompatibility(source);
+    expect(report?.invalidFields).not.toEqual(expect.arrayContaining([
+      'groups[0].pos.title.x',
+      'groups[0].pos.action.y',
+    ]));
+    expect(report?.unknownFields).not.toEqual(expect.arrayContaining([
+      'groups[0].pos.title',
+      'groups[0].pos.action',
+    ]));
+    expect(report?.flattenedPaths).toContain('groups[0].pos');
+    expect(convertM3eDocument(source)).not.toBeNull();
+  });
+
+  it('diagnoses malformed entries inside the canonical M3E group position map', () => {
+    const report = inspectM3eCompatibility({
+      frames: [{ id: 'home', name: 'ホーム', x: 0, y: 0 }],
+      groups: [{
+        id: 'free-group',
+        x: 0,
+        y: 0,
+        axis: 'y',
+        pos: {
+          title: { x: 12, y: '24', future: true },
+          action: null,
+        },
+        items: [{ id: 'title', kind: 'text', label: '見出し' }],
+      }],
+    });
+
+    expect(report?.invalidFields).toEqual(expect.arrayContaining([
+      'groups[0].pos.title.y',
+      'groups[0].pos.action',
+    ]));
+    expect(report?.unknownFields).toContain('groups[0].pos.title.future');
+  });
+
   it('reports duplicate frame, group, and item IDs before navigation becomes ambiguous', () => {
     const report = inspectM3eCompatibility({
       frames: [
@@ -1181,6 +1237,70 @@ describe('M3E compatibility importer', () => {
     expect(getM3eCompatibilityAnomalies(report!)).toEqual(expect.arrayContaining([
       expect.objectContaining({ code: 'INVALID_FIELD', status: 'lost' }),
     ]));
+  });
+
+  it('retains supported M3E project and theme metadata through a semantic round trip', () => {
+    const source = {
+      title: 'メタデータ付き設計',
+      paletteKey: 'custom',
+      customPalette: { key: 'custom', primary: '#123456', label: '独自色' },
+      dynamicColor: true,
+      platform: 'android',
+      brief: 'オフラインで使える一覧',
+      promptEdit: '余白を広めにする',
+      theme: {
+        dark: true,
+        bothModes: true,
+        contrast: 'high',
+        shape: 'full',
+        font: 'robotoFlex',
+        emphasized: true,
+        motion: 'expressive',
+      },
+      frames: [{ id: 'home', name: 'ホーム', x: 0, y: 0 }],
+      groups: [{ id: 'body', x: 0, y: 0, axis: 'y', items: [{ id: 'text', kind: 'text', label: '本文' }] }],
+    };
+
+    const report = inspectM3eCompatibility(source);
+    expect(report?.invalidFields).toEqual([]);
+    expect(report?.unknownFields).toEqual([]);
+
+    const document = convertM3eDocument(source);
+    expect(document).toMatchObject({
+      appearance: { colorScheme: 'dark', accentColor: 'custom', accentHex: '#123456' },
+      m3eMetadata: {
+        paletteKey: 'custom',
+        customPalette: source.customPalette,
+        dynamicColor: true,
+        platform: 'android',
+        brief: source.brief,
+        promptEdit: source.promptEdit,
+        theme: {
+          contrast: 'high',
+          shape: 'full',
+          font: 'robotoFlex',
+          emphasized: true,
+          motion: 'expressive',
+        },
+      },
+    });
+    if (!document) throw new Error('M3E metadata fixture was not converted');
+
+    const exported = exportM3eDocument(document);
+    expect(exported).toMatchObject({
+      paletteKey: 'custom',
+      customPalette: source.customPalette,
+      dynamicColor: true,
+      platform: 'android',
+      brief: source.brief,
+      promptEdit: source.promptEdit,
+      theme: source.theme,
+    });
+    expect(inspectM3eExportCompatibility(document)).toMatchObject({
+      invalidFields: [],
+      unknownFields: [],
+      roundTripValid: true,
+    });
   });
 
   it('reports and drops groups that are outside every valid frame', () => {

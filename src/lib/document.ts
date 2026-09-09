@@ -1,5 +1,5 @@
 import { isContainerNode } from './nodes';
-import type { AccentColor, AlertAction, AppearanceAccentColor, BackgroundStyle, ButtonStyle, ButtonToggle, CanvasDocument, CanvasNode, CanvasScreen, CardContentAlignment, CardImagePosition, ColorScheme, ContentPlacement, FontDesign, FrameWidth, GlassShape, GlassStyle, ImageSource, M3eAction, M3eItemMetadata, M3eMenuAction, M3ePresentationKind, M3eTab, M3eTextColor, M3eToggleAppearance, M3eVariant, NavigationTitleDisplayMode, NavigationTransition, NodeKind, ProgressStyle, ScreenBackground, ScreenDevice, ScreenOrientation, ShadowStyle, StackAlignment, SwipeDirection, TextAlignment, TextStyle, ToolbarItem, ToolbarPlacement } from '../types/document';
+import type { AccentColor, AlertAction, AppearanceAccentColor, BackgroundStyle, ButtonStyle, ButtonToggle, CanvasDocument, CanvasNode, CanvasScreen, CardContentAlignment, CardImagePosition, ColorScheme, ContentPlacement, FontDesign, FrameWidth, GlassShape, GlassStyle, ImageSource, M3eAction, M3eContrast, M3eDocumentMetadata, M3eFont, M3eItemMetadata, M3eMenuAction, M3eMotion, M3ePresentationKind, M3eShape, M3eTab, M3eTextColor, M3eToggleAppearance, M3eVariant, NavigationTitleDisplayMode, NavigationTransition, NodeKind, ProgressStyle, ScreenBackground, ScreenDevice, ScreenOrientation, ShadowStyle, StackAlignment, SwipeDirection, TextAlignment, TextStyle, ToolbarItem, ToolbarPlacement } from '../types/document';
 
 type RecordValue = Record<string, unknown>;
 
@@ -21,6 +21,51 @@ function isNonNegativeNumber(value: unknown): value is number {
 
 function isHexColor(value: unknown): value is string {
   return isString(value) && /^#[0-9a-f]{6}$/i.test(value);
+}
+
+function readM3eDocumentMetadata(value: unknown): M3eDocumentMetadata | null | undefined {
+  if (value === undefined) return undefined;
+  if (!isRecord(value)) return null;
+  if (value.paletteKey !== undefined && !isString(value.paletteKey)) return null;
+  if (value.customPalette !== undefined && (!isRecord(value.customPalette)
+    || (value.customPalette.primary !== undefined && !isHexColor(value.customPalette.primary)))) return null;
+  if (value.dynamicColor !== undefined && typeof value.dynamicColor !== 'boolean') return null;
+  if (value.platform !== undefined && !isOneOf(value.platform, ['android', 'web'])) return null;
+  if (value.brief !== undefined && !isString(value.brief)) return null;
+  if (value.promptEdit !== undefined && !isString(value.promptEdit)) return null;
+
+  const themeValue = value.theme;
+  if (themeValue !== undefined && !isRecord(themeValue)) return null;
+  if (themeValue) {
+    if (themeValue.dark !== undefined && typeof themeValue.dark !== 'boolean') return null;
+    if (themeValue.bothModes !== undefined && typeof themeValue.bothModes !== 'boolean') return null;
+    if (themeValue.contrast !== undefined && !isOneOf(themeValue.contrast, ['standard', 'medium', 'high'])) return null;
+    if (themeValue.shape !== undefined && !isOneOf(themeValue.shape, ['square', 'rounded', 'full'])) return null;
+    if (themeValue.font !== undefined && !isOneOf(themeValue.font, ['roboto', 'robotoFlex', 'robotoSerif', 'system'])) return null;
+    if (themeValue.emphasized !== undefined && typeof themeValue.emphasized !== 'boolean') return null;
+    if (themeValue.motion !== undefined && !isOneOf(themeValue.motion, ['standard', 'expressive'])) return null;
+  }
+
+  const theme = themeValue
+    ? {
+        ...(themeValue.dark === undefined ? {} : { dark: themeValue.dark as boolean }),
+        ...(themeValue.bothModes === undefined ? {} : { bothModes: themeValue.bothModes as boolean }),
+        ...(themeValue.contrast === undefined ? {} : { contrast: themeValue.contrast as M3eContrast }),
+        ...(themeValue.shape === undefined ? {} : { shape: themeValue.shape as M3eShape }),
+        ...(themeValue.font === undefined ? {} : { font: themeValue.font as M3eFont }),
+        ...(themeValue.emphasized === undefined ? {} : { emphasized: themeValue.emphasized as boolean }),
+        ...(themeValue.motion === undefined ? {} : { motion: themeValue.motion as M3eMotion }),
+      }
+    : undefined;
+  return {
+    ...(value.paletteKey === undefined ? {} : { paletteKey: value.paletteKey }),
+    ...(value.customPalette === undefined ? {} : { customPalette: value.customPalette }),
+    ...(value.dynamicColor === undefined ? {} : { dynamicColor: value.dynamicColor }),
+    ...(value.platform === undefined ? {} : { platform: value.platform }),
+    ...(value.brief === undefined ? {} : { brief: value.brief }),
+    ...(value.promptEdit === undefined ? {} : { promptEdit: value.promptEdit }),
+    ...(theme === undefined ? {} : { theme }),
+  };
 }
 
 function isOneOf<T extends string>(value: unknown, values: readonly T[]): value is T {
@@ -700,6 +745,9 @@ export function parseCanvasDocument(value: unknown): CanvasDocument | null {
     return null;
   }
 
+  const m3eMetadata = readM3eDocumentMetadata(value.m3eMetadata);
+  if (m3eMetadata === null) return null;
+
   const ids = new Set<string>();
   const screens = value.screens.map((screen) => readScreen(screen, ids));
   if (screens.some((screen): screen is null => screen === null)) return null;
@@ -721,6 +769,7 @@ export function parseCanvasDocument(value: unknown): CanvasDocument | null {
           ...(appearance.accentHex === undefined ? {} : { accentHex: appearance.accentHex as string }),
           ...(appearance.fontDesign === undefined ? {} : { fontDesign: appearance.fontDesign as FontDesign }),
         },
+    ...(m3eMetadata === undefined ? {} : { m3eMetadata }),
     activeScreenId: value.activeScreenId,
     screens: parsedScreens,
   };

@@ -14,8 +14,14 @@ import type {
   ImageSource,
   M3eAction,
   M3eCorners,
+  M3eContrast,
+  M3eDocumentMetadata,
+  M3eFont,
   M3eItemMetadata,
   M3eMenuAction,
+  M3eMotion,
+  M3ePlatform,
+  M3eShape,
   NavigationTransition,
   ScreenBackground,
   ScreenDevice,
@@ -141,12 +147,20 @@ export interface M3eExportDocument {
   theme: {
     dark: boolean;
     bothModes: boolean;
-    font: string;
+    contrast: M3eContrast;
+    shape: M3eShape;
+    font: M3eFont;
+    emphasized: boolean;
+    motion: M3eMotion;
   };
-  platform: 'web';
+  platform: M3ePlatform;
   frame: string;
   frames: M3eExportFrame[];
   groups: M3eExportGroup[];
+  customPalette?: Record<string, unknown>;
+  dynamicColor?: boolean;
+  brief?: string;
+  promptEdit?: string;
 }
 
 interface ConversionContext {
@@ -794,8 +808,9 @@ function inspectM3eItemFields(item: JsonObject): { preserved: string[]; approxim
   return { preserved, approximated, lost };
 }
 
-const m3eDocumentFields = new Set(['title', 'paletteKey', 'theme', 'platform', 'frame', 'frames', 'groups']);
-const m3eThemeFields = new Set(['dark', 'bothModes', 'font']);
+const m3ePaletteKeys = ['blue', 'purple', 'green', 'coral', 'amber', 'teal', 'mono', 'custom'] as const;
+const m3eDocumentFields = new Set(['title', 'paletteKey', 'theme', 'platform', 'frame', 'frames', 'groups', 'customPalette', 'dynamicColor', 'brief', 'promptEdit']);
+const m3eThemeFields = new Set(['dark', 'bothModes', 'contrast', 'shape', 'font', 'emphasized', 'motion']);
 const m3eFrameFields = new Set(['id', 'name', 'x', 'y', 'w', 'h', 'bg', 'note', 'place', 'swipe']);
 const m3eGroupFields = new Set(['id', 'x', 'y', 'axis', 'items', 'free', 'locked', 'pos']);
 const m3ePositionFields = new Set(['x', 'y']);
@@ -815,6 +830,49 @@ function collectUnknownObjectFields(value: unknown, allowed: ReadonlySet<string>
   if (!isRecord(value)) return;
   for (const key of Object.keys(value)) {
     if (!allowed.has(key)) unknownFields.add(`${path}.${key}`);
+  }
+}
+
+function isLegacyM3ePosition(value: JsonObject): boolean {
+  return ['x', 'y'].some((key) => Object.prototype.hasOwnProperty.call(value, key) && !isRecord(value[key]));
+}
+
+function isHexColor(value: unknown): value is string {
+  return typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value);
+}
+
+function readM3eDocumentMetadata(value: JsonObject, theme: JsonObject | undefined): M3eDocumentMetadata | undefined {
+  const metadata: M3eDocumentMetadata = {};
+  if (isOneOf(value.paletteKey, m3ePaletteKeys)) metadata.paletteKey = value.paletteKey;
+  const customPalette = recordValue(value, 'customPalette');
+  if (customPalette) metadata.customPalette = customPalette;
+  if (typeof value.dynamicColor === 'boolean') metadata.dynamicColor = value.dynamicColor;
+  if (isOneOf(value.platform, ['android', 'web'])) metadata.platform = value.platform;
+  if (typeof value.brief === 'string') metadata.brief = value.brief;
+  if (typeof value.promptEdit === 'string') metadata.promptEdit = value.promptEdit;
+  if (theme) {
+    const themeMetadata = {
+      ...(typeof theme.dark === 'boolean' ? { dark: theme.dark } : {}),
+      ...(typeof theme.bothModes === 'boolean' ? { bothModes: theme.bothModes } : {}),
+      ...(isOneOf(theme.contrast, ['standard', 'medium', 'high']) ? { contrast: theme.contrast } : {}),
+      ...(isOneOf(theme.shape, ['square', 'rounded', 'full']) ? { shape: theme.shape } : {}),
+      ...(isOneOf(theme.font, ['roboto', 'robotoFlex', 'robotoSerif', 'system']) ? { font: theme.font } : {}),
+      ...(typeof theme.emphasized === 'boolean' ? { emphasized: theme.emphasized } : {}),
+      ...(isOneOf(theme.motion, ['standard', 'expressive']) ? { motion: theme.motion } : {}),
+    };
+    if (Object.keys(themeMetadata).length > 0) metadata.theme = themeMetadata;
+  }
+  return Object.keys(metadata).length > 0 ? metadata : undefined;
+}
+
+function collectM3ePositionUnknownFields(value: unknown, path: string, unknownFields: Set<string>): void {
+  if (!isRecord(value)) return;
+  if (isLegacyM3ePosition(value)) {
+    collectUnknownObjectFields(value, m3ePositionFields, path, unknownFields);
+    return;
+  }
+  for (const [itemId, position] of Object.entries(value)) {
+    collectUnknownObjectFields(position, m3ePositionFields, `${path}.${itemId}`, unknownFields);
   }
 }
 
@@ -839,7 +897,7 @@ function collectM3eUnknownFields(value: unknown): string[] {
     const groupPath = `groups[${groupIndex}]`;
     collectUnknownObjectFields(group, m3eGroupFields, groupPath, unknownFields);
     if (!isRecord(group) || !Array.isArray(group.items)) return;
-    collectUnknownObjectFields(recordValue(group, 'pos'), m3ePositionFields, `${groupPath}.pos`, unknownFields);
+    collectM3ePositionUnknownFields(group.pos, `${groupPath}.pos`, unknownFields);
     group.items.forEach((item, itemIndex) => {
       const itemPath = `${groupPath}.items[${itemIndex}]`;
       collectUnknownObjectFields(item, m3eItemFields, itemPath, unknownFields);
@@ -889,8 +947,19 @@ function collectM3eInvalidFields(value: unknown): string[] {
       invalidFields.add(path);
       return;
     }
-    numericField(value, 'x', `${path}.x`);
-    numericField(value, 'y', `${path}.y`);
+    if (isLegacyM3ePosition(value)) {
+      numericField(value, 'x', `${path}.x`);
+      numericField(value, 'y', `${path}.y`);
+      return;
+    }
+    for (const [itemId, itemPosition] of Object.entries(value)) {
+      if (!isRecord(itemPosition)) {
+        invalidFields.add(`${path}.${itemId}`);
+        continue;
+      }
+      numericField(itemPosition, 'x', `${path}.${itemId}.x`);
+      numericField(itemPosition, 'y', `${path}.${itemId}.y`);
+    }
   };
   const selectionKinds = new Set(['select', 'tabs', 'bottomNav', 'navRail']);
   const validTransitions: readonly NavigationTransition[] = ['slide', 'slideLeft', 'slideUp', 'slideDown', 'fade', 'expand', 'none'];
@@ -908,8 +977,18 @@ function collectM3eInvalidFields(value: unknown): string[] {
   if (!Array.isArray(value.frames) || frames.length === 0) invalidFields.add('document.frames');
   if (!Array.isArray(value.groups)) invalidFields.add('document.groups');
   if (Object.prototype.hasOwnProperty.call(value, 'title') && typeof value.title !== 'string') invalidFields.add('document.title');
-  if (Object.prototype.hasOwnProperty.call(value, 'paletteKey') && !isOneOf(value.paletteKey, ['blue', 'purple', 'green', 'coral', 'amber', 'teal', 'mono'])) invalidFields.add('document.paletteKey');
-  if (Object.prototype.hasOwnProperty.call(value, 'platform') && typeof value.platform !== 'string') invalidFields.add('document.platform');
+  if (Object.prototype.hasOwnProperty.call(value, 'paletteKey') && !isOneOf(value.paletteKey, m3ePaletteKeys)) invalidFields.add('document.paletteKey');
+  if (Object.prototype.hasOwnProperty.call(value, 'platform') && !isOneOf(value.platform, ['android', 'web'])) invalidFields.add('document.platform');
+  if (Object.prototype.hasOwnProperty.call(value, 'customPalette')) {
+    if (!isRecord(value.customPalette)) {
+      invalidFields.add('document.customPalette');
+    } else if (Object.prototype.hasOwnProperty.call(value.customPalette, 'primary') && !isHexColor(value.customPalette.primary)) {
+      invalidFields.add('document.customPalette.primary');
+    }
+  }
+  if (Object.prototype.hasOwnProperty.call(value, 'dynamicColor') && typeof value.dynamicColor !== 'boolean') invalidFields.add('document.dynamicColor');
+  if (Object.prototype.hasOwnProperty.call(value, 'brief') && typeof value.brief !== 'string') invalidFields.add('document.brief');
+  if (Object.prototype.hasOwnProperty.call(value, 'promptEdit') && typeof value.promptEdit !== 'string') invalidFields.add('document.promptEdit');
   if (Object.prototype.hasOwnProperty.call(value, 'frame')) {
     if (typeof value.frame !== 'string' || !value.frame.trim() || !frameIds.has(value.frame)) invalidFields.add('document.frame');
   }
@@ -919,7 +998,11 @@ function collectM3eInvalidFields(value: unknown): string[] {
     } else {
       if (Object.prototype.hasOwnProperty.call(value.theme, 'dark') && typeof value.theme.dark !== 'boolean') invalidFields.add('theme.dark');
       if (Object.prototype.hasOwnProperty.call(value.theme, 'bothModes') && typeof value.theme.bothModes !== 'boolean') invalidFields.add('theme.bothModes');
-      if (Object.prototype.hasOwnProperty.call(value.theme, 'font') && !isOneOf(value.theme.font, ['system', 'robotoSerif'])) invalidFields.add('theme.font');
+      if (Object.prototype.hasOwnProperty.call(value.theme, 'contrast') && !isOneOf(value.theme.contrast, ['standard', 'medium', 'high'])) invalidFields.add('theme.contrast');
+      if (Object.prototype.hasOwnProperty.call(value.theme, 'shape') && !isOneOf(value.theme.shape, ['square', 'rounded', 'full'])) invalidFields.add('theme.shape');
+      if (Object.prototype.hasOwnProperty.call(value.theme, 'font') && !isOneOf(value.theme.font, ['roboto', 'robotoFlex', 'robotoSerif', 'system'])) invalidFields.add('theme.font');
+      if (Object.prototype.hasOwnProperty.call(value.theme, 'emphasized') && typeof value.theme.emphasized !== 'boolean') invalidFields.add('theme.emphasized');
+      if (Object.prototype.hasOwnProperty.call(value.theme, 'motion') && !isOneOf(value.theme.motion, ['standard', 'expressive'])) invalidFields.add('theme.motion');
     }
   }
   frames.forEach((frame, frameIndex) => {
@@ -1968,6 +2051,7 @@ export function convertM3eDocument(value: unknown): CanvasDocument | null {
 
   const theme = recordValue(value, 'theme');
   const paletteKey = stringValue(value, 'paletteKey');
+  const customPalette = recordValue(value, 'customPalette');
   const appearance: CanvasDocument['appearance'] = {
     colorScheme: booleanValue(theme ?? {}, 'dark')
       ? 'dark'
@@ -1999,12 +2083,19 @@ export function convertM3eDocument(value: unknown): CanvasDocument | null {
       appearance.accentColor = 'custom';
       appearance.accentHex = '#6e6e73';
       break;
+    case 'custom': {
+      appearance.accentColor = 'custom';
+      const primary = stringValue(customPalette ?? {}, 'primary');
+      appearance.accentHex = isHexColor(primary) ? primary : '#007AFF';
+      break;
+    }
     case 'blue':
     default:
       appearance.accentColor = 'blue';
       break;
   }
   if (stringValue(theme ?? {}, 'font') === 'robotoSerif') appearance.fontDesign = 'serif';
+  const m3eMetadata = readM3eDocumentMetadata(value, theme);
 
   const document: CanvasDocument = {
     version: 1,
@@ -2012,6 +2103,7 @@ export function convertM3eDocument(value: unknown): CanvasDocument | null {
     platform: 'iOS',
     minimumOS: '26.0',
     appearance,
+    ...(m3eMetadata === undefined ? {} : { m3eMetadata }),
     screens,
     activeScreenId,
   };
@@ -2705,6 +2797,10 @@ function exportMeaningfulSignatures(document: M3eExportDocument): string[] {
     theme: document.theme,
     platform: document.platform,
     frame: frameReference(document.frame),
+    ...(document.customPalette === undefined ? {} : { customPalette: document.customPalette }),
+    ...(document.dynamicColor === undefined ? {} : { dynamicColor: document.dynamicColor }),
+    ...(document.brief === undefined ? {} : { brief: document.brief }),
+    ...(document.promptEdit === undefined ? {} : { promptEdit: document.promptEdit }),
   });
   const frameSignatures = document.frames.map((frame) => {
     const swipe = frame.swipe;
@@ -2786,18 +2882,22 @@ function exportGroupsForScreen(screen: CanvasScreen, frameIds: Map<string, strin
   return groups;
 }
 
-function exportPaletteKey(appearance: CanvasDocument['appearance']): string {
+function exportPaletteKey(appearance: CanvasDocument['appearance'], metadata?: M3eDocumentMetadata): string {
+  if (appearance.accentColor === 'custom' && metadata?.paletteKey === 'custom') return 'custom';
+  if (appearance.accentColor === 'pink') return 'coral';
+  if (appearance.accentColor === 'orange') return 'amber';
   if (appearance.accentColor !== 'custom') return appearance.accentColor;
   switch (appearance.accentHex?.toLowerCase()) {
     case '#14b8a6': return 'teal';
     case '#f59e0b': return 'amber';
     case '#ff6b6b': return 'coral';
     case '#6e6e73': return 'mono';
-    default: return 'blue';
+    default: return 'custom';
   }
 }
 
-function exportFont(appearance: CanvasDocument['appearance']): string {
+function exportFont(appearance: CanvasDocument['appearance'], metadata?: M3eDocumentMetadata): M3eFont {
+  if ((!appearance.fontDesign || appearance.fontDesign === 'default') && metadata?.theme?.font) return metadata.theme.font;
   return appearance.fontDesign === 'serif' ? 'robotoSerif' : appearance.fontDesign === 'rounded' ? 'system' : 'system';
 }
 
@@ -2823,18 +2923,37 @@ export function exportM3eDocument(document: CanvasDocument): M3eExportDocument {
     return frame;
   });
   const groups = document.screens.flatMap((screen, index) => exportGroupsForScreen(screen, frameIds, frameDimensions(screen), frames[index]?.x ?? 0));
+  const metadata = document.m3eMetadata;
+  const paletteKey = exportPaletteKey(document.appearance, metadata);
+  const sourceTheme = metadata?.theme;
+  const sourceColorScheme = sourceTheme?.dark === true
+    ? 'dark'
+    : sourceTheme?.bothModes === true
+      ? 'system'
+      : sourceTheme?.dark === false || sourceTheme?.bothModes === false
+        ? 'light'
+        : undefined;
+  const useSourceMode = sourceColorScheme === undefined || sourceColorScheme === document.appearance.colorScheme;
   return {
     title: document.name,
-    paletteKey: exportPaletteKey(document.appearance),
+    paletteKey,
     theme: {
-      dark: document.appearance.colorScheme === 'dark',
-      bothModes: document.appearance.colorScheme === 'system',
-      font: exportFont(document.appearance),
+      dark: useSourceMode && sourceTheme?.dark !== undefined ? sourceTheme.dark : document.appearance.colorScheme === 'dark',
+      bothModes: useSourceMode && sourceTheme?.bothModes !== undefined ? sourceTheme.bothModes : document.appearance.colorScheme === 'system',
+      contrast: sourceTheme?.contrast ?? 'standard',
+      shape: sourceTheme?.shape ?? 'rounded',
+      font: exportFont(document.appearance, metadata),
+      emphasized: sourceTheme?.emphasized ?? false,
+      motion: sourceTheme?.motion ?? 'standard',
     },
-    platform: 'web',
+    platform: metadata?.platform ?? 'web',
     frame: document.activeScreenId,
     frames,
     groups,
+    ...(paletteKey === 'custom' && metadata?.customPalette !== undefined ? { customPalette: metadata.customPalette } : {}),
+    ...(metadata?.dynamicColor === undefined ? {} : { dynamicColor: metadata.dynamicColor }),
+    ...(metadata?.brief === undefined ? {} : { brief: metadata.brief }),
+    ...(metadata?.promptEdit === undefined ? {} : { promptEdit: metadata.promptEdit }),
   };
 }
 

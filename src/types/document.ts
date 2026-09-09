@@ -109,6 +109,11 @@ export type M3eInsertKind = Exclude<M3ePresentationKind, 'topAppBar' | 'bottomNa
 export type M3eScreenPartKind = Extract<M3ePresentationKind, 'topAppBar' | 'bottomNav' | 'navRail'>;
 export type M3eVariant = 'filled' | 'tonal' | 'elevated' | 'outlined' | 'text';
 export type M3eTextColor = 'primary' | 'secondary' | 'onSurface' | 'onSurfaceVariant' | 'onPrimaryContainer' | 'onSecondaryContainer' | 'onTertiaryContainer' | 'inverseOnSurface';
+export type M3eContrast = 'standard' | 'medium' | 'high';
+export type M3eShape = 'square' | 'rounded' | 'full';
+export type M3eFont = 'roboto' | 'robotoFlex' | 'robotoSerif' | 'system';
+export type M3eMotion = 'standard' | 'expressive';
+export type M3ePlatform = 'android' | 'web';
 
 export interface M3eTab {
   label: string;
@@ -185,6 +190,26 @@ export interface DocumentAppearance {
   accentColor: AppearanceAccentColor;
   accentHex?: string;
   fontDesign?: FontDesign;
+}
+
+export interface M3eThemeMetadata {
+  dark?: boolean;
+  bothModes?: boolean;
+  contrast?: M3eContrast;
+  shape?: M3eShape;
+  font?: M3eFont;
+  emphasized?: boolean;
+  motion?: M3eMotion;
+}
+
+export interface M3eDocumentMetadata {
+  paletteKey?: string;
+  customPalette?: Record<string, unknown>;
+  dynamicColor?: boolean;
+  platform?: M3ePlatform;
+  brief?: string;
+  promptEdit?: string;
+  theme?: M3eThemeMetadata;
 }
 
 export interface BaseNode {
@@ -523,6 +548,7 @@ export interface CanvasDocument {
   platform: 'iOS';
   minimumOS: '26.0';
   appearance: DocumentAppearance;
+  m3eMetadata?: M3eDocumentMetadata;
   screens: CanvasScreen[];
   activeScreenId: string;
 }
