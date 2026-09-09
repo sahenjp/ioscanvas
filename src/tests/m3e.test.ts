@@ -853,6 +853,29 @@ describe('M3E compatibility importer', () => {
     ]));
   });
 
+  it('reports invalid document metadata instead of silently applying defaults', () => {
+    const report = inspectM3eCompatibility({
+      title: 42,
+      platform: false,
+      frame: 'missing',
+      theme: { dark: 'true', bothModes: 1, font: null },
+      frames: [{ id: 'home', name: 'ホーム', x: 0, y: 0 }],
+      groups: [],
+    });
+
+    expect(report?.invalidFields).toEqual(expect.arrayContaining([
+      'document.title',
+      'document.platform',
+      'document.frame',
+      'theme.dark',
+      'theme.bothModes',
+      'theme.font',
+    ]));
+    expect(getM3eCompatibilityAnomalies(report!)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'INVALID_FIELD', status: 'lost' }),
+    ]));
+  });
+
   it('reports and drops groups that are outside every valid frame', () => {
     const value = {
       frames: [{ id: 'home', name: 'ホーム', x: 0, y: 0, w: 412, h: 892 }],
