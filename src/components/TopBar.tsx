@@ -70,14 +70,16 @@ export function TopBar() {
       const raw: unknown = JSON.parse(await file.text());
       const parsed = parseCanvasDocument(raw);
       const report = parsed ? null : inspectM3eCompatibility(raw);
+      const importAnomalies = report ? getM3eCompatibilityAnomalies(report) : [];
       const imported = parsed ? null : convertM3eDocument(raw);
       const loadedDocument = parsed ?? imported;
       if (!loadedDocument) {
         if (report) {
-          const anomalies = getM3eCompatibilityAnomalies(report);
-          setFileAnomalies(anomalies);
+          setFileAnomalies(importAnomalies);
           setFileImportSource(raw);
-          setFileNotice(`M3E互換確認: ${anomalies.map((anomaly) => `${anomaly.label}: ${anomaly.detail}`).join(' / ') || '変換できる画面がありません。'}`);
+          const actionableCount = importAnomalies.filter((anomaly) => anomaly.status !== 'approximated').length;
+          const noticeLabel = actionableCount > 0 ? 'M3E互換異常' : importAnomalies.length > 0 ? 'M3E近似' : 'M3E互換確認';
+          setFileNotice(`${noticeLabel}: ${importAnomalies.map((anomaly) => `${anomaly.label}: ${anomaly.detail}`).join(' / ') || '変換できる画面がありません。'}`);
           setFileError('プロジェクトファイルを開けませんでした。互換診断を確認してください。');
           return;
         }
@@ -85,11 +87,13 @@ export function TopBar() {
       }
       loadDocument(loadedDocument);
       if (report) {
-        const anomalies = getM3eCompatibilityAnomalies(report);
-        setFileAnomalies(anomalies);
+        const actionableCount = importAnomalies.filter((anomaly) => anomaly.status !== 'approximated').length;
+        const approximationCount = importAnomalies.filter((anomaly) => anomaly.status === 'approximated').length;
+        setFileAnomalies(importAnomalies);
         setFileImportSource(raw);
         const details = [
-          anomalies.length > 0 ? `互換異常${anomalies.length}件` : '',
+          actionableCount > 0 ? `互換異常${actionableCount}件` : '',
+          approximationCount > 0 ? `近似${approximationCount}件` : '',
           report.invalidFrameCount > 0 ? `無効な画面${report.invalidFrameCount}件` : '',
           report.invalidGroupCount > 0 ? `無効なグループ${report.invalidGroupCount}件` : '',
           report.orphanedGroupCount > 0 ? `画面外グループ${report.orphanedGroupCount}件` : '',
