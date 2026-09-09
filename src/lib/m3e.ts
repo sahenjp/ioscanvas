@@ -2725,12 +2725,17 @@ function collectExportCompatibilityKinds(
   node: CanvasNode,
   flattenedNodeKinds: Set<string>,
   approximatedKinds: Set<string>,
+  unsupportedNodeKinds: Set<string>,
+  frameIds: Map<string, string>,
 ): void {
   if (flattenedOnlyNodeKinds.has(node.kind)) flattenedNodeKinds.add(node.kind);
   if (approximatedNodeKinds.has(node.kind)) approximatedKinds.add(node.kind);
   if (node.m3eKind && approximatedM3eKinds.has(node.m3eKind)) approximatedKinds.add(node.m3eKind);
+  if (!isContainerNode(node) && exportItem(node, frameIds) === null) unsupportedNodeKinds.add(node.kind);
   if (Array.isArray(node.children)) {
-    for (const child of node.children) collectExportCompatibilityKinds(child, flattenedNodeKinds, approximatedKinds);
+    for (const child of node.children) {
+      collectExportCompatibilityKinds(child, flattenedNodeKinds, approximatedKinds, unsupportedNodeKinds, frameIds);
+    }
   }
 }
 
@@ -2738,7 +2743,7 @@ export function inspectM3eExportCompatibility(document: CanvasDocument): M3eExpo
   const exported = exportM3eDocument(document);
   const roundTripped = convertM3eDocument(exported);
   const roundTripExport = roundTripped ? exportM3eDocument(roundTripped) : null;
-  const frameIds = new Set(document.screens.map((screen) => screen.id));
+  const frameIds = new Map(document.screens.map((screen) => [screen.id, screen.id]));
   const unsupportedNodeKinds = new Set<string>();
   const flattenedNodeKinds = new Set<string>();
   const approximatedKinds = new Set<string>();
@@ -2757,7 +2762,7 @@ export function inspectM3eExportCompatibility(document: CanvasDocument): M3eExpo
   exported.groups.forEach((group) => group.items.forEach(collectExportedFields));
 
   for (const screen of document.screens) {
-    collectExportCompatibilityKinds(screen.root, flattenedNodeKinds, approximatedKinds);
+    collectExportCompatibilityKinds(screen.root, flattenedNodeKinds, approximatedKinds, unsupportedNodeKinds, frameIds);
     collectMetadataFields(screen.root);
     Object.keys(screen.m3eTopAppBar ?? {}).forEach((field) => sourceFields.add(field));
     Object.keys(screen.m3eBottomNav ?? {}).forEach((field) => sourceFields.add(field));

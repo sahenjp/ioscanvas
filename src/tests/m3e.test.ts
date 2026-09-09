@@ -132,6 +132,35 @@ describe('M3E compatibility importer', () => {
     ]));
   });
 
+  it('reports semantic nodes that are dropped during M3E export', () => {
+    const unknownNode = { id: 'unknown', kind: 'unknown-widget', label: '独自パーツ' } as unknown as CanvasNode;
+    const document: CanvasDocument = {
+      version: 1,
+      name: '未対応要素',
+      platform: 'iOS',
+      minimumOS: '26.0',
+      appearance: { colorScheme: 'system', accentColor: 'blue' },
+      activeScreenId: 'home',
+      screens: [{
+        id: 'home',
+        name: 'ホーム',
+        navigationTitle: 'ホーム',
+        previewDevice: 'iphone-se',
+        root: {
+          id: 'root',
+          kind: 'vstack',
+          children: [unknownNode, { id: 'title', kind: 'text', text: '見出し', fontSize: 28, weight: 'bold' }],
+        },
+      }],
+    };
+
+    const report = inspectM3eExportCompatibility(document);
+    expect(report.unsupportedNodeKinds).toEqual(['unknown-widget']);
+    expect(getM3eCompatibilityAnomalies(report)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'UNSUPPORTED_KIND', status: 'lost', detail: 'unknown-widget' }),
+    ]));
+  });
+
   it('reports invalid values in the exported M3E projection', () => {
     const document: CanvasDocument = {
       version: 1,
