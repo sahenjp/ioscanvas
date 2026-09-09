@@ -758,7 +758,7 @@ function readM3eMetadata(item: JsonObject): M3eItemMetadata | undefined {
       const parsed = m3eAction(value);
       return parsed ? [[slot, parsed]] : [];
     }));
-    if (entries.every(([, value]) => m3eAction(value) !== undefined)) metadata.actions = actions;
+    if (Object.keys(actions).length > 0 || entries.length === 0) metadata.actions = actions;
   }
 
   const toggle = recordValue(item, 'toggle');

@@ -999,6 +999,35 @@ describe('M3E compatibility importer', () => {
     ]));
   });
 
+  it('keeps valid action slots when another M3E action slot is malformed', () => {
+    const source = {
+      frames: [{ id: 'home', name: 'ホーム', x: 0, y: 0 }],
+      groups: [{
+        id: 'content',
+        x: 0,
+        y: 0,
+        axis: 'y',
+        items: [{
+          id: 'split',
+          kind: 'splitButton',
+          label: '操作',
+          variant: 'filled',
+          actions: { 'tab:0': { to: 'home', transition: 'fade' }, 'tab:1': null },
+        }],
+      }],
+    };
+
+    const document = convertM3eDocument(source);
+    expect(document).not.toBeNull();
+    if (!document) throw new Error('Partial action fixture was not converted');
+    const split = findNode(document.screens[0]?.root.children ?? [], 'm3e-split');
+    expect(split?.m3eMetadata?.actions).toEqual({ 'tab:0': { to: 'home', transition: 'fade' } });
+    expect(inspectM3eCompatibility(source)?.invalidFields).toContain('groups[0].items[0].actions.tab:1');
+    expect(exportM3eDocument(document).groups.flatMap((group) => group.items)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: 'splitButton', actions: { 'tab:0': { to: 'screen-home', transition: 'fade' } } }),
+    ]));
+  });
+
   it('reports values that the importer would normalize instead of preserving them', () => {
     const report = inspectM3eCompatibility({
       frames: [{
