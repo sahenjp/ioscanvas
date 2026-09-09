@@ -832,6 +832,20 @@ function renderNodeContent(
           </div>
         );
       }
+      if (node.kind === 'groupbox' && node.isBottomSheet && controls) {
+        return (
+          <button
+            type="button"
+            className="ios-row ios-sheet-trigger"
+            style={{ minHeight: 44 }}
+            aria-haspopup="dialog"
+            onClick={(event) => { event.stopPropagation(); onOpenSheet?.(node.id); }}
+          >
+            <span>{node.title || 'シートを開く'}</span>
+            <span className="ios-link-indicator" aria-hidden="true">⌃</span>
+          </button>
+        );
+      }
       if (node.kind === 'tabview' && controls) {
         const activeIndex = node.children.length > 0
           ? Math.max(0, Math.min(node.children.length - 1, Math.round(numberPreviewValue(controls.value, 0))))
@@ -965,7 +979,9 @@ function ScreenPreview({
   const bottomItems = toolbarItems.filter((item) => item.placement === 'bottomBar');
   const titleDisplayMode = screen.navigationTitleDisplayMode ?? 'automatic';
   const openOverlay = openSheetId ? findNode(screen.root.children, openSheetId) : undefined;
-  const sheet = openOverlay?.kind === 'sheet' ? openOverlay : undefined;
+  const sheet = openOverlay?.kind === 'sheet' || (openOverlay?.kind === 'groupbox' && openOverlay.isBottomSheet)
+    ? openOverlay
+    : undefined;
   const alert = openOverlay?.kind === 'alert' ? openOverlay : undefined;
   const confirmationDialog = openOverlay?.kind === 'confirmation-dialog' ? openOverlay : undefined;
   const canGoBack = previewMode && validPreviewHistory.length > 1;

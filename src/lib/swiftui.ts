@@ -64,6 +64,86 @@ function sheetBindingKey(node: CanvasNode): string {
   return `Sheet:${node.id}`;
 }
 
+function hasCustomProgress(nodes: CanvasNode[]): boolean {
+  return nodes.some((node) => (
+    node.kind === 'progress' && !node.indeterminate && (node.wavy || node.trackThickness !== undefined)
+  ) || (node.children ? hasCustomProgress(node.children) : false));
+}
+
+const customProgressSupport = `private struct M3EWavyLine: Shape {
+    var progress: CGFloat
+
+    func path(in rect: CGRect) -> Path {
+        let end = rect.width * max(0, min(progress, 1))
+        let amplitude = min(rect.height / 2, 4)
+        var path = Path()
+        path.move(to: CGPoint(x: 0, y: rect.midY))
+        for x in stride(from: CGFloat.zero, through: end, by: 2) {
+            let phase = Double(x / max(rect.width, 1)) * Double.pi * 4
+            path.addLine(to: CGPoint(x: x, y: rect.midY + CGFloat(sin(phase)) * amplitude))
+        }
+        return path
+    }
+}
+
+private struct M3EWavyProgressView: View {
+    let value: Double
+    let label: String
+    let trackThickness: CGFloat
+
+    var body: some View {
+        let progress = CGFloat(max(0, min(1, value)))
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text(label)
+                Spacer(minLength: 0)
+                Text("\\(Int(progress * 100))%")
+                    .monospacedDigit()
+            }
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(.secondary.opacity(0.2))
+                M3EWavyLine(progress: progress)
+                    .stroke(.tint, style: StrokeStyle(lineWidth: trackThickness, lineCap: .round))
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: max(trackThickness, 12))
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(Text(label))
+        .accessibilityValue(Text("\\(Int(progress * 100))%"))
+    }
+}
+
+private struct M3ECircularProgressView: View {
+    let value: Double
+    let label: String
+    let lineWidth: CGFloat
+
+    var body: some View {
+        let progress = CGFloat(max(0, min(1, value)))
+        VStack(spacing: 6) {
+            ZStack {
+                Circle()
+                    .stroke(.secondary.opacity(0.2), lineWidth: lineWidth)
+                Circle()
+                    .trim(from: 0, to: progress)
+                    .stroke(.tint, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+                Text("\\(Int(progress * 100))%")
+                    .font(.caption2)
+                    .monospacedDigit()
+            }
+            .frame(width: 58, height: 58)
+            Text(label)
+                .font(.caption)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(Text(label))
+        .accessibilityValue(Text("\\(Int(progress * 100))%"))
+    }
+}`;
+
 function alertBindingKey(node: Extract<CanvasNode, { kind: 'alert' }>): string {
   return `Alert:${node.id}`;
 }
@@ -694,15 +774,17 @@ function renderNodeContent(node: CanvasNode, depth: number, context: RenderConte
       return `${pad}Menu(${quoted(node.label)}) {\n${options}\n${pad}}\n${pad}.frame(minHeight: ${node.minHeight})`;
     }
     case 'progress': {
+      if (node.wavy && !node.indeterminate && node.style !== 'circular') {
+        return `${pad}M3EWavyProgressView(value: ${node.value}, label: ${quoted(node.label)}, trackThickness: ${node.trackThickness ?? 4})`;
+      }
+      if (node.style === 'circular' && !node.indeterminate && (node.wavy || node.trackThickness !== undefined)) {
+        return `${pad}M3ECircularProgressView(value: ${node.value}, label: ${quoted(node.label)}, lineWidth: ${node.trackThickness ?? 4})`;
+      }
       const progress = node.indeterminate
         ? `${pad}ProgressView {\n${pad}    Text(${quoted(node.label)})\n${pad}}`
         : `${pad}ProgressView(value: ${node.value}) {\n${pad}    Text(${quoted(node.label)})\n${pad}}`;
       const style = node.style === 'circular' ? `\n${pad}.progressViewStyle(.circular)` : '';
-      const notes = [
-        node.wavy ? `${pad}// M3Eの波形指定。標準ProgressViewでは直接表現できないため、必要ならカスタムShapeへ置き換える。` : '',
-        node.trackThickness !== undefined ? `${pad}// M3Eのトラック太さ: ${node.trackThickness}pt。標準ProgressViewでは直接指定できない。` : '',
-      ].filter(Boolean);
-      return `${notes.length > 0 ? `${notes.join('\n')}\n` : ''}${progress}${style}`;
+      return `${progress}${style}`;
     }
     case 'gauge':
       return `${pad}Gauge(value: ${node.value}, in: ${node.minimum}...${node.maximum}) {\n${pad}    Text(${quoted(node.label)})\n${pad}}\n${pad}.frame(minHeight: ${node.minHeight})`;
@@ -802,7 +884,8 @@ function renderNodeContent(node: CanvasNode, depth: number, context: RenderConte
           ? `${pad}GroupBox(${quoted(node.title)}) {\n${cardChildren}\n${pad}}`
           : `${pad}GroupBox {\n${cardChildren}\n${pad}}`;
         if (!node.isBottomSheet) return groupBox;
-        return `${pad}// M3Eのボトムシート表現。画面遷移時は .sheet と presentationDetents を追加する。\n${pad}VStack(spacing: 8) {\n${pad}    Capsule()\n${pad}        .fill(.secondary)\n${pad}        .frame(width: 36, height: 5)\n${pad}        .accessibilityHidden(true)\n${indentBlock(groupBox, 1)}\n${pad}}`;
+        const binding = context.bindings.get(sheetBindingKey(node))?.name ?? swiftIdentifier(`show_${node.id}`, 'showSheet');
+        return `${pad}// M3Eのボトムシート表現をSwiftUIのsheetへ変換しています。\n${pad}Button(${quoted(node.title ?? 'シートを開く')}) {\n${pad}    ${binding} = true\n${pad}}\n${pad}.sheet(isPresented: $${binding}) {\n${indentBlock(groupBox, 1)}\n${indent(depth + 1)}.presentationDetents([.medium, .large])\n${indent(depth + 1)}.presentationDragIndicator(.visible)\n${pad}}`;
       }
       if (node.kind === 'lazyvgrid') return `${pad}LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: ${node.columns ?? 2}), spacing: ${node.spacing ?? 12}) {\n${children}\n${pad}}`;
       if (node.kind === 'lazyhgrid') return `${pad}LazyHGrid(rows: Array(repeating: GridItem(.flexible()), count: ${node.rows ?? 2}), spacing: ${node.spacing ?? 12}) {\n${children}\n${pad}}`;
@@ -822,7 +905,7 @@ function renderNodeContent(node: CanvasNode, depth: number, context: RenderConte
       const sheetChildren = node.children.length > 0
         ? node.children.map((child) => renderNode(child, depth + 2, context)).join('\n')
         : `${indent(depth + 2)}EmptyView()`;
-      return `${pad}Button(${quoted(node.label ?? 'Open sheet')}) {\n${pad}    ${binding} = true\n${pad}}\n${pad}.sheet(isPresented: $${binding}) {\n${sheetChildren}\n${pad}}`;
+      return `${pad}Button(${quoted(node.label ?? 'Open sheet')}) {\n${pad}    ${binding} = true\n${pad}}\n${pad}.sheet(isPresented: $${binding}) {\n${indent(depth + 1)}VStack(spacing: 0) {\n${sheetChildren}\n${indent(depth + 1)}}\n${indent(depth + 1)}.presentationDetents([.medium, .large])\n${indent(depth + 1)}.presentationDragIndicator(.visible)\n${pad}}`;
     }
     case 'section': {
       if (node.m3eKind === 'fabMenu') return renderM3eFabMenu(node, depth, context);
@@ -885,6 +968,17 @@ function collectBindings(
       }
     }
     if (node.kind === 'sheet') {
+      const key = sheetBindingKey(node);
+      if (!result.has(key)) {
+        const base = swiftIdentifier(`show_${node.id}`, 'showSheet');
+        let name = base;
+        let suffix = 2;
+        while (usedNames.has(name)) name = `${base}${suffix++}`;
+        usedNames.add(name);
+        result.set(key, { name, type: 'Bool', initial: 'false' });
+      }
+    }
+    if (node.kind === 'groupbox' && node.isBottomSheet) {
       const key = sheetBindingKey(node);
       if (!result.has(key)) {
         const base = swiftIdentifier(`show_${node.id}`, 'showSheet');
@@ -1064,5 +1158,8 @@ export function generateSwiftUI(document: CanvasDocument): string {
     ...(hasNodeKind(document.screens.flatMap((candidate) => candidate.root.children), 'map') ? ['import MapKit'] : []),
     ...(document.screens.some((candidate) => candidate.background && candidate.background !== 'surface') ? ['import UIKit'] : []),
   ].join('\n');
-  return `${imports}\n\n${views}\n`;
+  const helpers = hasCustomProgress(document.screens.flatMap((candidate) => candidate.root.children))
+    ? `\n\n${customProgressSupport}`
+    : '';
+  return `${imports}\n\n${views}${helpers}\n`;
 }

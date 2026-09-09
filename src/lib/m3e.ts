@@ -925,9 +925,9 @@ function mapItem(item: JsonObject, context: ConversionContext): CanvasNode | nul
       const trackThickness = numberValue(item, 'trackThickness');
       const extras = [
         ...(value === undefined ? ['M3Eの不確定プログレス表示です。'] : []),
-        ...(booleanValue(item, 'wavy') ? ['M3Eの波形プログレス指定を保持しています。標準SwiftUIのProgressViewでは波形を直接指定できないため、実装時にカスタム表示へ置き換えてください。'] : []),
+        ...(booleanValue(item, 'wavy') ? ['M3Eの波形プログレス指定を保持しています。SwiftUI生成ではカスタムShapeへ変換します。'] : []),
         ...(trackThickness !== undefined && Number.isInteger(trackThickness) && trackThickness >= 2 && trackThickness <= 16
-          ? [`M3Eのトラック太さ ${trackThickness}pt を保持しています。標準SwiftUIのProgressViewでは太さを直接指定できません。`]
+          ? [`M3Eのトラック太さ ${trackThickness}pt を保持しています。SwiftUI生成へ引き継ぎます。`]
           : []),
       ];
       return appendNotes({
@@ -951,7 +951,7 @@ function mapItem(item: JsonObject, context: ConversionContext): CanvasNode | nul
         children: [],
         ...(backgroundStyle(item) ? { background: backgroundStyle(item) } : {}),
         ...(booleanValue(item, 'checked') ? { isBottomSheet: true } : {}),
-      }, item, booleanValue(item, 'checked') ? ['M3Eのボックスをボトムシートとして読み込みました。SwiftUIでは標準Shapeのハンドルを付けた構造として出力します。'] : []);
+      }, item, booleanValue(item, 'checked') ? ['M3Eのボックスをボトムシートとして読み込みました。SwiftUIではsheetとpresentationDetentsへ変換します。'] : []);
     case 'card': {
       const imagePosition: CardImagePosition = isOneOf(stringValue(item, 'imagePos'), ['top', 'leading', 'trailing', 'background']) ? stringValue(item, 'imagePos') as CardImagePosition : 'top';
       const contentAlignment: CardContentAlignment = isOneOf(stringValue(item, 'contentAlign'), ['start', 'center', 'end']) ? stringValue(item, 'contentAlign') as CardContentAlignment : 'start';

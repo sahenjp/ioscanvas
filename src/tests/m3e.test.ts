@@ -584,7 +584,8 @@ describe('M3E compatibility importer', () => {
     expect(output).toContain('@State private var selection_sort: String = "古い順"');
     expect(output).toContain('ProgressView {');
     expect(output).toContain('.progressViewStyle(.circular)');
-    expect(output).toContain('M3Eの波形指定');
+    expect(output).toContain('M3EWavyProgressView(value: 0.72, label: "同期", trackThickness: 8)');
+    expect(output).toContain('M3ECircularProgressView(value: 0.25, label: "処理", lineWidth: 6)');
   });
 
   it('preserves the initial selected tab in Preview and generated SwiftUI', () => {
@@ -636,8 +637,8 @@ describe('M3E compatibility importer', () => {
     expect(findNode(nodes, 'm3e-card')).toMatchObject({ kind: 'groupbox', cardImagePosition: 'leading', cardImageSize: 96, cardContentAlignment: 'center' });
     if (!document) throw new Error('M3E document was not converted');
     const output = generateSwiftUI(document);
-    expect(output).toContain('Capsule()');
     expect(output).toContain('M3Eのボトムシート表現');
+    expect(output).toContain('.presentationDetents([.medium, .large])');
     const card = findNode(nodes, 'm3e-card');
     if (!card) throw new Error('Card fixture missing');
     expect(card.children?.[0]).toMatchObject({ kind: 'hstack' });

@@ -356,7 +356,7 @@ describe('SwiftUI generator', () => {
     expect(output).toContain('ProgressView(value: 0.75)');
   });
 
-  it('preserves circular progress and documents unsupported expressive styling', () => {
+  it('exports expressive progress styling as native SwiftUI shapes', () => {
     const document = structuredClone(defaultDocument);
     document.screens[0]?.root.children.push({
       id: 'circular-progress-test',
@@ -370,9 +370,9 @@ describe('SwiftUI generator', () => {
 
     const output = generateSwiftUI(document);
 
-    expect(output).toContain('ProgressView(value: 0.4)');
-    expect(output).toContain('.progressViewStyle(.circular)');
-    expect(output).toContain('M3Eのトラック太さ: 8pt');
+    expect(output).toContain('M3ECircularProgressView(value: 0.4, label: "同期中", lineWidth: 8)');
+    expect(output).toContain('.stroke(.tint, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))');
+    expect(output).not.toContain('M3Eのトラック太さ: 8pt');
   });
 
   it('exports a bottom-sheet handle for imported box semantics', () => {
@@ -387,8 +387,9 @@ describe('SwiftUI generator', () => {
 
     const output = generateSwiftUI(document);
 
-    expect(output).toContain('Capsule()');
-    expect(output).toContain('presentationDetents');
+    expect(output).toContain('.sheet(isPresented: $show_sheet_box)');
+    expect(output).toContain('.presentationDetents([.medium, .large])');
+    expect(output).toContain('.presentationDragIndicator(.visible)');
   });
 
   it('exports ColorPicker with a typed Color binding', () => {
