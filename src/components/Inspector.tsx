@@ -1337,6 +1337,13 @@ function M3eSplitButtonFields({
           </div>
         );
       })}
+      <button
+        className="secondary-action-button toolbar-add-button"
+        type="button"
+        onClick={() => onTabsChange([...tabs, { label: `項目${tabs.length + 1}`, icon: null }])}
+      >
+        メニュー項目を追加
+      </button>
     </div>
   );
 }
