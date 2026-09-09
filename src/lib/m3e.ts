@@ -104,6 +104,9 @@ interface M3eExportItem {
   imageSize?: number;
   contentAlign?: CardContentAlignment;
   src?: string;
+  railExpanded?: boolean;
+  railModal?: boolean;
+  railExpansionSide?: 'left' | 'right';
   toggle?: {
     icon?: string | null;
     variant?: M3eVariant;
@@ -1091,7 +1094,7 @@ function mapItem(item: JsonObject, context: ConversionContext): CanvasNode | nul
       }, item, extras);
     }
     case 'badge':
-      return appendNotes({ id, kind: 'text', text: label, fontSize: 13, weight: 'semibold', textStyle: 'caption', m3eKind: 'badge' }, item);
+      return linkM3eNode({ id, kind: 'text', text: label, fontSize: 13, weight: 'semibold', textStyle: 'caption', m3eKind: 'badge' }, item, context, 'バッジ');
     case 'box':
       return appendNotes({
         id,
@@ -1806,6 +1809,24 @@ function exportItem(node: CanvasNode, frameIds: Map<string, string>, inheritedNo
       });
     }
     case 'navigation-link': {
+      const linkedText = node.children?.find((child): child is Extract<CanvasNode, { kind: 'text' }> => child.kind === 'text');
+      if ((node.m3eKind === 'text' || node.m3eKind === 'badge') && linkedText) {
+        const action = exportAction(node, frameIds);
+        return base(node.m3eKind === 'badge' ? 'badge' : 'text', linkedText.text, null, {
+          size: linkedText.fontSize,
+          ...(linkedText.weight === 'bold' || linkedText.weight === 'semibold' ? { bold: true } : {}),
+          ...(action ? { action } : {}),
+        });
+      }
+      const linkedImage = node.children?.find((child): child is Extract<CanvasNode, { kind: 'image' }> => child.kind === 'image');
+      if (node.m3eKind === 'image' && linkedImage) {
+        const external = linkedImage.source !== 'symbol' && linkedImage.source !== undefined && linkedImage.systemName.trim() !== '';
+        const action = exportAction(node, frameIds);
+        return base('image', linkedImage.accessibilityLabel || node.label, external ? null : linkedImage.systemName || null, {
+          ...(external ? { src: linkedImage.systemName } : {}),
+          ...(action ? { action } : {}),
+        });
+      }
       const cardNode = node.children?.find((child): child is ContainerNode => child.kind === 'groupbox' && child.m3eKind === 'card');
       if (node.m3eKind === 'card' && cardNode) {
         const presentation = exportCardPresentation(cardNode);
@@ -2152,6 +2173,23 @@ function exportSwipe(screen: CanvasScreen, frameIds: Map<string, string>): Parti
   return Object.keys(swipe).length > 0 ? swipe : undefined;
 }
 
+function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
+  if (isRecord(value)) {
+    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(',')}}`;
+  }
+  return JSON.stringify(value) ?? 'null';
+}
+
+function exportMeaningfulSignatures(document: M3eExportDocument): string[] {
+  return document.groups
+    .flatMap((group) => group.items)
+    .map((item) => canonicalJson(Object.fromEntries(
+      Object.entries(item).filter(([key]) => key !== 'id' && key !== 'note' && key !== 'noteHistory'),
+    )))
+    .sort();
+}
+
 function exportTopBar(screen: CanvasScreen, frameIds: Map<string, string>): M3eExportItem | null {
   const leading = (screen.toolbarItems ?? []).find((item) => item.placement === 'topBarLeading');
   const trailing = (screen.toolbarItems ?? []).find((item) => item.placement === 'topBarTrailing');
@@ -2281,6 +2319,7 @@ function collectExportCompatibilityKinds(
 export function inspectM3eExportCompatibility(document: CanvasDocument): M3eExportCompatibilityReport {
   const exported = exportM3eDocument(document);
   const roundTripped = convertM3eDocument(exported);
+  const roundTripExport = roundTripped ? exportM3eDocument(roundTripped) : null;
   const frameIds = new Set(document.screens.map((screen) => screen.id));
   const unsupportedNodeKinds = new Set<string>();
   const flattenedNodeKinds = new Set<string>();
@@ -2356,7 +2395,10 @@ export function inspectM3eExportCompatibility(document: CanvasDocument): M3eExpo
     approximatedFields,
     lostFields,
     normalizedScreenCount: exported.frames.length,
-    roundTripValid: roundTripped !== null && roundTripped.screens.length === exported.frames.length,
+    roundTripValid: roundTripped !== null
+      && roundTripped.screens.length === exported.frames.length
+      && roundTripExport !== null
+      && JSON.stringify(exportMeaningfulSignatures(exported)) === JSON.stringify(exportMeaningfulSignatures(roundTripExport)),
   };
 }
 

@@ -343,6 +343,31 @@ describe('M3E compatibility importer', () => {
     ]));
   });
 
+  it('keeps the original M3E kind for linked text and images', () => {
+    const document = convertM3eDocument({
+      frames: [{ id: 'home', name: 'ホーム', x: 0, y: 0 }, { id: 'detail', name: '詳細', x: 492, y: 0 }],
+      groups: [{
+        id: 'content',
+        x: 16,
+        y: 80,
+        axis: 'y',
+        items: [
+          { id: 'linked-text', kind: 'text', label: '詳細を見る', size: 17, icon: null, variant: 'filled', action: { to: 'detail', transition: 'fade' } },
+          { id: 'linked-badge', kind: 'badge', label: '新着', icon: null, variant: 'filled', action: { to: 'detail', transition: 'slide' } },
+          { id: 'linked-image', kind: 'image', label: '写真', icon: 'photo', variant: 'filled', action: { to: 'detail', transition: 'slide' } },
+        ],
+      }],
+    });
+
+    expect(document).not.toBeNull();
+    if (!document) throw new Error('Linked primitive fixture was not converted');
+    expect(exportM3eDocument(document).groups.flatMap((group) => group.items)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: 'text', label: '詳細を見る', action: { to: 'screen-detail', transition: 'fade' } }),
+      expect.objectContaining({ kind: 'badge', label: '新着', action: { to: 'screen-detail', transition: 'slide' } }),
+      expect.objectContaining({ kind: 'image', label: '写真', icon: 'photo', action: { to: 'screen-detail', transition: 'slide' } }),
+    ]));
+  });
+
   it('keeps approximation notes when exporting native SwiftUI controls to M3E', () => {
     const document = structuredClone(defaultDocument);
     const screen = document.screens[0];
