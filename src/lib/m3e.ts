@@ -2730,7 +2730,10 @@ function collectExportCompatibilityKinds(
 ): void {
   if (flattenedOnlyNodeKinds.has(node.kind)) flattenedNodeKinds.add(node.kind);
   if (approximatedNodeKinds.has(node.kind)) approximatedKinds.add(node.kind);
-  if (node.m3eKind && approximatedM3eKinds.has(node.m3eKind)) approximatedKinds.add(node.m3eKind);
+  if (node.m3eKind) {
+    if (approximatedM3eKinds.has(node.m3eKind)) approximatedKinds.add(node.m3eKind);
+    if (!supportedM3eKinds.has(node.m3eKind)) unsupportedNodeKinds.add(node.m3eKind);
+  }
   if (!isContainerNode(node) && exportItem(node, frameIds) === null) unsupportedNodeKinds.add(node.kind);
   if (Array.isArray(node.children)) {
     for (const child of node.children) {
@@ -2819,7 +2822,7 @@ export function inspectM3eExportCompatibility(document: CanvasDocument): M3eExpo
     lostFields,
     invalidFields: collectM3eInvalidFields(exported),
     duplicateIdFields: collectM3eDuplicateIdFields(exported),
-    unknownFields: [],
+    unknownFields: collectM3eUnknownFields(exported),
     normalizedScreenCount: exported.frames.length,
     roundTripValid: roundTripped !== null
       && roundTripped.screens.length === exported.frames.length

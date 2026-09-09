@@ -161,6 +161,39 @@ describe('M3E compatibility importer', () => {
     ]));
   });
 
+  it('reports unsupported M3E presentation kinds before export', () => {
+    const futureNode = {
+      id: 'future-button',
+      kind: 'button',
+      label: '将来の操作',
+      role: 'normal',
+      minHeight: 44,
+      m3eKind: 'future-control',
+    } as unknown as CanvasNode;
+    const document: CanvasDocument = {
+      version: 1,
+      name: '未知のM3E種別',
+      platform: 'iOS',
+      minimumOS: '26.0',
+      appearance: { colorScheme: 'system', accentColor: 'blue' },
+      activeScreenId: 'home',
+      screens: [{
+        id: 'home',
+        name: 'ホーム',
+        navigationTitle: 'ホーム',
+        previewDevice: 'iphone-se',
+        root: { id: 'root', kind: 'vstack', children: [futureNode] },
+      }],
+    };
+
+    const report = inspectM3eExportCompatibility(document);
+    expect(report.unsupportedNodeKinds).toEqual(['future-control']);
+    expect(report.roundTripValid).toBe(false);
+    expect(getM3eCompatibilityAnomalies(report)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'UNSUPPORTED_KIND', status: 'lost', detail: 'future-control' }),
+    ]));
+  });
+
   it('reports invalid values in the exported M3E projection', () => {
     const document: CanvasDocument = {
       version: 1,
