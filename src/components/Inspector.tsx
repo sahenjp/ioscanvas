@@ -67,6 +67,9 @@ export function Inspector() {
   const siblingCount = location?.parentId && parent && isContainerNode(parent)
     ? parent.children.length
     : screen?.root.children.length ?? 0;
+  const buttonIcon2 = node?.kind === 'button'
+    ? node.m3eIcon2 === undefined ? node.m3eMetadata?.icon2 : node.m3eIcon2
+    : undefined;
   const selectedLocations = screen
     ? selectedNodeIds.flatMap((id) => {
       const selectedLocation = findNodeLocation(screen.root.children, id);
@@ -850,6 +853,16 @@ export function Inspector() {
               <>
                 <Field label="SF Symbol">
                   <SymbolInput key={`${node.id}-button-symbol-${node.systemName ?? ''}`} value={node.systemName ?? ''} onCommit={(value) => updateSelectedNode({ systemName: value.trim() || undefined } as Partial<CanvasNode>)} />
+                </Field>
+                <Field label="末尾SF Symbol">
+                  <SymbolInput
+                    key={`${node.id}-button-symbol-2-${buttonIcon2 ?? ''}`}
+                    value={buttonIcon2 ?? ''}
+                    onCommit={(value) => {
+                      const icon2 = value.trim();
+                      updateSelectedNode({ m3eIcon2: icon2 || (buttonIcon2 === undefined ? undefined : null) } as Partial<CanvasNode>);
+                    }}
+                  />
                 </Field>
                 <Field label="VoiceOverラベル">
                   <DraftInput

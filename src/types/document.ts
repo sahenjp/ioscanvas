@@ -204,6 +204,7 @@ export interface BaseNode {
   m3eKind?: M3ePresentationKind;
   m3eVariant?: M3eVariant;
   m3eIcon?: string;
+  m3eIcon2?: string | null;
   m3eMetadata?: M3eItemMetadata;
 }
 

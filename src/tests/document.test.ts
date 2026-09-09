@@ -114,6 +114,7 @@ describe('project document parsing', () => {
     const button = screen?.root.children.find((node) => node.kind === 'button');
     if (!screen || !button || button.kind !== 'button') throw new Error('Button fixture missing');
     button.systemName = 'arrow.right';
+    button.m3eIcon2 = 'gearshape.fill';
     button.accessibilityLabel = '次の画面へ';
     button.buttonStyle = 'bordered';
     button.destinationScreenId = 'screen-settings';
@@ -122,6 +123,10 @@ describe('project document parsing', () => {
     expect(parseCanvasDocument({
       ...document,
       screens: [{ ...screen, root: { ...screen.root, children: [{ ...button, systemName: 12 }] } }],
+    })).toBeNull();
+    expect(parseCanvasDocument({
+      ...document,
+      screens: [{ ...screen, root: { ...screen.root, children: [{ ...button, m3eIcon2: 12 }] } }],
     })).toBeNull();
     expect(parseCanvasDocument({
       ...document,

@@ -317,6 +317,7 @@ function renderNodeContent(
         const toggleOn = node.toggle && controls ? controls.value === true : node.toggle?.isOn ?? false;
         const label = node.toggle && toggleOn ? node.toggle.onLabel : node.label;
         const systemName = node.toggle && toggleOn ? node.toggle.onSystemName ?? node.systemName : node.systemName;
+        const trailingSystemName = node.m3eIcon2 === undefined ? node.m3eMetadata?.icon2 : node.m3eIcon2;
         const buttonStyle = node.toggle && toggleOn ? node.toggle.onButtonStyle ?? node.buttonStyle : node.buttonStyle;
         if (node.m3eKind === 'splitButton') {
           return (
@@ -329,6 +330,7 @@ function renderNodeContent(
               >
                 {systemName && <span className="ios-button-symbol" style={m3eIconStyle(node)} aria-hidden="true">{symbolGlyph(systemName)}</span>}
                 <span>{label || 'Button'}</span>
+                {trailingSystemName && <span className="ios-button-symbol ios-button-symbol-trailing" style={m3eIconStyle(node)} aria-hidden="true">{symbolGlyph(trailingSystemName)}</span>}
               </button>
               <button type="button" className="ios-button ios-split-button-menu" style={m3eContentStyle(node)} aria-label={`${label || 'ボタン'}のメニュー`} onClick={(event) => event.stopPropagation()}>
                 <span aria-hidden="true">⌄</span>
@@ -351,6 +353,7 @@ function renderNodeContent(
           >
             {systemName && <span className="ios-button-symbol" style={m3eIconStyle(node)} aria-hidden="true">{symbolGlyph(systemName)}</span>}
             <span>{label || 'Button'}</span>
+            {trailingSystemName && <span className="ios-button-symbol ios-button-symbol-trailing" style={m3eIconStyle(node)} aria-hidden="true">{symbolGlyph(trailingSystemName)}</span>}
           </button>
         );
       }

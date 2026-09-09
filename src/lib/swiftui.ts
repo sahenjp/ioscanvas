@@ -222,15 +222,29 @@ function m3eButtonLabel(
   titleExpression = quoted(node.label),
   symbolExpression = node.systemName?.trim() ? quoted(node.systemName) : undefined,
 ): string {
-  if (!symbolExpression) return `Text(${titleExpression})`;
   const iconFill = node.m3eMetadata?.iconFill;
-  if (!iconFill || iconFill === 'none') return `Label(${titleExpression}, systemImage: ${symbolExpression})`;
-  return `Label {
+  const trailingSymbol = node.m3eIcon2 === undefined ? node.m3eMetadata?.icon2 : node.m3eIcon2;
+  const trailingExpression = trailingSymbol?.trim() ? quoted(trailingSymbol) : undefined;
+  const icon = (expression: string): string => {
+    const image = `Image(systemName: ${expression})`;
+    if (!iconFill || iconFill === 'none') return image;
+    return `${image}
+    .padding(6)
+    .background(${m3eFillLiteral(iconFill)}, in: RoundedRectangle(cornerRadius: 8))`;
+  };
+  const leading = symbolExpression
+    ? !iconFill || iconFill === 'none'
+      ? `Label(${titleExpression}, systemImage: ${symbolExpression})`
+      : `Label {
     Text(${titleExpression})
 } icon: {
-    Image(systemName: ${symbolExpression})
-        .padding(6)
-        .background(${m3eFillLiteral(iconFill)}, in: RoundedRectangle(cornerRadius: 8))
+${indentBlock(icon(symbolExpression), 1)}
+}`
+    : `Text(${titleExpression})`;
+  if (!trailingExpression) return leading;
+  return `HStack(spacing: 8) {
+${indentBlock(leading, 1)}
+${indentBlock(icon(trailingExpression), 1)}
 }`;
 }
 

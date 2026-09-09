@@ -909,8 +909,11 @@ describe('M3E compatibility importer', () => {
 
     const action = findNode(document.screens[0]?.root.children ?? [], 'm3e-action');
     const slider = findNode(document.screens[0]?.root.children ?? [], 'm3e-range');
+    expect(action).toMatchObject({ m3eIcon2: 'gearshape.fill' });
     expect(action?.m3eMetadata).toMatchObject({ icon: 'home', icon2: 'settings', note: '元の操作', bold: false });
     expect(slider?.m3eMetadata).toMatchObject({ icon: null, value: 25 });
+    expect(generateSwiftUI(document)).toContain('HStack(spacing: 8)');
+    expect(generateSwiftUI(document)).toContain('Image(systemName: "gearshape.fill")');
 
     const items = exportM3eDocument(document).groups.flatMap((group) => group.items);
     expect(items).toEqual(expect.arrayContaining([
@@ -930,6 +933,18 @@ describe('M3E compatibility importer', () => {
     };
     expect(exportM3eDocument(edited).groups.flatMap((group) => group.items)).toEqual(expect.arrayContaining([
       expect.objectContaining({ id: 'm3e-action', icon: 'star.fill' }),
+    ]));
+    const removeIcon = (node: CanvasNode): CanvasNode => node.id === action.id
+      ? { ...node, m3eIcon2: null }
+      : Array.isArray(node.children) ? { ...node, children: node.children.map(removeIcon) } : node;
+    const removedIcon = {
+      ...edited,
+      screens: edited.screens.map((screen) => screen.id !== edited.activeScreenId
+        ? screen
+        : { ...screen, root: { ...screen.root, children: screen.root.children.map(removeIcon) } }),
+    };
+    expect(exportM3eDocument(removedIcon).groups.flatMap((group) => group.items)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'm3e-action', icon2: null }),
     ]));
     expect(inspectM3eCompatibility(source)?.lostFields).toEqual([]);
     expect(inspectM3eExportCompatibility(document).lostFields).toEqual([]);

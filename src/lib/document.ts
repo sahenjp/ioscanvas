@@ -229,6 +229,7 @@ function readNodeProperties(value: RecordValue): {
   const m3eVariant = readM3eVariant(value.m3eVariant);
   if (m3eVariant === null) return null;
   if (value.m3eIcon !== undefined && !isString(value.m3eIcon)) return null;
+  if (value.m3eIcon2 !== undefined && value.m3eIcon2 !== null && !isString(value.m3eIcon2)) return null;
   const m3eMetadata = readM3eMetadata(value.m3eMetadata);
   if (m3eMetadata === null) return null;
 
@@ -251,6 +252,7 @@ function readNodeProperties(value: RecordValue): {
     ...(m3eKind === undefined ? {} : { m3eKind }),
     ...(m3eVariant === undefined ? {} : { m3eVariant }),
     ...(value.m3eIcon === undefined ? {} : { m3eIcon: value.m3eIcon }),
+    ...(value.m3eIcon2 === undefined ? {} : { m3eIcon2: value.m3eIcon2 === null ? null : value.m3eIcon2 }),
     ...(m3eMetadata === undefined ? {} : { m3eMetadata }),
   };
 }

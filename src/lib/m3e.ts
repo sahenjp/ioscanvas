@@ -811,6 +811,8 @@ function mapItem(item: JsonObject, context: ConversionContext): CanvasNode | nul
   const id = stableId('m3e', sourceId, context.usedIds);
   const label = stringValue(item, 'label')?.trim() ?? '';
   const icon = iconOf(item);
+  const rawIcon2 = rawIconOf(item, 'icon2');
+  const icon2 = rawIcon2 === null ? null : iconOf(item, 'icon2');
   const style = buttonStyle(item.variant);
   const imageSource = imageSourceFor(stringValue(item, 'src'));
   const presentationKind = isOneOf(item.kind, ['fab', 'extendedFab', 'chip', 'splitButton'] as const)
@@ -834,6 +836,7 @@ function mapItem(item: JsonObject, context: ConversionContext): CanvasNode | nul
           ? { accessibilityLabel: label || (item.kind === 'fab' ? '追加' : '操作') }
           : {}),
         ...(icon ? { systemName: icon } : {}),
+        ...(rawIcon2 === null ? { m3eIcon2: null } : icon2 === undefined ? {} : { m3eIcon2: icon2 }),
         ...(style ? { buttonStyle: style } : {}),
         ...(presentationKind ? { m3eKind: presentationKind, m3eVariant: item.variant as M3eVariant } : {}),
       };
@@ -1552,7 +1555,7 @@ function exportItem(node: CanvasNode, frameIds: Map<string, string>, inheritedNo
       ...metadata,
       ...(nodeFill ? { fill: nodeFill } : {}),
       ...extra,
-      ...(metadata.icon === undefined ? {} : { icon: preferOriginalIcon(metadata.icon, extra.icon ?? icon) }),
+      ...(metadata.icon === undefined ? {} : { icon: preferOriginalIcon(metadata.icon, extra.icon === undefined ? icon : extra.icon) }),
       ...(metadata.icon2 === undefined ? {} : { icon2: preferOriginalIcon(metadata.icon2, extra.icon2) }),
       ...(exportNote(node, inheritedNote) ? { note: exportNote(node, inheritedNote) } : {}),
     };
@@ -1572,6 +1575,7 @@ function exportItem(node: CanvasNode, frameIds: Map<string, string>, inheritedNo
         : node.label.trim() ? 'button' : node.systemName ? 'iconButton' : 'button';
       const action = exportAction(node, frameIds);
       return base(buttonKind, node.label, node.systemName ?? null, {
+        ...(node.m3eIcon2 === undefined ? {} : { icon2: node.m3eIcon2 }),
         ...(node.toggle ? { checked: node.toggle.isOn } : {}),
         ...(action ? { action } : {}),
         ...(node.toggle ? {
